@@ -67,3 +67,25 @@ ComPtr<ID3DBlob> FileReader::LoadShaderBlobFromAssets(std::wstring compiledShade
 	return shaderBlob;
 
 }
+
+
+#include <Windows.h>
+
+// UTF-8 -> UTF-16
+std::wstring FileReader::ToWideString(const std::string& s) {
+	int size = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+	std::wstring ws(size, 0);
+	MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &ws[0], size);
+	ws.pop_back(); // remove null terminator
+	return ws;
+}
+
+// UTF-16 -> UTF-8
+std::string FileReader::ToNarrowString(const std::wstring& ws) {
+	int size = WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	std::string s(size, 0);
+	WideCharToMultiByte(CP_UTF8, 0, ws.c_str(), -1, &s[0], size, nullptr, nullptr);
+	s.pop_back();
+	return s;
+}
+

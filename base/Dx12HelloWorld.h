@@ -20,8 +20,11 @@ protected:
 private:
 
 	HRESULT CreatePipelineState();		///< Create RootSignature, Compile Shaders, Create Pipeline State
+	HRESULT CreatePipelineStateFromModel();
 	HRESULT CreateAppResources();
 	HRESULT CreateAndLoadVertexBuffer();
+
+	HRESULT TestTinyGLTFLoading();
 
 	FileReader                  m_fileReader;
 
@@ -31,5 +34,13 @@ private:
 
 	UINT                        m_vertexBufferSizeInBytes;
 	UINT						m_vertexStrideInBytes;
+
+	///@todo model resources refactor
+	std::vector<ComPtr<ID3D12Resource>>   m_attributeResources;
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_attributeBufferViews;
+	std::vector<std::string>              m_attributeNamesList;
+	ComPtr<ID3D12Resource>                m_constantBufferResource;
+	std::vector<DXGI_FORMAT>              m_attributeFormats;
+	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 };
 

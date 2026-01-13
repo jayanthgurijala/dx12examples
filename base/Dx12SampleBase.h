@@ -4,6 +4,9 @@
 #include <vector>
 #include <d3d12.h>
 #include "FileReader.h"
+#include <DirectXMath.h>
+
+using namespace DirectX;
 
 using namespace Microsoft::WRL;
 
@@ -26,8 +29,13 @@ public:
 	virtual HRESULT PostRun() { return S_OK; };
 	FLOAT m_aspectRatio;
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
+	XMMATRIX GetMVPMatrix(XMMATRIX& modelMatrix);
+	
+	///@todo use utils class
+	DXGI_FORMAT GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT components);
 
-	//HRESULT SaveContentsToBmp();
+	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout);
+
 
 protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
@@ -36,6 +44,11 @@ protected:
 	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(LPCWSTR vertexShaderName,
 															   LPCWSTR pixelShaderName,
 															   ID3D12RootSignature* signature);
+	HRESULT GetGfxPipelineStateDesc(const LPCWSTR vertexShaderName,
+									const LPCWSTR pixelShaderName,
+									ID3D12RootSignature* signature,
+									const D3D12_INPUT_LAYOUT_DESC& inputLayoutDesc,
+									D3D12_GRAPHICS_PIPELINE_STATE_DESC& gfxPipelineStateDesc);
 	HRESULT UploadCpuDataAndWaitForCompletion(void*                      cpuData,
 		                                      UINT                       dataSizeInBytes,
 		                                      ID3D12GraphicsCommandList* pcmdList,
@@ -53,6 +66,9 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 
 private:
+
+	///@todo Use tiny gltf util class
+	DXGI_FORMAT GetDxgiFloatFormat(UINT numComponents);
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
 

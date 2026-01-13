@@ -1,5 +1,7 @@
 #include "Dx12SampleBase.h"
 #include <d3dx12.h>
+#include "tiny_gltf.h"
+
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_width(width),
@@ -361,8 +363,8 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 		m_pDevice->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&m_simpleComposition.rootSignature));
 	}
 
-	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders(L"SimpleFrameVS.cso",
-		                                                               L"SimpleFramePS.cso",
+	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders(L"FrameSimpleVS.cso",
+		                                                               L"FrameSimplePS.cso",
 		                                                               m_simpleComposition.rootSignature.Get());
 
 	///@note instead of drawing two triangles to form a quad, we draw a triangle which covers the full screen.
@@ -404,7 +406,7 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 	m_pDevice->CreateCommittedResource(&heapProps,
 										D3D12_HEAP_FLAG_NONE,
 										&resourceDesc,
-										D3D12_RESOURCE_STATE_COPY_DEST,
+										D3D12_RESOURCE_STATE_COMMON,
 										nullptr,
 										IID_PPV_ARGS(&bufferResource));
 
@@ -415,7 +417,7 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 							   pCmdList,
 							   pCmdQueue,
 							   bufferResource.Get(),
-							   D3D12_RESOURCE_STATE_COPY_DEST,
+							   D3D12_RESOURCE_STATE_COMMON,
 							   D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
 	return bufferResource;
@@ -592,7 +594,67 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 	}
 
 	return result;
+}
 
+
+XMMATRIX Dx12SampleBase::GetMVPMatrix(XMMATRIX& modelMatrix)
+{
+	FLOAT aspectRatio = ((FLOAT)m_width) / m_height;
+	///@note FOV, width/height, near and far clipping plane.
+	XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
+												   aspectRatio,
+												   0.1f,
+												   100.0f);
+
+	///@note camera position, camera forward vector, up direction
+	XMMATRIX view = XMMatrixLookAtLH(XMVectorSet(0.0f, 2.0f, -5.0f, 1.0f),
+									 XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
+									 XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+
+	XMMATRIX finalMvp = XMMatrixTranspose(modelMatrix * view * projection);
+
+	return finalMvp;
+}
+
+DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT components)
+{
+	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
+
+	switch (tinyGltfComponentType)
+	{
+	case TINYGLTF_COMPONENT_TYPE_FLOAT:
+		dxgiFormat = GetDxgiFloatFormat(components);
+		break;
+	default:
+		break;
+	}
+
+	return dxgiFormat;
+}
+
+DXGI_FORMAT Dx12SampleBase::GetDxgiFloatFormat(UINT numComponents)
+{
+	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
+
+	switch (numComponents)
+	{
+	case 1:
+		dxgiFormat = DXGI_FORMAT_R32_FLOAT;
+		break;
+	case 2:
+		dxgiFormat = DXGI_FORMAT_R32G32_FLOAT;
+		break;
+	case 3:
+		dxgiFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+		break;
+	case 4:
+		dxgiFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		break;
+	default:
+		break;
+	}
+
+	return dxgiFormat;
 }
 
 

@@ -12,6 +12,8 @@ class FileReader
 public:
 	FileReader();
 	static void GetExecutablePath(_Out_writes_(pathSize) WCHAR* path, UINT pathSize);
+	static std::string ToNarrowString(const std::wstring& wideString);
+	static std::wstring ToWideString(const std::string& narrowString);
 
 	std::wstring GetFullAssetFilePath(LPCWSTR assetName);
 	ComPtr<ID3DBlob> LoadShaderBlobFromAssets(std::wstring compiledShaderName);
