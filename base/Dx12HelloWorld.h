@@ -8,6 +8,13 @@
 using namespace Microsoft::WRL;
 using namespace DirectX;
 
+struct DxIASemantic
+{
+	std::string semanticName;
+	UINT semanticIndex;
+	BOOL isIndexValid;
+};
+
 class Dx12HelloWorld : public Dx12SampleBase
 {
 public:
@@ -38,9 +45,10 @@ private:
 	///@todo model resources refactor
 	std::vector<ComPtr<ID3D12Resource>>   m_attributeResources;
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_attributeBufferViews;
-	std::vector<std::string>              m_attributeNamesList;
+	std::vector<DxIASemantic>             m_attributeNamesList;
 	ComPtr<ID3D12Resource>                m_constantBufferResource;
 	std::vector<DXGI_FORMAT>              m_attributeFormats;
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
+	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
 };
 

@@ -19,6 +19,8 @@ HRESULT Dx12HelloWorld::PreRun()
 	HRESULT result = S_OK;
 
 	result = CreatePipelineState();
+	result = TestTinyGLTFLoading();
+	result = CreatePipelineStateFromModel();
 	result = CreateAndLoadVertexBuffer();
 	result = CreateAppResources();
 	return result;
@@ -41,9 +43,10 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 
 	for (UINT i = 0; i < numAttributes; i++)
 	{
-		inputElementDescs[i].SemanticName         = m_attributeNamesList[i].c_str();
+		const UINT semanticIndex				  = m_attributeNamesList[i].isIndexValid ? m_attributeNamesList[i].semanticIndex : 0;
+		inputElementDescs[i].SemanticName         = m_attributeNamesList[i].semanticName.c_str();
 		inputElementDescs[i].AlignedByteOffset    = 0;
-		inputElementDescs[i].SemanticIndex        = 0;
+		inputElementDescs[i].SemanticIndex        = semanticIndex;
 		inputElementDescs[i].InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 		inputElementDescs[i].InstanceDataStepRate = 0;
 		inputElementDescs[i].Format               = m_attributeFormats[i];
@@ -59,19 +62,17 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	//@todo Root signature
 	//Root CBV
 	//desc table -> SRV
-
-	CD3DX12_ROOT_DESCRIPTOR cbvRootDesc;
-	cbvRootDesc.Init(0);
 	CD3DX12_ROOT_PARAMETER parameters[1];
-	parameters[0].Descriptor = cbvRootDesc;
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(1, parameters);
+	parameters[0].InitAsConstantBufferView(0);
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(1, parameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> error;
 	ComPtr<ID3DBlob> signature;
 
-	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0, &signature, &error);
+	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(L"ModelSimpleVS.cso", L"ModelSimplePS.cso", m_modelRootSignature.Get(), inputLayoutDesc);
 
 	return result;
 
@@ -200,7 +201,6 @@ HRESULT Dx12HelloWorld::CreateAppResources()
 	const UINT numRTVs  = NumRTVsNeededForApp();
 	result              = CreateRenderTargetResourceAndSRVs(numRTVs);
 	result              = CreateRenderTargetViews(numRTVs, FALSE);
-	TestTinyGLTFLoading();
 	return result;
 }
 
@@ -363,6 +363,7 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 				{
 					m_attributeFormats[attrIndx] = GltfGetDxgiFormat(model.accessors[i].componentType, model.accessors[i].type);
 					accessorByteOffset = model.accessors[i].byteOffset;
+					break;
 				}
 			}
 
@@ -374,7 +375,24 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			m_attributeBufferViews[attrIndx].SizeInBytes    = (UINT)buflength;
 			m_attributeBufferViews[attrIndx].StrideInBytes  = (UINT)bufStride;
 
-			m_attributeNamesList[attrIndx] = attributeName;
+			auto& currentSemantic = m_attributeNamesList[attrIndx];
+			///@todo make a string utils class to check for stuff
+			auto pos = attributeName.find("_");
+
+			if (pos != std::string::npos)
+			{
+				std::string left = attributeName.substr(0, pos);
+				std::string right = attributeName.substr(pos + 1);
+				int index = std::stoi(right);
+				currentSemantic.semanticName = left;
+				currentSemantic.semanticIndex = index;
+				currentSemantic.isIndexValid = TRUE;
+			}
+			else
+			{
+				currentSemantic.semanticName = attributeName;
+				currentSemantic.isIndexValid = FALSE;
+			}
 
 			attributeIt++;
 			attrIndx++;
