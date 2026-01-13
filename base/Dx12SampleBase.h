@@ -34,21 +34,17 @@ public:
 	///@todo use utils class
 	DXGI_FORMAT GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT components);
 
-	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout);
+	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
 
 
 protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
-	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(LPCWSTR vertexShaderName,
-															   LPCWSTR pixelShaderName,
-															   ID3D12RootSignature* signature);
-	HRESULT GetGfxPipelineStateDesc(const LPCWSTR vertexShaderName,
-									const LPCWSTR pixelShaderName,
-									ID3D12RootSignature* signature,
-									const D3D12_INPUT_LAYOUT_DESC& inputLayoutDesc,
-									D3D12_GRAPHICS_PIPELINE_STATE_DESC& gfxPipelineStateDesc);
+	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const LPCWSTR vertexShaderName,
+															   const LPCWSTR pixelShaderName,
+															   ID3D12RootSignature* signature,
+		                                                       const D3D12_INPUT_LAYOUT_DESC& iaLayout);
 	HRESULT UploadCpuDataAndWaitForCompletion(void*                      cpuData,
 		                                      UINT                       dataSizeInBytes,
 		                                      ID3D12GraphicsCommandList* pcmdList,

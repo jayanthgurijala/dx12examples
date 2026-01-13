@@ -284,22 +284,29 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 	return result;
 }
 
-ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(LPCWSTR vertexShaderName,
-																	       LPCWSTR pixelShaderName,
-	                                                                       ID3D12RootSignature* signature)
+VOID Dx12SampleBase::GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1)
 {
-	ComPtr<ID3D12PipelineState> gfxPipelineState;
-	ComPtr<ID3DBlob>            vertexShader;
-	ComPtr<ID3DBlob>            pixelShader;
-
 	// Define the vertex input layout.
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+	static const D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
 	};
 
+	layout1.NumElements = _countof(inputElementDescs);
+	layout1.pInputElementDescs = inputElementDescs;
+}
+
+ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const LPCWSTR vertexShaderName,
+																	       const LPCWSTR pixelShaderName,
+	                                                                       ID3D12RootSignature* signature,
+																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout)
+{
+	ComPtr<ID3D12PipelineState> gfxPipelineState;
+	ComPtr<ID3DBlob>            vertexShader;
+	ComPtr<ID3DBlob>            pixelShader;
+	
 	///@todo compileFlags = 0 for release
 	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 
@@ -310,7 +317,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(LPCWS
 	pixelShader  = m_assetReader.LoadShaderBlobFromAssets(compiledPixelShaderPath);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.InputLayout                        = { inputElementDescs, _countof(inputElementDescs)};
+	pipelineStateDesc.InputLayout                        = iaLayout;
 	pipelineStateDesc.pRootSignature                     = signature;
 	pipelineStateDesc.VS                                 = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
 	pipelineStateDesc.PS                                 = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
@@ -363,9 +370,12 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 		m_pDevice->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&m_simpleComposition.rootSignature));
 	}
 
+	D3D12_INPUT_LAYOUT_DESC layout1 = {};
+	GetInputLayoutDesc_Layout1(layout1);
 	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders(L"FrameSimpleVS.cso",
 		                                                               L"FrameSimplePS.cso",
-		                                                               m_simpleComposition.rootSignature.Get());
+		                                                               m_simpleComposition.rootSignature.Get(),
+		                                                               layout1);
 
 	///@note instead of drawing two triangles to form a quad, we draw a triangle which covers the full screen.
 	///      This helps in avoiding diagonal interpolation issues.
