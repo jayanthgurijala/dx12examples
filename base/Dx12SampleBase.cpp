@@ -290,7 +290,7 @@ VOID Dx12SampleBase::GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1
 	static const D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
 	};
 
@@ -626,7 +626,7 @@ XMMATRIX Dx12SampleBase::GetMVPMatrix(XMMATRIX& modelMatrix)
 	return finalMvp;
 }
 
-DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT components)
+DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(int tinyGltfComponentType, int components)
 {
 	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
 
@@ -635,6 +635,10 @@ DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT c
 	case TINYGLTF_COMPONENT_TYPE_FLOAT:
 		dxgiFormat = GetDxgiFloatFormat(components);
 		break;
+
+	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+		dxgiFormat = GetDxgiUnsignedShortFormat(components);
+		break;
 	default:
 		break;
 	}
@@ -642,23 +646,53 @@ DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT c
 	return dxgiFormat;
 }
 
-DXGI_FORMAT Dx12SampleBase::GetDxgiFloatFormat(UINT numComponents)
+/*
+#define TINYGLTF_TYPE_VEC2 (2)
+#define TINYGLTF_TYPE_VEC3 (3)
+#define TINYGLTF_TYPE_VEC4 (4)
+#define TINYGLTF_TYPE_MAT2 (32 + 2)
+#define TINYGLTF_TYPE_MAT3 (32 + 3)
+#define TINYGLTF_TYPE_MAT4 (32 + 4)
+#define TINYGLTF_TYPE_SCALAR (64 + 1)
+#define TINYGLTF_TYPE_VECTOR (64 + 4)
+#define TINYGLTF_TYPE_MATRIX (64 + 16) 
+*/
+DXGI_FORMAT Dx12SampleBase::GetDxgiFloatFormat(int numComponents)
 {
 	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
 
 	switch (numComponents)
 	{
-	case 1:
+	case TINYGLTF_TYPE_SCALAR:
 		dxgiFormat = DXGI_FORMAT_R32_FLOAT;
 		break;
-	case 2:
+	case TINYGLTF_TYPE_VEC2:
 		dxgiFormat = DXGI_FORMAT_R32G32_FLOAT;
 		break;
-	case 3:
+	case TINYGLTF_TYPE_VEC3:
 		dxgiFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 		break;
-	case 4:
+	case TINYGLTF_TYPE_VEC4:
 		dxgiFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		break;
+	default:
+		break;
+	}
+
+	return dxgiFormat;
+}
+
+DXGI_FORMAT Dx12SampleBase::GetDxgiUnsignedShortFormat(int numComponents)
+{
+	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
+
+	switch (numComponents)
+	{
+	case TINYGLTF_TYPE_SCALAR:
+		dxgiFormat = DXGI_FORMAT_R16_UINT;
+		break;
+	case TINYGLTF_TYPE_VEC2:
+		dxgiFormat = DXGI_FORMAT_R16G16_UINT;
 		break;
 	default:
 		break;

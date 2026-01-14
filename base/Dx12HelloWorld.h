@@ -16,6 +16,13 @@ struct DxIASemantic
 	DXGI_FORMAT format;
 };
 
+struct DxDrawPrimitive
+{
+	UINT numVertices;
+	UINT numIndices;
+	BOOL isIndexedDraw;
+};
+
 class Dx12HelloWorld : public Dx12SampleBase
 {
 public:
@@ -44,11 +51,14 @@ private:
 	UINT						m_vertexStrideInBytes;
 
 	///@todo model resources refactor
-	std::vector<ComPtr<ID3D12Resource>>   m_modelVbResources;
-	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbVs;
+	std::vector<ComPtr<ID3D12Resource>>   m_modelVbBuffers;
+	ComPtr<ID3D12Resource>                m_modelIbBuffer;
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
+	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
 	ComPtr<ID3D12Resource>                m_modelConstantBuffer;
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
+	DxDrawPrimitive                       m_modelDrawPrimitive;
 };
 

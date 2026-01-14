@@ -30,9 +30,6 @@ public:
 	FLOAT m_aspectRatio;
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
 	XMMATRIX GetMVPMatrix(XMMATRIX& modelMatrix);
-	
-	///@todo use utils class
-	DXGI_FORMAT GltfGetDxgiFormat(UINT tinyGltfComponentType, UINT components);
 
 	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
 
@@ -61,10 +58,12 @@ protected:
 	virtual DXGI_FORMAT GetBackBufferFormat();
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 
-private:
-
 	///@todo Use tiny gltf util class
-	DXGI_FORMAT GetDxgiFloatFormat(UINT numComponents);
+	DXGI_FORMAT GltfGetDxgiFormat(int tinyGltfComponentType, int components);
+	DXGI_FORMAT GetDxgiFloatFormat(int numComponents);
+	DXGI_FORMAT GetDxgiUnsignedShortFormat(int numComponents);
+
+private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
 

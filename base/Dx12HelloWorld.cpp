@@ -244,13 +244,23 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		///@todo get this from mode of primitive
 		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		pCmdList->SetPipelineState(m_modelPipelineState.Get());
+		pCmdList->SetGraphicsRootConstantBufferView(0, m_modelConstantBuffer->GetGPUVirtualAddress());
 		
-		const SIZE_T numVertexBufferViews = m_modelVbResources.size();
+		const SIZE_T numVertexBufferViews = m_modelVbBuffers.size();
 		for (UINT i = 0; i < numVertexBufferViews; i++)
 		{
-			pCmdList->IASetVertexBuffers(i, 1, &m_modelVbVs[i]);
+			pCmdList->IASetVertexBuffers(i, 1, &m_modelVbvs[i]);
 		}
 
+		if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
+		{
+			pCmdList->IASetIndexBuffer(&m_modelIbv);
+			pCmdList->DrawIndexedInstanced(m_modelDrawPrimitive.numIndices, 1, 0, 0, 0);
+		}
+		else
+		{
+			pCmdList->DrawInstanced(m_modelDrawPrimitive.numVertices, 1, 0, 0);
+		}
 	}
 
 	RenderRtvContentsOnScreen(0);
@@ -260,6 +270,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 
 HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 {
+	HRESULT result = S_OK;
 	tinygltf::Model    model;
 	tinygltf::TinyGLTF loader;
 	std::string        err;
@@ -277,149 +288,181 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 	if (!ret)
 	{
 		std::cout << "Failed to parse glTF" << std::endl;
-		return E_FAIL;
+		result = E_FAIL;
 	}
 
-	const tinygltf::Scene& firstScene   = model.scenes[0];
-	const UINT firstNode          = firstScene.nodes[0];
-	const tinygltf::Node& firstNodeDesc = model.nodes[0];
-	const UINT firstMesh          = firstNodeDesc.mesh;
-	
-	///@todo Need to make cbuffer
-	const BOOL hasScale           = (firstNodeDesc.scale.size() != 0);
-	const BOOL hasTranslation	  = (firstNodeDesc.translation.size() != 0);
-	const BOOL hasRotation        = (firstNodeDesc.rotation.size() != 0);
-	const BOOL hasMatrix          = (firstNodeDesc.matrix.size() != 0);
-
-	XMMATRIX modelMatrix;
-	if (hasMatrix == FALSE)
+	if (result == S_OK)
 	{
-		XMVECTOR translation = (hasTranslation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.translation[0], 
-			                                                          (FLOAT)firstNodeDesc.translation[1],
-			                                                          (FLOAT)firstNodeDesc.translation[2], 1.0f) : XMVectorZero();
+		const tinygltf::Scene& firstScene = model.scenes[0];
+		const UINT firstNode = firstScene.nodes[0];
+		const tinygltf::Node& firstNodeDesc = model.nodes[0];
+		const UINT firstMesh = firstNodeDesc.mesh;
 
-		XMVECTOR rotation    = (hasRotation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.rotation[0],
-																   (FLOAT)firstNodeDesc.rotation[1],
-			                                                       (FLOAT)firstNodeDesc.rotation[2],
-																   (FLOAT)firstNodeDesc.rotation[3]) : XMQuaternionIdentity();
+		///@todo Need to make cbuffer
+		const BOOL hasScale = (firstNodeDesc.scale.size() != 0);
+		const BOOL hasTranslation = (firstNodeDesc.translation.size() != 0);
+		const BOOL hasRotation = (firstNodeDesc.rotation.size() != 0);
+		const BOOL hasMatrix = (firstNodeDesc.matrix.size() != 0);
 
-		XMVECTOR scale       = (hasScale == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.scale[0],
-			                                                    (FLOAT)firstNodeDesc.scale[1],
-			                                                    (FLOAT)firstNodeDesc.scale[2],
-																1.0f) : XMVectorSplatOne();
-
-		XMMATRIX T = XMMatrixTranslationFromVector(translation);
-		XMMATRIX R = XMMatrixRotationQuaternion(rotation);
-		XMMATRIX S = XMMatrixScalingFromVector(scale);
-
-		modelMatrix = T * R * S;
-	}
-	else
-	{
-		const std::vector<double> m4x4 = firstNodeDesc.matrix;
-
-
-		///@note gltf matrix is column major but DirectX Math expects row major.
-		///      We could transpose it while construction but looks likt that is "error prone"
-		///      Taking the safer approach.
-		XMFLOAT4X4 temp = 
+		XMMATRIX modelMatrix;
+		if (hasMatrix == FALSE)
 		{
-			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
-			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
-			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
-			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
-		};
+			XMVECTOR translation = (hasTranslation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.translation[0],
+				(FLOAT)firstNodeDesc.translation[1],
+				(FLOAT)firstNodeDesc.translation[2], 1.0f) : XMVectorZero();
 
-		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
-		modelMatrix      = XMMatrixTranspose(tempMat);
-	}
+			XMVECTOR rotation = (hasRotation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.rotation[0],
+				(FLOAT)firstNodeDesc.rotation[1],
+				(FLOAT)firstNodeDesc.rotation[2],
+				(FLOAT)firstNodeDesc.rotation[3]) : XMQuaternionIdentity();
 
-	XMMATRIX mvpMatrix = GetMVPMatrix(modelMatrix);
-	XMFLOAT4X4 cbData;
-	XMStoreFloat4x4(&cbData, mvpMatrix);
+			XMVECTOR scale = (hasScale == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.scale[0],
+				(FLOAT)firstNodeDesc.scale[1],
+				(FLOAT)firstNodeDesc.scale[2],
+				1.0f) : XMVectorSplatOne();
 
-	///@note constant buffer data layout
-	/// MVP matrix (16 floats)
-	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
-	m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+			XMMATRIX T = XMMatrixTranslationFromVector(translation);
+			XMMATRIX R = XMMatrixRotationQuaternion(rotation);
+			XMMATRIX S = XMMatrixScalingFromVector(scale);
 
-	const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
-	const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
-
-	const tinygltf::Accessor& accessors = model.accessors[0];
-	const SIZE_T numAccessors = model.accessors.size();
-
-	m_modelVbResources.resize(firstPrimitive.attributes.size());
-	m_modelVbVs.resize(firstPrimitive.attributes.size());
-	m_modelIaSemantics.resize(firstPrimitive.attributes.size());
-
-	std::vector<std::string> supportedAttributeNames;
-	supportedAttributeNames.push_back("POSITION");
-	supportedAttributeNames.push_back("NORMAL");
-	supportedAttributeNames.push_back("TEXCOORD_0");
-	supportedAttributeNames.push_back("TEXCOORD_1");
-	supportedAttributeNames.push_back("TEXCOORD_2");
-
-	auto attributeIt = supportedAttributeNames.begin();
-	UINT attrIndx = 0;
-	while (attributeIt != supportedAttributeNames.end())
-	{
-		auto it = firstPrimitive.attributes.find(*attributeIt);
-		if (it != firstPrimitive.attributes.end())
+			modelMatrix = T * R * S;
+		}
+		else
 		{
-			const std::string attributeName = it->first;
-			const int bufferViewIdx = it->second;
-			const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufferViewIdx];
-			const int    bufferIdx = bufViewDesc.buffer;
-			const size_t buflength = bufViewDesc.byteLength;
-			const size_t bufOffset = bufViewDesc.byteOffset;
-			const size_t bufStride = bufViewDesc.byteStride;
+			const std::vector<double> m4x4 = firstNodeDesc.matrix;
 
-			size_t accessorByteOffset = 0;
 
-			for (UINT i = 0; i < numAccessors; i++)
+			///@note gltf matrix is column major but DirectX Math expects row major.
+			///      We could transpose it while construction but looks likt that is "error prone"
+			///      Taking the safer approach.
+			XMFLOAT4X4 temp =
 			{
-				if (model.accessors[i].bufferView == bufferViewIdx)
+				(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
+				(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
+				(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
+				(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
+			};
+
+			XMMATRIX tempMat = XMLoadFloat4x4(&temp);
+			modelMatrix = XMMatrixTranspose(tempMat);
+		}
+
+		XMMATRIX mvpMatrix = GetMVPMatrix(modelMatrix);
+		XMFLOAT4X4 cbData;
+		XMStoreFloat4x4(&cbData, mvpMatrix);
+
+		///@note constant buffer data layout
+		/// MVP matrix (16 floats)
+		const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
+		m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+
+		const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
+		const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
+
+		const tinygltf::Accessor& accessors = model.accessors[0];
+		const SIZE_T numAccessors = model.accessors.size();
+
+		///@note load IA Layout and VB info and resources
+		{
+			m_modelVbBuffers.resize(firstPrimitive.attributes.size());
+			m_modelVbvs.resize(firstPrimitive.attributes.size());
+			m_modelIaSemantics.resize(firstPrimitive.attributes.size());
+
+			std::vector<std::string> supportedAttributeNames;
+			supportedAttributeNames.push_back("POSITION");
+			supportedAttributeNames.push_back("NORMAL");
+			supportedAttributeNames.push_back("TEXCOORD_0");
+			supportedAttributeNames.push_back("TEXCOORD_1");
+			supportedAttributeNames.push_back("TEXCOORD_2");
+
+			//primitive -> attribute names -> accessor index -> accessor -> bufferview -> buffer
+			auto attributeIt = supportedAttributeNames.begin();
+			UINT attrIndx = 0;
+			SIZE_T numTotalVertices = 0;
+			while (attributeIt != supportedAttributeNames.end())
+			{
+				auto it = firstPrimitive.attributes.find(*attributeIt);
+				if (it != firstPrimitive.attributes.end())
 				{
-					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(model.accessors[i].componentType, model.accessors[i].type);
-					accessorByteOffset = model.accessors[i].byteOffset;
-					break;
+					const std::string attributeName = it->first;
+					const int accessorIdx = it->second;
+
+					const tinygltf::Accessor& accessorDesc = model.accessors[accessorIdx];
+					const int bufferViewIdx = accessorDesc.bufferView;
+					const tinygltf::BufferView bufViewDesc = model.bufferViews[bufferViewIdx];
+					const int    bufferIdx = bufViewDesc.buffer;
+					const size_t buflength = bufViewDesc.byteLength;
+					const size_t bufOffset = bufViewDesc.byteOffset;
+					const size_t bufStride = bufViewDesc.byteStride;
+					const size_t accessorByteOffset = accessorDesc.byteOffset;
+					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+					numTotalVertices += accessorDesc.count;
+					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
+					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
+					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
+
+					m_modelVbvs[attrIndx].BufferLocation = m_modelVbBuffers[attrIndx].Get()->GetGPUVirtualAddress();
+					m_modelVbvs[attrIndx].SizeInBytes = (UINT)buflength;
+					m_modelVbvs[attrIndx].StrideInBytes = (UINT)bufStride;
+
+					auto& currentSemantic = m_modelIaSemantics[attrIndx];
+					///@todo make a string utils class to check for stuff
+					auto pos = attributeName.find("_");
+
+					if (pos != std::string::npos)
+					{
+						std::string left = attributeName.substr(0, pos);
+						std::string right = attributeName.substr(pos + 1);
+						int index = std::stoi(right);
+						currentSemantic.name = left;
+						currentSemantic.index = index;
+						currentSemantic.isIndexValid = TRUE;
+					}
+					else
+					{
+						currentSemantic.name = attributeName;
+						currentSemantic.isIndexValid = FALSE;
+					}
+					attributeIt++;
+					attrIndx++;
 				}
 			}
+			m_modelDrawPrimitive.numVertices = (UINT)(numTotalVertices);
+		}
 
-			const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
-			const unsigned char* attributedata = &bufferDesc.data[accessorByteOffset + bufOffset]; //upto buf length, makes up one resource
-			m_modelVbResources[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
-
-			m_modelVbVs[attrIndx].BufferLocation = m_modelVbResources[attrIndx].Get()->GetGPUVirtualAddress();
-			m_modelVbVs[attrIndx].SizeInBytes    = (UINT)buflength;
-			m_modelVbVs[attrIndx].StrideInBytes  = (UINT)bufStride;
-
-			auto& currentSemantic = m_modelIaSemantics[attrIndx];
-			///@todo make a string utils class to check for stuff
-			auto pos = attributeName.find("_");
-
-			if (pos != std::string::npos)
+		//load index buffers
+		{
+			const int bufViewIdx = firstPrimitive.indices;
+			if (bufViewIdx != -1)
 			{
-				std::string left = attributeName.substr(0, pos);
-				std::string right = attributeName.substr(pos + 1);
-				int index = std::stoi(right);
-				currentSemantic.name = left;
-				currentSemantic.index = index;
-				currentSemantic.isIndexValid = TRUE;
+				const tinygltf::Accessor& accessorDesc = model.accessors[bufViewIdx];
+				const int bufferViewIdx = accessorDesc.bufferView;
+				const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufferViewIdx];
+				const int bufferIdx = bufViewDesc.buffer;
+				const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
+
+				const size_t accessorByteOffset = accessorDesc.byteOffset;
+				const UINT bufferSizeInBytes = (UINT)bufViewDesc.byteLength;
+				const size_t bufferViewOffset = bufViewDesc.byteOffset;
+
+				const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
+
+
+				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes);
+				m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
+				m_modelIbv.Format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+				m_modelIbv.SizeInBytes = bufferSizeInBytes;
+				m_modelDrawPrimitive.isIndexedDraw = TRUE;
+				m_modelDrawPrimitive.numIndices = (UINT)accessorDesc.count;
 			}
 			else
 			{
-				currentSemantic.name = attributeName;
-				currentSemantic.isIndexValid = FALSE;
+				m_modelDrawPrimitive.isIndexedDraw = FALSE;
 			}
-
-			attributeIt++;
-			attrIndx++;
-
 		}
 	}
 
-	return S_OK;
+	return result;
 }
+
 
