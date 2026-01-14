@@ -37,19 +37,19 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	HRESULT result = S_OK;
 	ID3D12Device* pDevice = GetDevice();
 
-	const SIZE_T numAttributes = m_attributeNamesList.size();
+	const SIZE_T numAttributes = m_modelIaSemantics.size();
 	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
 	inputElementDescs.resize(numAttributes);
 
 	for (UINT i = 0; i < numAttributes; i++)
 	{
-		const UINT semanticIndex				  = m_attributeNamesList[i].isIndexValid ? m_attributeNamesList[i].semanticIndex : 0;
-		inputElementDescs[i].SemanticName         = m_attributeNamesList[i].semanticName.c_str();
+		const UINT semanticIndex				  = m_modelIaSemantics[i].isIndexValid ? m_modelIaSemantics[i].index : 0;
+		inputElementDescs[i].SemanticName         = m_modelIaSemantics[i].name.c_str();
 		inputElementDescs[i].AlignedByteOffset    = 0;
 		inputElementDescs[i].SemanticIndex        = semanticIndex;
 		inputElementDescs[i].InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
 		inputElementDescs[i].InstanceDataStepRate = 0;
-		inputElementDescs[i].Format               = m_attributeFormats[i];
+		inputElementDescs[i].Format               = m_modelIaSemantics[i].format;
 
 		///@note depends on VB allocation. Need gltf to DX converter to give this info
 		inputElementDescs[i].InputSlot = i;
@@ -206,6 +206,9 @@ HRESULT Dx12HelloWorld::CreateAppResources()
 
 HRESULT Dx12HelloWorld::RenderFrame()
 {
+
+	BOOL renderTriangle = FALSE;
+
 	ID3D12GraphicsCommandList*  pCmdList      = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle     = GetRenderTargetView(0, FALSE);
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
@@ -226,11 +229,29 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		                            0,
 		                            nullptr);
 	
-	pCmdList->SetGraphicsRootSignature(m_rootSignarure.Get());
-	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	pCmdList->SetPipelineState(m_pipelineState.Get());
-	pCmdList->IASetVertexBuffers(0, 1, &vertexBufferView);
-	pCmdList->DrawInstanced(3, 1, 0, 0);
+	if (renderTriangle == TRUE)
+	{
+		pCmdList->SetGraphicsRootSignature(m_rootSignarure.Get());
+		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCmdList->SetPipelineState(m_pipelineState.Get());
+		pCmdList->IASetVertexBuffers(0, 1, &vertexBufferView);
+		pCmdList->DrawInstanced(3, 1, 0, 0);
+	}
+	else
+	{
+		pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
+
+		///@todo get this from mode of primitive
+		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCmdList->SetPipelineState(m_modelPipelineState.Get());
+		
+		const SIZE_T numVertexBufferViews = m_modelVbResources.size();
+		for (UINT i = 0; i < numVertexBufferViews; i++)
+		{
+			pCmdList->IASetVertexBuffers(i, 1, &m_modelVbVs[i]);
+		}
+
+	}
 
 	RenderRtvContentsOnScreen(0);
 
@@ -320,7 +341,7 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 	///@note constant buffer data layout
 	/// MVP matrix (16 floats)
 	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
-	m_constantBufferResource = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+	m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
 
 	const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
 	const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
@@ -328,10 +349,9 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 	const tinygltf::Accessor& accessors = model.accessors[0];
 	const SIZE_T numAccessors = model.accessors.size();
 
-	m_attributeResources.resize(firstPrimitive.attributes.size());
-	m_attributeBufferViews.resize(firstPrimitive.attributes.size());
-	m_attributeNamesList.resize(firstPrimitive.attributes.size());
-	m_attributeFormats.resize(firstPrimitive.attributes.size());
+	m_modelVbResources.resize(firstPrimitive.attributes.size());
+	m_modelVbVs.resize(firstPrimitive.attributes.size());
+	m_modelIaSemantics.resize(firstPrimitive.attributes.size());
 
 	std::vector<std::string> supportedAttributeNames;
 	supportedAttributeNames.push_back("POSITION");
@@ -361,7 +381,7 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			{
 				if (model.accessors[i].bufferView == bufferViewIdx)
 				{
-					m_attributeFormats[attrIndx] = GltfGetDxgiFormat(model.accessors[i].componentType, model.accessors[i].type);
+					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(model.accessors[i].componentType, model.accessors[i].type);
 					accessorByteOffset = model.accessors[i].byteOffset;
 					break;
 				}
@@ -369,13 +389,13 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 
 			const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
 			const unsigned char* attributedata = &bufferDesc.data[accessorByteOffset + bufOffset]; //upto buf length, makes up one resource
-			m_attributeResources[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
+			m_modelVbResources[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
 
-			m_attributeBufferViews[attrIndx].BufferLocation = m_attributeResources[attrIndx].Get()->GetGPUVirtualAddress();
-			m_attributeBufferViews[attrIndx].SizeInBytes    = (UINT)buflength;
-			m_attributeBufferViews[attrIndx].StrideInBytes  = (UINT)bufStride;
+			m_modelVbVs[attrIndx].BufferLocation = m_modelVbResources[attrIndx].Get()->GetGPUVirtualAddress();
+			m_modelVbVs[attrIndx].SizeInBytes    = (UINT)buflength;
+			m_modelVbVs[attrIndx].StrideInBytes  = (UINT)bufStride;
 
-			auto& currentSemantic = m_attributeNamesList[attrIndx];
+			auto& currentSemantic = m_modelIaSemantics[attrIndx];
 			///@todo make a string utils class to check for stuff
 			auto pos = attributeName.find("_");
 
@@ -384,13 +404,13 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 				std::string left = attributeName.substr(0, pos);
 				std::string right = attributeName.substr(pos + 1);
 				int index = std::stoi(right);
-				currentSemantic.semanticName = left;
-				currentSemantic.semanticIndex = index;
+				currentSemantic.name = left;
+				currentSemantic.index = index;
 				currentSemantic.isIndexValid = TRUE;
 			}
 			else
 			{
-				currentSemantic.semanticName = attributeName;
+				currentSemantic.name = attributeName;
 				currentSemantic.isIndexValid = FALSE;
 			}
 

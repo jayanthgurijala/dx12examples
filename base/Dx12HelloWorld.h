@@ -10,9 +10,10 @@ using namespace DirectX;
 
 struct DxIASemantic
 {
-	std::string semanticName;
-	UINT semanticIndex;
+	std::string name;
+	UINT index;
 	BOOL isIndexValid;
+	DXGI_FORMAT format;
 };
 
 class Dx12HelloWorld : public Dx12SampleBase
@@ -43,11 +44,10 @@ private:
 	UINT						m_vertexStrideInBytes;
 
 	///@todo model resources refactor
-	std::vector<ComPtr<ID3D12Resource>>   m_attributeResources;
-	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_attributeBufferViews;
-	std::vector<DxIASemantic>             m_attributeNamesList;
-	ComPtr<ID3D12Resource>                m_constantBufferResource;
-	std::vector<DXGI_FORMAT>              m_attributeFormats;
+	std::vector<ComPtr<ID3D12Resource>>   m_modelVbResources;
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbVs;
+	std::vector<DxIASemantic>             m_modelIaSemantics;
+	ComPtr<ID3D12Resource>                m_modelConstantBuffer;
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
 };
