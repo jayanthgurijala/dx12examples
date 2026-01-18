@@ -19,6 +19,15 @@
     <Filter Include="Assets\Shaders">
       <UniqueIdentifier>{59ba8499-f6c1-4e9d-814f-45b5206727f0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Assets\Shaders\FrameComposition">
+      <UniqueIdentifier>{5f49bb5b-7a88-426b-9a75-858ea112bfa5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets\Shaders\Rendering">
+      <UniqueIdentifier>{bc9aaf03-2c5f-46a0-805e-ab4189c7b2fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets\Shaders\Includes">
+      <UniqueIdentifier>{8a54daf0-aa7f-44da-ac98-15bdfc413261}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Win32Application.h">
@@ -34,6 +43,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FileReader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DxPrintUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DxGltfUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,31 +71,36 @@
     <ClCompile Include="tinygltf.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DxPrintUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DxGltfUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-    <None Include="SimpleVSPSInterface.hlsli">
+    <None Include="..\Shaders\CompileShaders.bat">
       <Filter>Assets\Shaders</Filter>
+    </None>
+    <None Include="packages.config">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
+      <Filter>Assets\Shaders\Includes</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="VertexShader.hlsl">
+    <Resource Include="..\Shaders\Hello.hlsl">
       <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="PixelShader.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="FrameSimpleVS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="FrameSimplePS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="ModelSimpleVS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="ModelSimplePS.hlsl">
-      <Filter>Assets\Shaders</Filter>
-    </FxCompile>
+    </Resource>
+    <Resource Include="..\Shaders\FrameSimple.hlsl">
+      <Filter>Assets\Shaders\FrameComposition</Filter>
+    </Resource>
+    <Resource Include="..\Shaders\Simple1.hlsl">
+      <Filter>Assets\Shaders\Rendering</Filter>
+    </Resource>
+    <Resource Include="..\Shaders\Simple5.hlsl">
+      <Filter>Assets\Shaders\Rendering</Filter>
+    </Resource>
   </ItemGroup>
 </Project>

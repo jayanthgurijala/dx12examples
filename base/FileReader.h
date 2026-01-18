@@ -11,17 +11,15 @@ class FileReader
 {
 public:
 	FileReader();
-	static void GetExecutablePath(_Out_writes_(pathSize) WCHAR* path, UINT pathSize);
-	static std::string ToNarrowString(const std::wstring& wideString);
-	static std::wstring ToWideString(const std::string& narrowString);
+	static void GetExecutablePath(_Out_writes_(pathSize) CHAR* path, UINT pathSize);
 
-	std::wstring GetFullAssetFilePath(LPCWSTR assetName);
-	ComPtr<ID3DBlob> LoadShaderBlobFromAssets(std::wstring compiledShaderName);
+	std::string GetFullAssetFilePath(const std::string& assetName);
+	ComPtr<ID3DBlob> LoadShaderBlobFromAssets(std::string compiledShaderName);
 
 protected:
 
 private:
-	std::wstring m_assetsPath;
+	std::string m_assetsPath;
 
 };
 

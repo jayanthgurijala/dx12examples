@@ -69,11 +69,15 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
 {
 	switch (message)
 	{
+	case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE)
+			PostQuitMessage(0);
+		break;
 	
 	case WM_DESTROY:
 		//Post WM_QUIT with the exit code
 		PostQuitMessage(0);
-		return 0;
+		break;
 	}
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }

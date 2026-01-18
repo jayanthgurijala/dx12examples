@@ -29,7 +29,6 @@ public:
 	virtual HRESULT PostRun() { return S_OK; };
 	FLOAT m_aspectRatio;
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
-	XMMATRIX GetMVPMatrix(XMMATRIX& modelMatrix);
 
 	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
 
@@ -38,10 +37,11 @@ protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
-	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const LPCWSTR vertexShaderName,
-															   const LPCWSTR pixelShaderName,
+	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
+															   const std::string& pixelShaderName,
 															   ID3D12RootSignature* signature,
-		                                                       const D3D12_INPUT_LAYOUT_DESC& iaLayout);
+		                                                       const D3D12_INPUT_LAYOUT_DESC& iaLayout,
+														       BOOL wireframe = FALSE);
 	HRESULT UploadCpuDataAndWaitForCompletion(void*                      cpuData,
 		                                      UINT                       dataSizeInBytes,
 		                                      ID3D12GraphicsCommandList* pcmdList,
@@ -55,13 +55,10 @@ protected:
 	inline ID3D12Device*              GetDevice()           { return m_pDevice.Get();           }
 	inline ID3D12GraphicsCommandList* GetCmdList()          { return m_pCmdList.Get();          }
 	inline UINT                       GetAppRTVStartIndex() { return GetSwapChainBufferCount(); }
+	inline UINT                       GetWidth()            { return m_width;}
+	inline UINT                       GetHeight()           { return m_height;}
 	virtual DXGI_FORMAT GetBackBufferFormat();
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
-
-	///@todo Use tiny gltf util class
-	DXGI_FORMAT GltfGetDxgiFormat(int tinyGltfComponentType, int components);
-	DXGI_FORMAT GetDxgiFloatFormat(int numComponents);
-	DXGI_FORMAT GetDxgiUnsignedShortFormat(int numComponents);
 
 private:
 

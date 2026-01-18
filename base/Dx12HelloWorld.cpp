@@ -1,14 +1,19 @@
 #include "Dx12HelloWorld.h"
 #include <d3dx12.h>
 #include <iostream>
-
+#include "DxPrintUtils.h"
+#include "DxGltfUtils.h"
 #include "tiny_gltf.h"
+
+using namespace DxGltfUtils;
 
 
 
 Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 	m_vertexBufferSizeInBytes(0),
 	m_vertexStrideInBytes(0),
+	m_modelExtents{},
+	m_modelDrawPrimitive{},
 	Dx12SampleBase(width, height)
 {
 	m_fileReader = FileReader();
@@ -18,7 +23,7 @@ HRESULT Dx12HelloWorld::PreRun()
 {
 	HRESULT result = S_OK;
 
-	result = CreatePipelineState();
+	//result = CreatePipelineState();
 	result = TestTinyGLTFLoading();
 	result = CreatePipelineStateFromModel();
 	result = CreateAndLoadVertexBuffer();
@@ -40,6 +45,12 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	const SIZE_T numAttributes = m_modelIaSemantics.size();
 	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
 	inputElementDescs.resize(numAttributes);
+
+	char vertexShaderName[64];
+	char pixelShaderName[64];
+
+	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
+	snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
 
 	for (UINT i = 0; i < numAttributes; i++)
 	{
@@ -72,7 +83,7 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 
-	m_modelPipelineState = GetGfxPipelineStateWithShaders(L"ModelSimpleVS.cso", L"ModelSimplePS.cso", m_modelRootSignature.Get(), inputLayoutDesc);
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, TRUE);
 
 	return result;
 
@@ -106,8 +117,8 @@ HRESULT Dx12HelloWorld::CreatePipelineState()
 		///@todo compileFlags = 0 for release
 		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 
-		std::wstring compiledVertexShaderPath = m_fileReader.GetFullAssetFilePath(L"VertexShader.cso");
-		std::wstring compiledPixelShaderPath  = m_fileReader.GetFullAssetFilePath(L"PixelShader.cso");
+		std::string compiledVertexShaderPath = m_fileReader.GetFullAssetFilePath("VertexShader.cso");
+		std::string compiledPixelShaderPath  = m_fileReader.GetFullAssetFilePath("PixelShader.cso");
 
 		vertexShader = m_fileReader.LoadShaderBlobFromAssets(compiledVertexShaderPath);
 		pixelShader = m_fileReader.LoadShaderBlobFromAssets(compiledPixelShaderPath);
@@ -246,11 +257,15 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		pCmdList->SetPipelineState(m_modelPipelineState.Get());
 		pCmdList->SetGraphicsRootConstantBufferView(0, m_modelConstantBuffer->GetGPUVirtualAddress());
 		
-		const SIZE_T numVertexBufferViews = m_modelVbBuffers.size();
-		for (UINT i = 0; i < numVertexBufferViews; i++)
-		{
-			pCmdList->IASetVertexBuffers(i, 1, &m_modelVbvs[i]);
-		}
+		const SIZE_T numVertexBufferViews = m_modelVbvs.size();
+		D3D12_VERTEX_BUFFER_VIEW vbv = {};
+		vbv.BufferLocation = m_modelVbvs[0].BufferLocation;
+		vbv.SizeInBytes    = m_modelVbvs[0].SizeInBytes;
+		vbv.StrideInBytes  = m_modelVbvs[0].StrideInBytes;
+		assert(vbv.SizeInBytes > 0);
+		assert(vbv.StrideInBytes > 0);
+		assert(vbv.BufferLocation != 0);
+		pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
 
 		if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
 		{
@@ -268,6 +283,138 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	return S_OK;
 }
 
+HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
+{
+	HRESULT result = S_OK;
+
+	XMMATRIX modelMatrix;
+	
+	const std::vector<double>& meshTranslation = m_meshTransformInfo.translation;
+	const std::vector<double>& meshRotation    = m_meshTransformInfo.rotation;
+	const std::vector<double>& meshScale       = m_meshTransformInfo.scale;
+
+	if (m_meshTransformInfo.hasMatrix == FALSE)
+	{
+		XMVECTOR translation = (m_meshTransformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
+																						  (FLOAT)meshTranslation[1],
+																						  (FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
+
+		//XMVECTOR rotation =  XMMatrixIdentity();
+
+		XMVECTOR scale = (m_meshTransformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
+																			  (FLOAT)meshScale[1],
+																			  (FLOAT)meshScale[2],
+																			  1.0f) : XMVectorSplatOne();
+
+		XMMATRIX T = XMMatrixTranslationFromVector(translation);
+		XMMATRIX R = XMMatrixRotationY(XM_PIDIV2);
+		XMMATRIX S = XMMatrixScalingFromVector(scale);
+
+		modelMatrix = S * R * T;
+		PrintUtils::PrintXMMatrix("Model Matrix", modelMatrix);
+	}
+	else
+	{
+		const std::vector<double>& m4x4 = m_meshTransformInfo.matrix;
+
+
+		///@note gltf matrix is column major but DirectX Math expects row major.
+		///      We could transpose it while construction but looks likt that is "error prone"
+		///      Taking the safer approach.
+		XMFLOAT4X4 temp =
+		{
+			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
+			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
+			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
+			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
+		};
+
+		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
+		modelMatrix = XMMatrixTranspose(tempMat);
+	}
+
+	XMMATRIX mvpMatrix = GetMVPMatrix(modelMatrix);
+	XMFLOAT4X4 cbData;
+	XMStoreFloat4x4(&cbData, mvpMatrix);
+	
+	PrintUtils::PrintXMMatrix("Final MVP Matrix", mvpMatrix);
+	
+
+	///@note constant buffer data layout
+	/// MVP matrix (16 floats)
+	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
+	m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+
+	return result;
+}
+
+XMMATRIX Dx12HelloWorld::GetMVPMatrix(XMMATRIX& modelMatrix)
+{
+	const FLOAT width = (FLOAT)GetWidth();
+	const UINT  height      = GetHeight();
+	const FLOAT aspectRatio = ((FLOAT)width) / height;
+
+	assert(m_modelExtents.hasValidExtents == TRUE);
+
+	///@note FOV, width/height, near and far clipping plane.
+	const XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
+														 aspectRatio,
+														 0.1f,
+														 100.0f);
+
+	PrintUtils::PrintXMMatrix("Projection Matrix", projection);
+
+	const XMVECTOR minExtent = XMVectorSet(m_modelExtents.min[0], m_modelExtents.min[1], m_modelExtents.min[2], 1.0f);
+	const XMVECTOR maxExtent = XMVectorSet(m_modelExtents.max[0], m_modelExtents.max[1], m_modelExtents.max[2], 1.0f);
+
+	const XMVECTOR modelCenter  = (minExtent + maxExtent) / 2.0f;
+	const XMVECTOR modelDiagnol = (maxExtent - minExtent);
+	
+	const float diagLength = XMVectorGetX(XMVector3Length(modelDiagnol)) * 1.5f;
+	const XMVECTOR cameraPosition = modelCenter - XMVectorSet(0.0f, diagLength, 0.0f, 0.0f);
+
+
+	///@note camera position, camera forward vector, up direction
+	///@note this is stored in row-major order
+	const XMMATRIX view = XMMatrixLookAtLH(XMVectorSet(0,0,-15,0),
+		                             XMVectorZero(),
+		                             XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
+
+	PrintUtils::PrintXMMatrix("View Matrix", view);
+
+	const XMMATRIX mvpMatrix = modelMatrix * view * projection;
+
+	PrintUtils::PrintXMMatrix("MVP without Transpose", mvpMatrix);
+
+	const XMMATRIX finalMvp = XMMatrixTranspose(mvpMatrix);
+
+	return finalMvp;
+
+	//XMMATRIX model = XMMatrixScaling(0.389073f, 0.389073f, 0.389073f)	*
+	//	             XMMatrixTranslation(0.f, 0.078706f, 0.304987f);
+
+	//XMMATRIX model = XMMatrixScaling(1.0f, 1.0f, 1.0f) *
+	//	             XMMatrixTranslation(0.f, 0.0f, 0.0f);
+
+	//XMMATRIX view = XMMatrixTranslation(0.f, 0.f, 15.f); // camera at z=-15
+
+	//XMMATRIX proj = XMMatrixPerspectiveFovLH(
+	//	XM_PIDIV4, 16.f / 9.f, 0.1f, 100.f
+	//);
+
+	//XMMATRIX mvpMatrix = model * view * proj;
+
+	//XMMATRIX finalMvp = XMMatrixTranspose(mvpMatrix);
+
+	//PrintUtils::PrintXMMatrix("Model Matrix", model);
+	//PrintUtils::PrintXMMatrix("View  Matrix", view);
+	//PrintUtils::PrintXMMatrix("Projection Matrix", proj);
+	//PrintUtils::PrintXMMatrix("MVP Matrix", mvpMatrix);
+	//PrintUtils::PrintXMMatrix("Final MVP Matrix", finalMvp);
+
+	//return model;
+}
+
 HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 {
 	HRESULT result = S_OK;
@@ -275,8 +422,8 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 	tinygltf::TinyGLTF loader;
 	std::string        err;
 	std::string        warn;
-	std::wstring modelPath = m_fileReader.GetFullAssetFilePath(L"deer.gltf");
-	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, FileReader::ToNarrowString(modelPath));
+	std::string modelPath = m_fileReader.GetFullAssetFilePath("deer.gltf");
+	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, modelPath);
 	if (!warn.empty())
 	{
 		std::cout << "Warn: " << warn << std::endl;
@@ -299,62 +446,17 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 		const UINT firstMesh = firstNodeDesc.mesh;
 
 		///@todo Need to make cbuffer
-		const BOOL hasScale = (firstNodeDesc.scale.size() != 0);
-		const BOOL hasTranslation = (firstNodeDesc.translation.size() != 0);
-		const BOOL hasRotation = (firstNodeDesc.rotation.size() != 0);
+		m_meshTransformInfo.hasScale       = (firstNodeDesc.scale.size() != 0);
+		m_meshTransformInfo.hasTranslation = (firstNodeDesc.translation.size() != 0);
+		m_meshTransformInfo.hasRotation    = (firstNodeDesc.rotation.size() != 0);
+		m_meshTransformInfo.hasMatrix      = (firstNodeDesc.matrix.size()   != 0);
+		m_meshTransformInfo.translation    = firstNodeDesc.translation;
+		m_meshTransformInfo.rotation       = firstNodeDesc.rotation;
+		m_meshTransformInfo.scale          = firstNodeDesc.scale;
+
 		const BOOL hasMatrix = (firstNodeDesc.matrix.size() != 0);
 
-		XMMATRIX modelMatrix;
-		if (hasMatrix == FALSE)
-		{
-			XMVECTOR translation = (hasTranslation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.translation[0],
-				(FLOAT)firstNodeDesc.translation[1],
-				(FLOAT)firstNodeDesc.translation[2], 1.0f) : XMVectorZero();
-
-			XMVECTOR rotation = (hasRotation == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.rotation[0],
-				(FLOAT)firstNodeDesc.rotation[1],
-				(FLOAT)firstNodeDesc.rotation[2],
-				(FLOAT)firstNodeDesc.rotation[3]) : XMQuaternionIdentity();
-
-			XMVECTOR scale = (hasScale == TRUE) ? XMVectorSet((FLOAT)firstNodeDesc.scale[0],
-				(FLOAT)firstNodeDesc.scale[1],
-				(FLOAT)firstNodeDesc.scale[2],
-				1.0f) : XMVectorSplatOne();
-
-			XMMATRIX T = XMMatrixTranslationFromVector(translation);
-			XMMATRIX R = XMMatrixRotationQuaternion(rotation);
-			XMMATRIX S = XMMatrixScalingFromVector(scale);
-
-			modelMatrix = T * R * S;
-		}
-		else
-		{
-			const std::vector<double> m4x4 = firstNodeDesc.matrix;
-
-
-			///@note gltf matrix is column major but DirectX Math expects row major.
-			///      We could transpose it while construction but looks likt that is "error prone"
-			///      Taking the safer approach.
-			XMFLOAT4X4 temp =
-			{
-				(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
-				(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
-				(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
-				(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
-			};
-
-			XMMATRIX tempMat = XMLoadFloat4x4(&temp);
-			modelMatrix = XMMatrixTranspose(tempMat);
-		}
-
-		XMMATRIX mvpMatrix = GetMVPMatrix(modelMatrix);
-		XMFLOAT4X4 cbData;
-		XMStoreFloat4x4(&cbData, mvpMatrix);
-
-		///@note constant buffer data layout
-		/// MVP matrix (16 floats)
-		const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
-		m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+		
 
 		const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
 		const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
@@ -367,6 +469,8 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			m_modelVbBuffers.resize(firstPrimitive.attributes.size());
 			m_modelVbvs.resize(firstPrimitive.attributes.size());
 			m_modelIaSemantics.resize(firstPrimitive.attributes.size());
+
+			std::string positionAttributeName = "POSITION";
 
 			std::vector<std::string> supportedAttributeNames;
 			supportedAttributeNames.push_back("POSITION");
@@ -386,16 +490,33 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 				{
 					const std::string attributeName = it->first;
 					const int accessorIdx = it->second;
-
 					const tinygltf::Accessor& accessorDesc = model.accessors[accessorIdx];
+					const UINT componentDataType    = accessorDesc.componentType; 
+					const UINT componentVecType     = accessorDesc.type;
+					const UINT componentSizeInBytes = GetComponentTypeSizeInBytes(componentDataType);
+					const UINT numComponents        = GetNumComponentsInType(componentVecType);
+
+					///@note for POSITION attriubte, extents are needed to setup camera
+					if (attributeName == positionAttributeName)
+					{
+						std::vector<double> maxValues = accessorDesc.maxValues;
+						std::vector<double> minValues = accessorDesc.minValues;
+						memcpy(m_modelExtents.min, accessorDesc.minValues.data(), sizeof(m_modelExtents.min));
+						memcpy(m_modelExtents.max, accessorDesc.maxValues.data(), sizeof(m_modelExtents.max));
+						m_modelExtents.hasValidExtents = TRUE;
+					}
 					const int bufferViewIdx = accessorDesc.bufferView;
 					const tinygltf::BufferView bufViewDesc = model.bufferViews[bufferViewIdx];
+
+					///@todo need to support interleaved data
+					assert(bufViewDesc.byteStride == 0);
+
 					const int    bufferIdx = bufViewDesc.buffer;
 					const size_t buflength = bufViewDesc.byteLength;
 					const size_t bufOffset = bufViewDesc.byteOffset;
-					const size_t bufStride = bufViewDesc.byteStride;
+
 					const size_t accessorByteOffset = accessorDesc.byteOffset;
-					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(componentDataType, componentVecType);
 					numTotalVertices += accessorDesc.count;
 					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
 					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
@@ -403,7 +524,7 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 
 					m_modelVbvs[attrIndx].BufferLocation = m_modelVbBuffers[attrIndx].Get()->GetGPUVirtualAddress();
 					m_modelVbvs[attrIndx].SizeInBytes = (UINT)buflength;
-					m_modelVbvs[attrIndx].StrideInBytes = (UINT)bufStride;
+					m_modelVbvs[attrIndx].StrideInBytes = componentSizeInBytes * numComponents;
 
 					auto& currentSemantic = m_modelIaSemantics[attrIndx];
 					///@todo make a string utils class to check for stuff
@@ -423,9 +544,9 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 						currentSemantic.name = attributeName;
 						currentSemantic.isIndexValid = FALSE;
 					}
-					attributeIt++;
 					attrIndx++;
 				}
+				attributeIt++;
 			}
 			m_modelDrawPrimitive.numVertices = (UINT)(numTotalVertices);
 		}
@@ -461,6 +582,8 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			}
 		}
 	}
+
+	CreateSceneMVPMatrix();
 
 	return result;
 }

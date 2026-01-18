@@ -1,6 +1,7 @@
 #include "Dx12SampleBase.h"
 #include <d3dx12.h>
 #include "tiny_gltf.h"
+#include "DxPrintUtils.h"
 
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
@@ -298,45 +299,62 @@ VOID Dx12SampleBase::GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1
 	layout1.pInputElementDescs = inputElementDescs;
 }
 
-ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const LPCWSTR vertexShaderName,
-																	       const LPCWSTR pixelShaderName,
+ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
+																	       const std::string& pixelShaderName,
 	                                                                       ID3D12RootSignature* signature,
-																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout)
+																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
+																		   BOOL enableWireFrame)
 {
-	ComPtr<ID3D12PipelineState> gfxPipelineState;
+	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
 	ComPtr<ID3DBlob>            vertexShader;
 	ComPtr<ID3DBlob>            pixelShader;
 	
 	///@todo compileFlags = 0 for release
 	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 
-	std::wstring compiledVertexShaderPath = m_assetReader.GetFullAssetFilePath(vertexShaderName);
-	std::wstring compiledPixelShaderPath  = m_assetReader.GetFullAssetFilePath(pixelShaderName);
+	std::string compiledVertexShaderPath = m_assetReader.GetFullAssetFilePath(vertexShaderName);
+	std::string compiledPixelShaderPath  = m_assetReader.GetFullAssetFilePath(pixelShaderName);
 
 	vertexShader = m_assetReader.LoadShaderBlobFromAssets(compiledVertexShaderPath);
 	pixelShader  = m_assetReader.LoadShaderBlobFromAssets(compiledPixelShaderPath);
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.InputLayout                        = iaLayout;
-	pipelineStateDesc.pRootSignature                     = signature;
-	pipelineStateDesc.VS                                 = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-	pipelineStateDesc.PS                                 = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-	pipelineStateDesc.RasterizerState                    = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	pipelineStateDesc.BlendState                         = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	pipelineStateDesc.DepthStencilState                  = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	
-	///@todo write some test cases for this
-	pipelineStateDesc.SampleMask                         = UINT_MAX;
-	pipelineStateDesc.PrimitiveTopologyType              = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	pipelineStateDesc.NumRenderTargets                   = 1;
-	pipelineStateDesc.RTVFormats[0]						 = GetBackBufferFormat();
-	
-	///@todo experiment with flags
-	pipelineStateDesc.Flags                              = D3D12_PIPELINE_STATE_FLAG_NONE;
-	
-	pipelineStateDesc.SampleDesc.Count                   = 1;
-	
-	m_pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&gfxPipelineState));
+	if (vertexShader == nullptr || pixelShader == nullptr)
+	{
+		PrintUtils::PrintString("Unable to load shaders");
+	}
+	else
+	{
+
+		CD3DX12_RASTERIZER_DESC rast(D3D12_DEFAULT);
+
+		if (enableWireFrame == TRUE)
+		{
+			rast.CullMode = D3D12_CULL_MODE_NONE;
+			rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
+		}
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
+		pipelineStateDesc.InputLayout = iaLayout;
+		pipelineStateDesc.pRootSignature = signature;
+		pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
+		pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+		pipelineStateDesc.RasterizerState = rast;
+		pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		pipelineStateDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+		///@todo write some test cases for this
+		pipelineStateDesc.SampleMask = UINT_MAX;
+		pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		pipelineStateDesc.NumRenderTargets = 1;
+		pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
+
+		///@todo experiment with flags
+		pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+		pipelineStateDesc.SampleDesc.Count = 1;
+
+		m_pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&gfxPipelineState));
+	}
 
 	return gfxPipelineState;
 }
@@ -372,8 +390,8 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 
 	D3D12_INPUT_LAYOUT_DESC layout1 = {};
 	GetInputLayoutDesc_Layout1(layout1);
-	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders(L"FrameSimpleVS.cso",
-		                                                               L"FrameSimplePS.cso",
+	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders("FrameSimple_VS.cso",
+		                                                               "FrameSimple_PS.cso",
 		                                                               m_simpleComposition.rootSignature.Get(),
 		                                                               layout1);
 
@@ -381,14 +399,16 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	///      This helps in avoiding diagonal interpolation issues.
 	/// 
 	///      Normalized coordinates for Dx12 (x,y):
-	///      (-1, -1)	(+1, -1)
-	///      (-1, +1)   (+1, +1)
+	///      (-1, -1) uv=(0,0)	(+1, -1) uv = (1,0)
+	///      (-1, +1) uv=(0,1)   (+1, +1) uv = (1,1)
 	///      Simple Vertex is position[3], color[3], texcoord[2]
 	SimpleVertex fullScreenTri[] =
 	{
-		{-1.0f, -1.0f, +1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f},
-		{-1.0f, +3.0f, +1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 2.0f},
-		{+3.0f, -1.0f, +1.0f, 1.0f, 1.0f, 1.0f, 2.0f, 0.0f}
+		{-1.0f, -1.0f, +1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f},   // start only vertex visible at bottom left
+		{-1.0f, +3.0f, +1.0f, 1.0f, 1.0f, 1.0f, 0.0f, -1.0f},  // clockwise to top(out of screen) left
+		{+3.0f, -1.0f, +1.0f, 1.0f, 1.0f, 1.0f, 2.0f, 1.0f},   // clockwise to third vertex out of screen
+		
+		
 	};
 	UINT dataSizeInBytes = sizeof(fullScreenTri);
 
@@ -606,99 +626,5 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 	return result;
 }
 
-
-XMMATRIX Dx12SampleBase::GetMVPMatrix(XMMATRIX& modelMatrix)
-{
-	FLOAT aspectRatio = ((FLOAT)m_width) / m_height;
-	///@note FOV, width/height, near and far clipping plane.
-	XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
-												   aspectRatio,
-												   0.1f,
-												   100.0f);
-
-	///@note camera position, camera forward vector, up direction
-	XMMATRIX view = XMMatrixLookAtLH(XMVectorSet(0.0f, 2.0f, -5.0f, 1.0f),
-									 XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f),
-									 XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-
-	XMMATRIX finalMvp = XMMatrixTranspose(modelMatrix * view * projection);
-
-	return finalMvp;
-}
-
-DXGI_FORMAT Dx12SampleBase::GltfGetDxgiFormat(int tinyGltfComponentType, int components)
-{
-	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
-
-	switch (tinyGltfComponentType)
-	{
-	case TINYGLTF_COMPONENT_TYPE_FLOAT:
-		dxgiFormat = GetDxgiFloatFormat(components);
-		break;
-
-	case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-		dxgiFormat = GetDxgiUnsignedShortFormat(components);
-		break;
-	default:
-		break;
-	}
-
-	return dxgiFormat;
-}
-
-/*
-#define TINYGLTF_TYPE_VEC2 (2)
-#define TINYGLTF_TYPE_VEC3 (3)
-#define TINYGLTF_TYPE_VEC4 (4)
-#define TINYGLTF_TYPE_MAT2 (32 + 2)
-#define TINYGLTF_TYPE_MAT3 (32 + 3)
-#define TINYGLTF_TYPE_MAT4 (32 + 4)
-#define TINYGLTF_TYPE_SCALAR (64 + 1)
-#define TINYGLTF_TYPE_VECTOR (64 + 4)
-#define TINYGLTF_TYPE_MATRIX (64 + 16) 
-*/
-DXGI_FORMAT Dx12SampleBase::GetDxgiFloatFormat(int numComponents)
-{
-	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
-
-	switch (numComponents)
-	{
-	case TINYGLTF_TYPE_SCALAR:
-		dxgiFormat = DXGI_FORMAT_R32_FLOAT;
-		break;
-	case TINYGLTF_TYPE_VEC2:
-		dxgiFormat = DXGI_FORMAT_R32G32_FLOAT;
-		break;
-	case TINYGLTF_TYPE_VEC3:
-		dxgiFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		break;
-	case TINYGLTF_TYPE_VEC4:
-		dxgiFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		break;
-	default:
-		break;
-	}
-
-	return dxgiFormat;
-}
-
-DXGI_FORMAT Dx12SampleBase::GetDxgiUnsignedShortFormat(int numComponents)
-{
-	DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
-
-	switch (numComponents)
-	{
-	case TINYGLTF_TYPE_SCALAR:
-		dxgiFormat = DXGI_FORMAT_R16_UINT;
-		break;
-	case TINYGLTF_TYPE_VEC2:
-		dxgiFormat = DXGI_FORMAT_R16G16_UINT;
-		break;
-	default:
-		break;
-	}
-
-	return dxgiFormat;
-}
 
 
