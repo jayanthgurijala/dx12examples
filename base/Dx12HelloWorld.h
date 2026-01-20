@@ -8,41 +8,6 @@
 using namespace Microsoft::WRL;
 using namespace DirectX;
 
-struct DxExtents
-{
-	double min[3];
-	double max[3];
-	BOOL hasValidExtents;
-};
-
-struct DxMeshNodeTransformInfo
-{
-	BOOL hasTranslation;
-	BOOL hasRotation;
-	BOOL hasScale;
-	BOOL hasMatrix;
-	
-	std::vector<double> translation;
-	std::vector<double> rotation;
-	std::vector<double> scale;
-	std::vector<double> matrix;
-};
-
-struct DxIASemantic
-{
-	std::string name;
-	UINT index;
-	BOOL isIndexValid;
-	DXGI_FORMAT format;
-};
-
-struct DxDrawPrimitive
-{
-	UINT numVertices;
-	UINT numIndices;
-	BOOL isIndexedDraw;
-};
-
 class Dx12HelloWorld : public Dx12SampleBase
 {
 public:
@@ -78,7 +43,7 @@ private:
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
 	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
-	ComPtr<ID3D12Resource>                m_modelConstantBuffer;
+	ComPtr<ID3D12Resource>                m_mvpCameraConstantBuffer;
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
 	DxDrawPrimitive                       m_modelDrawPrimitive;

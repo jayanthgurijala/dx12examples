@@ -18,19 +18,54 @@ struct SimpleVertex
 	FLOAT texCoords[2];
 };
 
+struct DxExtents
+{
+	double min[3];
+	double max[3];
+	BOOL hasValidExtents;
+};
+
+struct DxMeshNodeTransformInfo
+{
+	BOOL hasTranslation;
+	BOOL hasRotation;
+	BOOL hasScale;
+	BOOL hasMatrix;
+
+	std::vector<double> translation;
+	std::vector<double> rotation;
+	std::vector<double> scale;
+	std::vector<double> matrix;
+};
+
+struct DxIASemantic
+{
+	std::string name;
+	UINT index;
+	BOOL isIndexValid;
+	DXGI_FORMAT format;
+};
+
+struct DxDrawPrimitive
+{
+	UINT numVertices;
+	UINT numIndices;
+	BOOL isIndexedDraw;
+};
+
 class Dx12SampleBase
 {
 public:
 	Dx12SampleBase(UINT width, UINT height);
 	HRESULT OnInit(HWND hwnd);
 	virtual HRESULT PreRun()  { return S_OK; };
-	HRESULT Run();
+	HRESULT Run(float frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
 	FLOAT m_aspectRatio;
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
-
 	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
+	FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }
 
 
 protected:
@@ -50,7 +85,7 @@ protected:
 											  D3D12_RESOURCE_STATES      dstStateBefore,
 		                                      D3D12_RESOURCE_STATES      dstStateAfter);
 	HRESULT WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue);
-	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData, UINT sizeInBytes);
+	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap = FALSE);
 
 	inline ID3D12Device*              GetDevice()           { return m_pDevice.Get();           }
 	inline ID3D12GraphicsCommandList* GetCmdList()          { return m_pCmdList.Get();          }
@@ -59,6 +94,9 @@ protected:
 	inline UINT                       GetHeight()           { return m_height;}
 	virtual DXGI_FORMAT GetBackBufferFormat();
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
+
+	XMMATRIX GetModelMatrix(const DxMeshNodeTransformInfo& transformInfo);
+	XMMATRIX GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent);
 
 private:
 
@@ -109,5 +147,6 @@ private:
 	ComPtr<ID3D12Fence>         m_fence;
 	UINT64                      m_fenceValue;
 	HANDLE                      m_fenceEvent;
+	FLOAT						m_frameDeltaTime;
 };
 

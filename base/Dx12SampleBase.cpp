@@ -9,7 +9,8 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_height(height),
 	m_simpleComposition({}),
 	m_fenceValue(0),
-	m_fenceEvent(0)
+	m_fenceEvent(0),
+	m_frameDeltaTime(0)
 {
 	m_aspectRatio = (static_cast<FLOAT>(width)) / height;
 	m_assetReader = FileReader();
@@ -423,14 +424,16 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	return result;
 }
 
-ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT sizeInBytes)
+ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap)
 {
 	ID3D12GraphicsCommandList*  pCmdList  = m_pCmdList.Get();
 	ID3D12CommandQueue*         pCmdQueue = m_pCmdQueue.Get();
 
 	ComPtr<ID3D12Resource> bufferResource;
 
-	auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
+
+	auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
 	auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeInBytes);
 
 	m_pDevice->CreateCommittedResource(&heapProps,
@@ -440,15 +443,19 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 										nullptr,
 										IID_PPV_ARGS(&bufferResource));
 
-	pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+	if (cpuData != NULL && sizeInBytes > 0)
+	{
 
-	UploadCpuDataAndWaitForCompletion(cpuData,
-							   sizeInBytes,
-							   pCmdList,
-							   pCmdQueue,
-							   bufferResource.Get(),
-							   D3D12_RESOURCE_STATE_COMMON,
-							   D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+
+		UploadCpuDataAndWaitForCompletion(cpuData,
+										  sizeInBytes,
+										  pCmdList,
+										  pCmdQueue,
+										  bufferResource.Get(),
+										  D3D12_RESOURCE_STATE_COMMON,
+										  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+	}
 
 	return bufferResource;
 
@@ -517,9 +524,11 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                 
 	return result;
 }
 
-HRESULT Dx12SampleBase::Run()
+HRESULT Dx12SampleBase::Run(FLOAT frameDeltaTime)
 {
 	HRESULT result = S_OK;
+
+	m_frameDeltaTime = frameDeltaTime;
 	
 	result = m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
@@ -624,6 +633,101 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 	}
 
 	return result;
+}
+
+
+XMMATRIX Dx12SampleBase::GetModelMatrix(const DxMeshNodeTransformInfo& transformInfo)
+{
+	XMMATRIX modelMatrix;
+
+	const std::vector<double>& meshTranslation = transformInfo.translation;
+	const std::vector<double>& meshRotation    = transformInfo.rotation;
+	const std::vector<double>& meshScale       = transformInfo.scale;
+
+	if (transformInfo.hasMatrix == FALSE)
+	{
+		XMVECTOR translation = (transformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
+																				    (FLOAT)meshTranslation[1],
+																					(FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
+
+		//XMVECTOR rotation =  XMMatrixIdentity();
+
+		XMVECTOR scale = (transformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
+																        (FLOAT)meshScale[1],
+			                                                            (FLOAT)meshScale[2],
+			                                                            1.0f) : XMVectorSplatOne();
+
+		XMMATRIX T = XMMatrixTranslationFromVector(translation);
+
+		///@todo find good way for this rotate by 180 degree gltf to dx RH vs LH conversion
+		XMMATRIX R = XMMatrixRotationY(XM_PI);
+		XMMATRIX S = XMMatrixScalingFromVector(scale);
+
+		modelMatrix = S * R * T;
+	}
+	else
+	{
+		const std::vector<double>& m4x4 = transformInfo.matrix;
+
+
+		///@note gltf matrix is column major but DirectX Math expects row major.
+		///      We could transpose it while construction but looks likt that is "error prone"
+		///      Taking the safer approach.
+		XMFLOAT4X4 temp =
+		{
+			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
+			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
+			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
+			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
+		};
+
+		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
+		modelMatrix = XMMatrixTranspose(tempMat);
+	}
+
+		return modelMatrix;
+}
+
+XMMATRIX Dx12SampleBase::GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent)
+{
+	static XMVECTOR up = XMVectorSet(0, 1, 0, 0);  // Y-up
+
+	///@todo possibly fix this and make a camera class
+	static FLOAT cameraRotateAngleInDeg = 0;
+	const FLOAT deltaFrameTime = GetFrameDeltaTime();
+	const FLOAT cameraSpeedInDegPerSecond = 10.0f;
+
+	///@todo use std::chrono properly
+	cameraRotateAngleInDeg += cameraSpeedInDegPerSecond * deltaFrameTime;
+
+	const XMVECTOR sceneCenter = (minExtent + maxExtent) / 2.0f;
+	const XMVECTOR sceneDiagnol = (maxExtent - minExtent);
+	const float diagLength = XMVectorGetX(XMVector3Length(sceneDiagnol)) * 1.5f;
+	const XMVECTOR cameraPosition = sceneCenter - XMVectorSet(0.0f, 0.0f, diagLength, 0.0f);
+
+	///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".
+	const XMVECTOR cameraVector     = cameraPosition - sceneCenter;
+	const XMMATRIX rotationMatrix   = XMMatrixRotationY(XMConvertToRadians(cameraRotateAngleInDeg));
+	const XMVECTOR newCameraVector  = XMVector3Transform(cameraVector, rotationMatrix);
+	const XMVECTOR newCameraPos     = newCameraVector + sceneCenter;
+
+
+	///@note camera position, camera forward vector, up direction
+	///@note this is stored in row-major order
+	const XMMATRIX view = XMMatrixLookAtLH(newCameraPos,
+									       sceneCenter,
+			                               up);
+
+
+	const FLOAT aspectRatio = ((FLOAT)m_width) / m_height;
+
+	///@note FOV, width/height, near and far clipping plane.
+	const XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
+																			aspectRatio,
+																			0.1f,
+																			100.0f);
+
+	return view * projection;
 }
 
 

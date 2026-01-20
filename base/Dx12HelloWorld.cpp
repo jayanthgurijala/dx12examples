@@ -250,12 +250,13 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	}
 	else
 	{
+		CreateSceneMVPMatrix();
 		pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
 
 		///@todo get this from mode of primitive
 		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		pCmdList->SetPipelineState(m_modelPipelineState.Get());
-		pCmdList->SetGraphicsRootConstantBufferView(0, m_modelConstantBuffer->GetGPUVirtualAddress());
+		pCmdList->SetGraphicsRootConstantBufferView(0, m_mvpCameraConstantBuffer->GetGPUVirtualAddress());
 		
 		const SIZE_T numVertexBufferViews = m_modelVbvs.size();
 		D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -287,132 +288,41 @@ HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
 
-	XMMATRIX modelMatrix;
-	
-	const std::vector<double>& meshTranslation = m_meshTransformInfo.translation;
-	const std::vector<double>& meshRotation    = m_meshTransformInfo.rotation;
-	const std::vector<double>& meshScale       = m_meshTransformInfo.scale;
-
-	if (m_meshTransformInfo.hasMatrix == FALSE)
-	{
-		XMVECTOR translation = (m_meshTransformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
-																						  (FLOAT)meshTranslation[1],
-																						  (FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
-
-		//XMVECTOR rotation =  XMMatrixIdentity();
-
-		XMVECTOR scale = (m_meshTransformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
-																			  (FLOAT)meshScale[1],
-																			  (FLOAT)meshScale[2],
-																			  1.0f) : XMVectorSplatOne();
-
-		XMMATRIX T = XMMatrixTranslationFromVector(translation);
-		XMMATRIX R = XMMatrixRotationY(XM_PIDIV2);
-		XMMATRIX S = XMMatrixScalingFromVector(scale);
-
-		modelMatrix = S * R * T;
-		PrintUtils::PrintXMMatrix("Model Matrix", modelMatrix);
-	}
-	else
-	{
-		const std::vector<double>& m4x4 = m_meshTransformInfo.matrix;
-
-
-		///@note gltf matrix is column major but DirectX Math expects row major.
-		///      We could transpose it while construction but looks likt that is "error prone"
-		///      Taking the safer approach.
-		XMFLOAT4X4 temp =
-		{
-			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
-			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
-			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
-			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
-		};
-
-		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
-		modelMatrix = XMMatrixTranspose(tempMat);
-	}
-
-	XMMATRIX mvpMatrix = GetMVPMatrix(modelMatrix);
+	XMMATRIX modelMatrix = GetModelMatrix(m_meshTransformInfo);
+	XMMATRIX mvpMatrix   = GetMVPMatrix(modelMatrix);
 	XMFLOAT4X4 cbData;
 	XMStoreFloat4x4(&cbData, mvpMatrix);
-	
-	PrintUtils::PrintXMMatrix("Final MVP Matrix", mvpMatrix);
-	
+	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
 
+	///@todo avoid using static
+	static VOID* pMappedPtr = nullptr;
+	
 	///@note constant buffer data layout
 	/// MVP matrix (16 floats)
-	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
-	m_modelConstantBuffer = CreateBufferWithData(&cbData, constantBufferSizeInBytes);
+	if (pMappedPtr == nullptr)
+	{
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE);
+		CD3DX12_RANGE readRange(0, 0);
+		//@note specifying nullptr as read range indicates CPU can read entire resource
+		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
+	}
+	assert(pMappedPtr != nullptr);
+	memcpy(pMappedPtr, &cbData, constantBufferSizeInBytes);
+
 
 	return result;
 }
 
 XMMATRIX Dx12HelloWorld::GetMVPMatrix(XMMATRIX& modelMatrix)
 {
-	const FLOAT width = (FLOAT)GetWidth();
-	const UINT  height      = GetHeight();
-	const FLOAT aspectRatio = ((FLOAT)width) / height;
-
 	assert(m_modelExtents.hasValidExtents == TRUE);
-
-	///@note FOV, width/height, near and far clipping plane.
-	const XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
-														 aspectRatio,
-														 0.1f,
-														 100.0f);
-
-	PrintUtils::PrintXMMatrix("Projection Matrix", projection);
-
 	const XMVECTOR minExtent = XMVectorSet(m_modelExtents.min[0], m_modelExtents.min[1], m_modelExtents.min[2], 1.0f);
 	const XMVECTOR maxExtent = XMVectorSet(m_modelExtents.max[0], m_modelExtents.max[1], m_modelExtents.max[2], 1.0f);
-
-	const XMVECTOR modelCenter  = (minExtent + maxExtent) / 2.0f;
-	const XMVECTOR modelDiagnol = (maxExtent - minExtent);
-	
-	const float diagLength = XMVectorGetX(XMVector3Length(modelDiagnol)) * 1.5f;
-	const XMVECTOR cameraPosition = modelCenter - XMVectorSet(0.0f, diagLength, 0.0f, 0.0f);
-
-
-	///@note camera position, camera forward vector, up direction
-	///@note this is stored in row-major order
-	const XMMATRIX view = XMMatrixLookAtLH(XMVectorSet(0,0,-15,0),
-		                             XMVectorZero(),
-		                             XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
-
-	PrintUtils::PrintXMMatrix("View Matrix", view);
-
-	const XMMATRIX mvpMatrix = modelMatrix * view * projection;
-
-	PrintUtils::PrintXMMatrix("MVP without Transpose", mvpMatrix);
-
-	const XMMATRIX finalMvp = XMMatrixTranspose(mvpMatrix);
+	XMMATRIX viewProj        = GetViewProjMatrix(minExtent, maxExtent);
+	const XMMATRIX mvpMatrix = modelMatrix * viewProj;
+	const XMMATRIX finalMvp  = XMMatrixTranspose(mvpMatrix);
 
 	return finalMvp;
-
-	//XMMATRIX model = XMMatrixScaling(0.389073f, 0.389073f, 0.389073f)	*
-	//	             XMMatrixTranslation(0.f, 0.078706f, 0.304987f);
-
-	//XMMATRIX model = XMMatrixScaling(1.0f, 1.0f, 1.0f) *
-	//	             XMMatrixTranslation(0.f, 0.0f, 0.0f);
-
-	//XMMATRIX view = XMMatrixTranslation(0.f, 0.f, 15.f); // camera at z=-15
-
-	//XMMATRIX proj = XMMatrixPerspectiveFovLH(
-	//	XM_PIDIV4, 16.f / 9.f, 0.1f, 100.f
-	//);
-
-	//XMMATRIX mvpMatrix = model * view * proj;
-
-	//XMMATRIX finalMvp = XMMatrixTranspose(mvpMatrix);
-
-	//PrintUtils::PrintXMMatrix("Model Matrix", model);
-	//PrintUtils::PrintXMMatrix("View  Matrix", view);
-	//PrintUtils::PrintXMMatrix("Projection Matrix", proj);
-	//PrintUtils::PrintXMMatrix("MVP Matrix", mvpMatrix);
-	//PrintUtils::PrintXMMatrix("Final MVP Matrix", finalMvp);
-
-	//return model;
 }
 
 HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
@@ -445,7 +355,6 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 		const tinygltf::Node& firstNodeDesc = model.nodes[0];
 		const UINT firstMesh = firstNodeDesc.mesh;
 
-		///@todo Need to make cbuffer
 		m_meshTransformInfo.hasScale       = (firstNodeDesc.scale.size() != 0);
 		m_meshTransformInfo.hasTranslation = (firstNodeDesc.translation.size() != 0);
 		m_meshTransformInfo.hasRotation    = (firstNodeDesc.rotation.size() != 0);
@@ -455,8 +364,6 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 		m_meshTransformInfo.scale          = firstNodeDesc.scale;
 
 		const BOOL hasMatrix = (firstNodeDesc.matrix.size() != 0);
-
-		
 
 		const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
 		const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
@@ -580,6 +487,32 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			{
 				m_modelDrawPrimitive.isIndexedDraw = FALSE;
 			}
+		}
+
+		//load materials
+		{
+			const int materialIdx = firstPrimitive.material;
+			if (materialIdx != -1)
+			{
+				const tinygltf::Material&             materialDesc         = model.materials[materialIdx];
+				const tinygltf::PbrMetallicRoughness& pbrMaterialRoughness = materialDesc.pbrMetallicRoughness;
+				const tinygltf::TextureInfo&          baseColorTex         = pbrMaterialRoughness.baseColorTexture;
+				const int                             textureIdx           = baseColorTex.index;
+				const tinygltf::Texture&              baseTexInfo          = model.textures[textureIdx];
+				const int                             baseTexSource        = baseTexInfo.source;
+				const tinygltf::Image&                baseTexImage         = model.images[baseTexSource];
+				const int                             bufViewIdx           = baseTexImage.bufferView;
+				const tinygltf::BufferView&           bufViewDesc          = model.bufferViews[bufViewIdx];
+				const int                             bufferIdx            = bufViewDesc.buffer;
+				const size_t                          byteLength           = bufViewDesc.byteLength;
+				const tinygltf::Buffer&               bufferDesc           = model.buffers[bufferIdx];
+				&bufferDesc.data[bufViewDesc.byteOffset];
+
+				assert(bufViewDesc.byteStride == 0);
+
+
+			}
+			
 		}
 	}
 

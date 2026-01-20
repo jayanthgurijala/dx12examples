@@ -3,12 +3,16 @@
 #include "stdafx.h"
 #include "Win32Application.h"
 #include "Dx12SampleBase.h"
+#include <chrono>
 
 HWND Win32Application::m_hwnd = nullptr;
 
 int Win32Application::Run(Dx12SampleBase* pSample, HINSTANCE hInstance, int nCmdShow)
 {
 	//@todo command line arguments
+
+	///@todo understand this
+	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
 
 	//Create window
@@ -45,18 +49,29 @@ int Win32Application::Run(Dx12SampleBase* pSample, HINSTANCE hInstance, int nCmd
 
 	pSample->PreRun();
 
-	pSample->Run();
-
 	//Main message loop
 	MSG msg = {};
+	using clock = std::chrono::high_resolution_clock;
+	using durationf32 = std::chrono::duration<float>;
+	auto previousTime = clock::now();
+
 	while (msg.message != WM_QUIT)
 	{
+		
 		//process messages in the queue
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+
+		auto currentTime = clock::now();
+
+		// deltaTime in seconds
+		 durationf32 duration = (currentTime - previousTime);
+
+		pSample->Run(duration.count());
+		previousTime = currentTime;
 	}
 
 	pSample->PostRun();
