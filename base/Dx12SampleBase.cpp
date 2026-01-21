@@ -1,5 +1,4 @@
 #include "Dx12SampleBase.h"
-#include <d3dx12.h>
 #include "tiny_gltf.h"
 #include "DxPrintUtils.h"
 
@@ -64,6 +63,12 @@ HRESULT Dx12SampleBase::CreateDevice()
 				featureLevel,
 				IID_PPV_ARGS(&m_pDevice)
 	);
+
+	m_srvUavCbvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_samplerDescriptorSize   = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+	m_dsvDescriptorSize       = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	m_rtvDescriptorSize       = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
 
 	return result;
 }
@@ -184,16 +189,13 @@ HRESULT Dx12SampleBase::CreateShaderResourceViewDescriptorHeap(UINT numDescripto
 
 HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 {
-	HRESULT    result = S_OK;
-	const UINT start  = (isInternal == TRUE) ? 0 : GetSwapChainBufferCount();
-
-	///@todo repeats code A
-	UINT    rtvHeapSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescHeap.Get()->GetCPUDescriptorHandleForHeapStart());
-	rtvHandle.Offset(start, rtvHeapSize);
+	HRESULT    result    = S_OK;
+	const UINT start     = (isInternal == TRUE) ? 0 : GetSwapChainBufferCount();
+	UINT	   rtvOffset = 0;
 
 	for (UINT i = start; i < start + numRTVs; i++)
 	{
+		auto rtvHandle = GetRtvCpuHeapHandle(start + rtvOffset);
 		ID3D12Resource* rtvResource = nullptr;
 		if (isInternal)
 		{
@@ -206,7 +208,8 @@ HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 		}
 
 		m_pDevice->CreateRenderTargetView(rtvResource, nullptr, rtvHandle);
-		rtvHandle.Offset(1, rtvHeapSize);
+		rtvOffset++;
+
 	}
 
 	return result;
@@ -215,11 +218,8 @@ HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 D3D12_CPU_DESCRIPTOR_HANDLE Dx12SampleBase::GetRenderTargetView(UINT rtvIndex, BOOL isInternal)
 {
 	const UINT rtvOffset = (isInternal == TRUE) ? 0 : GetSwapChainBufferCount();
-	///@todo repete code A
-	UINT rtvHeapSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescHeap.Get()->GetCPUDescriptorHandleForHeapStart());
-	rtvHandle.Offset(rtvIndex + rtvOffset, rtvHeapSize);
-	
+	auto rtvHandle = GetRtvCpuHeapHandle(rtvIndex + rtvOffset);
+
 	return rtvHandle;
 }
 
@@ -265,11 +265,9 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 
 	auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-	const UINT srvDescHeapSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	CD3DX12_CPU_DESCRIPTOR_HANDLE srvHandle(m_srvDescHeap->GetCPUDescriptorHandleForHeapStart());
-
 	for (UINT i=0; i<numResources; i++)
 	{
+		auto srvHandle = GetSrvCpuHeapHandle(i);
 		m_pDevice->CreateCommittedResource(&heapProperties,
 			                               D3D12_HEAP_FLAG_NONE,
 										   &resourceDesc,
@@ -280,10 +278,27 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
 										 nullptr,
 			                             srvHandle);
-		srvHandle.Offset(1, srvDescHeapSize);
 	}
 
 	return result;
+}
+
+/*
+* 
+* SRV Heap Layout is
+* 
+* 1. N SRV descriptors for RTV composition NumRTVsNeededForApp()
+*		- These are created when app creates RTV resources CreateRenderTargetResourceAndSRVs
+* 
+* 2. M descriptors requested by application NumSRVsNeededForApp()
+* 
+*/
+VOID Dx12SampleBase::CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource)
+{
+	const UINT appSrvStartIndex = NumRTVsNeededForApp();	//see comment above
+	auto srvHandle = GetSrvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+	m_pDevice->CreateShaderResourceView(srvResource, nullptr, srvHandle);
+
 }
 
 VOID Dx12SampleBase::GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1)
@@ -445,9 +460,6 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 
 	if (cpuData != NULL && sizeInBytes > 0)
 	{
-
-		pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
-
 		UploadCpuDataAndWaitForCompletion(cpuData,
 										  sizeInBytes,
 										  pCmdList,
@@ -456,9 +468,40 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 										  D3D12_RESOURCE_STATE_COMMON,
 										  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 	}
-
 	return bufferResource;
+}
 
+ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format)
+{
+	ID3D12GraphicsCommandList* pCmdList = m_pCmdList.Get();
+	ID3D12CommandQueue* pCmdQueue       = m_pCmdQueue.Get();
+	ComPtr<ID3D12Resource> texture2D;
+
+	auto heapProps    = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	auto resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1);
+
+	m_pDevice->CreateCommittedResource(&heapProps,
+		                               D3D12_HEAP_FLAG_NONE,
+		                               &resourceDesc,
+		                               D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		                               nullptr,
+		                               IID_PPV_ARGS(&texture2D));
+
+	auto queryDesc = texture2D.Get()->GetDesc();
+
+
+	if (cpuData != NULL && sizeInBytes > 0)
+	{
+		UploadCpuDataAndWaitForCompletion(cpuData,
+			                              sizeInBytes,
+			                              pCmdList,
+			                              pCmdQueue,
+			                              texture2D.Get(),
+			                              D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			                              D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	}
+
+	return texture2D;
 }
 
 HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                      cpuData,
@@ -473,11 +516,46 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                 
 
 	ComPtr<ID3D12Resource> stagingResource;
 
-	//Create an staging resource for upload
+	D3D12_RESOURCE_DESC dstResDesc = pDstRes->GetDesc();
+
+	assert(dstResDesc.MipLevels == 1);
+	assert(dstResDesc.DepthOrArraySize = 1);
+
+	//@todo test and add more
+	assert(dstResDesc.Format == DXGI_FORMAT_UNKNOWN || DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+
+	//@todo add more support
+	assert(dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER || D3D12_RESOURCE_DIMENSION_TEXTURE2D);
+
+
+
+	///@note used for textures.
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
+	UINT numRows;
+	UINT64 rowSizeInBytes, totalSizeInBytes;
+	UINT64 dstResWidth       = dstResDesc.Width;
+	UINT64 dstResHeight      = dstResDesc.Height;
+	DXGI_FORMAT dstResFormat = dstResDesc.Format;
+
+	///@note Create an upload heap, for buffers it is straight forward, but for textures we need get the footprint
 	{
 		CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
-		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(dataSizeInBytes);
+		CD3DX12_RESOURCE_DESC resourceDesc;
 
+		if (dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+		{
+			resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(dataSizeInBytes);
+		}
+		else if (dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+		{
+			m_pDevice->GetCopyableFootprints(&dstResDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalSizeInBytes);
+			resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(totalSizeInBytes);
+		}
+		else
+		{
+			assert(0);
+		}
+		
 		result = m_pDevice->CreateCommittedResource(&heapProperties,
 													 D3D12_HEAP_FLAG_NONE,
 													 &resourceDesc,
@@ -491,8 +569,23 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                 
 
 	//@note specifying nullptr as read range indicates CPU can read entire resource
 	stagingResource->Map(0, &readRange, &pMappedPtr);
-	memcpy(pMappedPtr, cpuData, dataSizeInBytes);
+	if (dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+	{
+		memcpy(pMappedPtr, cpuData, dataSizeInBytes);
+	}
+	else
+	{
+		for (UINT row = 0; row < numRows; row++)
+		{
+			BYTE* pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
+			BYTE* pCpuBytePtr    = static_cast<BYTE*>(cpuData);
+			memcpy(pMappedBytePtr + footprint.Offset + row * footprint.Footprint.RowPitch, pCpuBytePtr + row * rowSizeInBytes, rowSizeInBytes);
+		}
+	}
 	stagingResource->Unmap(0, nullptr);
+
+	///@todo not really good to reset here, need to abstract?
+	pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
 	if (dstStateBefore != D3D12_RESOURCE_STATE_COPY_DEST)
 	{
@@ -502,11 +595,32 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                 
 		pCmdList->ResourceBarrier(1, &toCopyDst);
 	}
 
-	pCmdList->CopyBufferRegion(pDstRes,
-							   0,
-		                       stagingResource.Get(),
-		                       0,
-		                       dataSizeInBytes);
+	if (dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+	{
+		pCmdList->CopyBufferRegion(pDstRes,
+								   0,
+			                       stagingResource.Get(),
+			                       0,
+			                       dataSizeInBytes);
+	}
+	else if (dstResDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+	{
+		D3D12_TEXTURE_COPY_LOCATION dstCopyLoc;
+		dstCopyLoc.pResource = pDstRes;
+		dstCopyLoc.SubresourceIndex = 0;
+		dstCopyLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
+		D3D12_TEXTURE_COPY_LOCATION srcCopyLoc;
+		srcCopyLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		srcCopyLoc.pResource = stagingResource.Get();
+		srcCopyLoc.PlacedFootprint = footprint;
+
+		pCmdList->CopyTextureRegion(&dstCopyLoc, 0, 0, 0, &srcCopyLoc, nullptr);
+	}
+	else
+	{
+		assert(0);
+	}
 
 	if (dstStateAfter != D3D12_RESOURCE_STATE_COPY_DEST)
 	{
@@ -564,12 +678,15 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 
 	m_pCmdList->ResourceBarrier(2, preResourceBarriers);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(currentFrameIndex, TRUE);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle   = GetRenderTargetView(currentFrameIndex, TRUE);
+	ID3D12DescriptorHeap*       descHeaps[] = { GetSrvDescriptorHeap() };
+
 	m_pCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	m_pCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_pCmdList->SetPipelineState(m_simpleComposition.pipelineState.Get());
 	m_pCmdList->SetGraphicsRootSignature(m_simpleComposition.rootSignature.Get());
-	m_pCmdList->SetDescriptorHeaps(1, m_srvDescHeap.GetAddressOf());
+	m_pCmdList->SetDescriptorHeaps(1, descHeaps);
+	//m_pCmdList->SetGraphicsRootDescriptorTable(0, GetSrvGpuHeapHandle(rtvResourceIndex)
 	m_pCmdList->SetGraphicsRootDescriptorTable(0,
 		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvDescHeap->GetGPUDescriptorHandleForHeapStart(),
 			rtvResourceIndex,
@@ -626,9 +743,10 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 	{
 		const UINT numRTVsForComposition = GetSwapChainBufferCount();
 		const UINT numRTVsForApp         = NumRTVsNeededForApp();
+		const UINT numSRVsForApp         = NumSRVsNeededForApp();
 
 		CreateRenderTargetDescriptorHeap(numRTVsForComposition + numRTVsForApp);
-		CreateShaderResourceViewDescriptorHeap(numRTVsForApp);
+		CreateShaderResourceViewDescriptorHeap(numRTVsForApp + numSRVsForApp);
 		CreateRenderTargetViews(numRTVsForComposition, TRUE);
 	}
 

@@ -17,6 +17,7 @@ public:
 	virtual HRESULT PostRun() override;
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
+	virtual inline UINT NumSRVsNeededForApp() override { return 1; }
 private:
 
 	HRESULT CreatePipelineState();		///< Create RootSignature, Compile Shaders, Create Pipeline State
@@ -49,5 +50,6 @@ private:
 	DxDrawPrimitive                       m_modelDrawPrimitive;
 	DxMeshNodeTransformInfo               m_meshTransformInfo;
 	DxExtents							  m_modelExtents;
+	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
 };
 

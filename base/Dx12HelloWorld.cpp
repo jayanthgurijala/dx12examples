@@ -4,8 +4,10 @@
 #include "DxPrintUtils.h"
 #include "DxGltfUtils.h"
 #include "tiny_gltf.h"
+#include "WICImageLoader.h"
 
 using namespace DxGltfUtils;
+using namespace WICImageLoader;
 
 
 
@@ -14,6 +16,8 @@ Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 	m_vertexStrideInBytes(0),
 	m_modelExtents{},
 	m_modelDrawPrimitive{},
+	m_modelBaseColorTex2D(nullptr),
+	m_modelIbv{},
 	Dx12SampleBase(width, height)
 {
 	m_fileReader = FileReader();
@@ -73,9 +77,12 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	//@todo Root signature
 	//Root CBV
 	//desc table -> SRV
-	CD3DX12_ROOT_PARAMETER parameters[1];
+	CD3DX12_ROOT_PARAMETER parameters[2] = {};
 	parameters[0].InitAsConstantBufferView(0);
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(1, parameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	parameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, parameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> error;
 	ComPtr<ID3DBlob> signature;
@@ -89,6 +96,7 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 
 }
 
+///@todo remove this function
 HRESULT Dx12HelloWorld::CreatePipelineState()
 {
 	HRESULT       result  = S_OK;
@@ -267,6 +275,15 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		assert(vbv.StrideInBytes > 0);
 		assert(vbv.BufferLocation != 0);
 		pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
+
+		///@todo support models without base textures
+		assert(m_modelBaseColorTex2D != nullptr);
+		
+		ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
+
+		pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+		pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+
 
 		if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
 		{
@@ -503,14 +520,13 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 				const tinygltf::Image&                baseTexImage         = model.images[baseTexSource];
 				const int                             bufViewIdx           = baseTexImage.bufferView;
 				const tinygltf::BufferView&           bufViewDesc          = model.bufferViews[bufViewIdx];
-				const int                             bufferIdx            = bufViewDesc.buffer;
-				const size_t                          byteLength           = bufViewDesc.byteLength;
-				const tinygltf::Buffer&               bufferDesc           = model.buffers[bufferIdx];
-				&bufferDesc.data[bufViewDesc.byteOffset];
+				const tinygltf::Buffer&               bufferDesc           = model.buffers[bufViewDesc.buffer];
 
 				assert(bufViewDesc.byteStride == 0);
 
-
+				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferDesc.data[bufViewDesc.byteOffset], bufViewDesc.byteLength);
+				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
+				CreateAppSrvAtIndex(0, m_modelBaseColorTex2D.Get());
 			}
 			
 		}
