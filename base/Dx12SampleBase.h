@@ -72,12 +72,14 @@ public:
 protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
+	HRESULT CreateDsvResources(UINT numResources, BOOL createViews = TRUE);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
 	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
 															   const std::string& pixelShaderName,
 															   ID3D12RootSignature* signature,
 		                                                       const D3D12_INPUT_LAYOUT_DESC& iaLayout,
-														       BOOL wireframe = FALSE);
+														       BOOL wireframe = FALSE,
+		                                                       BOOL doubleSided = FALSE);
 	HRESULT UploadCpuDataAndWaitForCompletion(void*                      cpuData,
 		                                      UINT                       dataSizeInBytes,
 		                                      ID3D12GraphicsCommandList* pcmdList,
@@ -139,9 +141,17 @@ protected:
 		return handle;
 	}
 
+	inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetDsvCpuHeapHandle(UINT index)
+	{
+		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvDescHeap->GetCPUDescriptorHandleForHeapStart());
+		OffsetHandle< CD3DX12_CPU_DESCRIPTOR_HANDLE>(handle, index, m_dsvDescriptorSize);
+		return handle;
+	}
+
 	virtual DXGI_FORMAT GetBackBufferFormat();
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 	virtual inline UINT NumSRVsNeededForApp() { return 0; }
+	virtual inline UINT NumDSVsNeededForApp() { return 0; }
 
 	XMMATRIX GetModelMatrix(const DxMeshNodeTransformInfo& transformInfo);
 	XMMATRIX GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent);
@@ -168,8 +178,12 @@ private:
 
 	HRESULT InitializeFrameComposition();
 	HRESULT CreateFence();
+
+	///@todo refactor this, maybe use single function
 	HRESULT CreateRenderTargetDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateShaderResourceViewDescriptorHeap(UINT numDescriptors);
+	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
+
 	UINT    GetSwapChainBufferCount();
 
 	UINT                       m_width;
@@ -181,6 +195,7 @@ private:
 	ComPtr<IDXGISwapChain4>    m_swapChain4;
 
 	ComPtr<ID3D12DescriptorHeap>        m_rtvDescHeap;
+	ComPtr<ID3D12DescriptorHeap>        m_dsvDescHeap;
 	ComPtr<ID3D12DescriptorHeap>        m_srvDescHeap;
 	ComPtr<ID3D12CommandAllocator>      m_pCommandAllocator;
 	ComPtr<ID3D12GraphicsCommandList>   m_pCmdList;
@@ -188,6 +203,7 @@ private:
 	std::vector<ComPtr<ID3D12Resource>> m_swapChainBuffers;
 	///@todo created on application basis, kept here because most samples need it
 	std::vector<ComPtr<ID3D12Resource>> m_rtvResources;
+	std::vector<ComPtr<ID3D12Resource>> m_dsvResources;
 
 
 	FileReader                          m_assetReader;

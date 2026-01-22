@@ -9,7 +9,14 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_simpleComposition({}),
 	m_fenceValue(0),
 	m_fenceEvent(0),
-	m_frameDeltaTime(0)
+	m_frameDeltaTime(0),
+	m_dsvDescHeap(nullptr),
+	m_srvDescHeap(nullptr),
+	m_rtvDescHeap(nullptr),
+	m_srvUavCbvDescriptorSize(0),
+	m_rtvDescriptorSize(0),
+	m_dsvDescriptorSize(0),
+	m_samplerDescriptorSize(0)
 {
 	m_aspectRatio = (static_cast<FLOAT>(width)) / height;
 	m_assetReader = FileReader();
@@ -187,6 +194,20 @@ HRESULT Dx12SampleBase::CreateShaderResourceViewDescriptorHeap(UINT numDescripto
 	return result;
 }
 
+HRESULT Dx12SampleBase::CreateDepthStencilViewDescriptorHeap(UINT numDescriptors)
+{
+	HRESULT result = S_OK;
+
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.NumDescriptors = numDescriptors;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_dsvDescHeap));
+
+	return result;
+}
+
 HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 {
 	HRESULT    result    = S_OK;
@@ -234,6 +255,43 @@ HRESULT Dx12SampleBase::CreateCommandList()
 										nullptr, 
 										IID_PPV_ARGS(&m_pCmdList));
 	m_pCmdList->Close();
+	return result;
+}
+
+HRESULT Dx12SampleBase::CreateDsvResources(UINT numResources, BOOL createViews)
+{
+	HRESULT result = S_OK;
+
+	m_dsvResources.clear();
+	m_dsvResources.resize(numResources);
+
+	DXGI_FORMAT depthFormat = DXGI_FORMAT_D32_FLOAT;
+
+	D3D12_CLEAR_VALUE clearValue  = {};
+	clearValue.Format             = depthFormat;
+	clearValue.DepthStencil.Depth = 1.0f;
+	clearValue.DepthStencil.Stencil = 0;
+
+	const auto dsvDesc   = CD3DX12_RESOURCE_DESC::Tex2D(depthFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+	const auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	for (UINT i=0; i<numResources; i++)
+	{
+		m_pDevice->CreateCommittedResource(&heapProps,
+			                               D3D12_HEAP_FLAG_NONE,
+			                               &dsvDesc,
+			                               D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			                               &clearValue,
+			                               IID_PPV_ARGS(&m_dsvResources[i]));
+
+		if (createViews == TRUE)
+		{
+			assert(m_dsvDescHeap != nullptr && m_dsvDescHeap->GetDesc().NumDescriptors ==numResources);
+			auto dsvHeapHandle = GetDsvCpuHeapHandle(i);
+			m_pDevice->CreateDepthStencilView(m_dsvResources[i].Get(), nullptr, dsvHeapHandle);
+		}
+	}
+
 	return result;
 }
 
@@ -319,7 +377,8 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 																	       const std::string& pixelShaderName,
 	                                                                       ID3D12RootSignature* signature,
 																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
-																		   BOOL enableWireFrame)
+																		   BOOL enableWireFrame,
+																		   BOOL doubleSided)
 {
 	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
 	ComPtr<ID3DBlob>            vertexShader;
@@ -347,6 +406,11 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 		{
 			rast.CullMode = D3D12_CULL_MODE_NONE;
 			rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
+		}
+
+		if (doubleSided == TRUE)
+		{
+			rast.CullMode = D3D12_CULL_MODE_NONE;
 		}
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -686,11 +750,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	m_pCmdList->SetPipelineState(m_simpleComposition.pipelineState.Get());
 	m_pCmdList->SetGraphicsRootSignature(m_simpleComposition.rootSignature.Get());
 	m_pCmdList->SetDescriptorHeaps(1, descHeaps);
-	//m_pCmdList->SetGraphicsRootDescriptorTable(0, GetSrvGpuHeapHandle(rtvResourceIndex)
-	m_pCmdList->SetGraphicsRootDescriptorTable(0,
-		CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvDescHeap->GetGPUDescriptorHandleForHeapStart(),
-			rtvResourceIndex,
-			m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)));
+	m_pCmdList->SetGraphicsRootDescriptorTable(0, GetSrvGpuHeapHandle(rtvResourceIndex));
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
 
@@ -744,8 +804,11 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 		const UINT numRTVsForComposition = GetSwapChainBufferCount();
 		const UINT numRTVsForApp         = NumRTVsNeededForApp();
 		const UINT numSRVsForApp         = NumSRVsNeededForApp();
+		const UINT numDSVsForApp         = NumDSVsNeededForApp();
 
+		///@todo sample base should setup descriptor heaps, RTVs and DSVs. App can override and return FALSE - yet to create this
 		CreateRenderTargetDescriptorHeap(numRTVsForComposition + numRTVsForApp);
+		CreateDepthStencilViewDescriptorHeap(numDSVsForApp);
 		CreateShaderResourceViewDescriptorHeap(numRTVsForApp + numSRVsForApp);
 		CreateRenderTargetViews(numRTVsForComposition, TRUE);
 	}
@@ -820,7 +883,7 @@ XMMATRIX Dx12SampleBase::GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExten
 
 	const XMVECTOR sceneCenter = (minExtent + maxExtent) / 2.0f;
 	const XMVECTOR sceneDiagnol = (maxExtent - minExtent);
-	const float diagLength = XMVectorGetX(XMVector3Length(sceneDiagnol)) * 1.5f;
+	const float diagLength = XMVectorGetX(XMVector3Length(sceneDiagnol)) * 1.0f;
 	const XMVECTOR cameraPosition = sceneCenter - XMVectorSet(0.0f, 0.0f, diagLength, 0.0f);
 
 	///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".

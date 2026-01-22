@@ -82,7 +82,12 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 
 	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	parameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, parameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, parameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+
 
 	ComPtr<ID3DBlob> error;
 	ComPtr<ID3DBlob> signature;
@@ -90,7 +95,8 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
 	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 
-	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, TRUE);
+	///@todo tie up cull mode to double sided from gltf
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE);
 
 	return result;
 
@@ -213,13 +219,15 @@ HRESULT Dx12HelloWorld::CreateAndLoadVertexBuffer()
 }
 
 
-
+///@todo move it to samplebase
 HRESULT Dx12HelloWorld::CreateAppResources()
 {
 	HRESULT    result   = S_OK;
 	const UINT numRTVs  = NumRTVsNeededForApp();
+	const UINT numDsvs  = NumDSVsNeededForApp();
 	result              = CreateRenderTargetResourceAndSRVs(numRTVs);
 	result              = CreateRenderTargetViews(numRTVs, FALSE);
+	result              = CreateDsvResources(numDsvs);
 	return result;
 }
 
@@ -230,23 +238,26 @@ HRESULT Dx12HelloWorld::RenderFrame()
 
 	ID3D12GraphicsCommandList*  pCmdList      = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle     = GetRenderTargetView(0, FALSE);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle     = GetDsvCpuHeapHandle(0);
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
 	
 	vertexBufferView.BufferLocation           = m_vertexBuffer.Get()->GetGPUVirtualAddress();
 	vertexBufferView.SizeInBytes              = m_vertexBufferSizeInBytes;
 	vertexBufferView.StrideInBytes            = m_vertexStrideInBytes;
 	
-	FLOAT clearColor[4] = { 0.02f, 0.02f, 0.05f, 1.0f};
+	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
 	
 	pCmdList->OMSetRenderTargets(1,
-		                         &rtvHandle,              //D3D12_CPU_DESCRIPTOR_HANDLE
+		                         &rtvHandle,
 		                         FALSE,                   //RTsSingleHandleToDescriptorRange
-		                         nullptr);                //D3D12_CPU_DESCRIPTOR_HANDLE
+		                         &dsvHandle);
 	
 	pCmdList->ClearRenderTargetView(rtvHandle,
 		                            clearColor,
 		                            0,
 		                            nullptr);
+
+	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	
 	if (renderTriangle == TRUE)
 	{

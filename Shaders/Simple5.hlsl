@@ -5,6 +5,11 @@ cbuffer MVP : register(b0)
     float4x4 g_MVP;
 }
 
+//needs a sampler and srv
+Texture2D gTexture : register(t0);
+SamplerState gSampler : register(s0);
+
+
 VSOutputPrimitive VSMain(VSInputPrimitive input)
 {
     VSOutputPrimitive output;
@@ -17,5 +22,5 @@ VSOutputPrimitive VSMain(VSInputPrimitive input)
 
 float4 PSMain(PSInputPrimitive input) : SV_TARGET
 {
-    return float4(1.0f, 1.0f, 1.0f, 1.0f);
+    return gTexture.Sample(gSampler, input.texcoord);
 }
