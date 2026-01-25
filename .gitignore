@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Shaders/Simple1_VS.cso
+/Shaders/Simple5_VS.cso
+/Shaders/Simple5_PS.cso

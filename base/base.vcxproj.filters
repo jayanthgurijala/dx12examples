@@ -54,6 +54,12 @@
     <ClInclude Include="WICImageLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DxCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dxtypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="base.cpp">
@@ -83,6 +89,9 @@
     <ClCompile Include="WICImageLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DxCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Shaders\CompileShaders.bat">
@@ -94,6 +103,7 @@
     <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
       <Filter>Assets\Shaders\Includes</Filter>
     </None>
+    <None Include="..\Shaders\CameraBuffer.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="..\Shaders\Hello.hlsl">

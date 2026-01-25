@@ -26,7 +26,7 @@ private:
 	HRESULT CreateAppResources();
 	HRESULT CreateAndLoadVertexBuffer();
 	HRESULT CreateSceneMVPMatrix();
-	XMMATRIX GetMVPMatrix(XMMATRIX& modelMatrix);
+	XMMATRIX GetViewProjMatrixWithExtents();
 
 	HRESULT TestTinyGLTFLoading();
 
@@ -49,7 +49,6 @@ private:
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
 	DxDrawPrimitive                       m_modelDrawPrimitive;
-	DxMeshNodeTransformInfo               m_meshTransformInfo;
 	DxExtents							  m_modelExtents;
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
 };

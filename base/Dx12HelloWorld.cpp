@@ -96,7 +96,7 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 
 	///@todo tie up cull mode to double sided from gltf
-	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE);
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE, TRUE);
 
 	return result;
 
@@ -287,13 +287,12 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		assert(vbv.BufferLocation != 0);
 		pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
 
-		///@todo support models without base textures
-		assert(m_modelBaseColorTex2D != nullptr);
-		
-		ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
-
-		pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
-		pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+		if (m_modelBaseColorTex2D != nullptr)
+		{
+			ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
+			pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+		}
 
 
 		if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
@@ -316,14 +315,32 @@ HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
 
-	XMMATRIX modelMatrix = GetModelMatrix(m_meshTransformInfo);
-	XMMATRIX mvpMatrix   = GetMVPMatrix(modelMatrix);
-	XMFLOAT4X4 cbData;
-	XMStoreFloat4x4(&cbData, mvpMatrix);
-	const UINT constantBufferSizeInBytes = (sizeof(float) * 16);
+	const XMMATRIX modelMatrix    = GetModelMatrix_Temp();
+	const XMMATRIX viewProjMatrix = GetViewProjMatrixWithExtents();
+	const XMMATRIX mvpMatrix      = modelMatrix * viewProjMatrix;
+
+	const XMMATRIX finalMvpT       = XMMatrixTranspose(mvpMatrix);
+	const XMMATRIX modelMatrixT    = XMMatrixTranspose(modelMatrix);
+	const XMMATRIX viewProjMatrixT = XMMatrixTranspose(viewProjMatrix);
+	const XMMATRIX tempFinalMVP    = viewProjMatrixT * modelMatrixT;
+
+	XMFLOAT4X4 mmData;
+	XMFLOAT4X4 vpData;
+	XMFLOAT4X4 mvpData;
+	XMFLOAT4X4 tempFinalMVPData;
+
+	XMStoreFloat4x4(&mmData, modelMatrixT);
+	XMStoreFloat4x4(&vpData, viewProjMatrixT);
+	XMStoreFloat4x4(&mvpData, finalMvpT);
+	XMStoreFloat4x4(&tempFinalMVPData, tempFinalMVP);
+
+	const UINT numMatrix         = 4; //modelT + viewProjT + finalMvpT
+	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
+	const UINT constantBufferSizeInBytes = matrixSizeInBytes * numMatrix;
 
 	///@todo avoid using static
-	static VOID* pMappedPtr = nullptr;
+	static VOID* pMappedPtr     = nullptr;
+	static BYTE* pMappedBytePtr = nullptr;
 	
 	///@note constant buffer data layout
 	/// MVP matrix (16 floats)
@@ -333,24 +350,32 @@ HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
+		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
 	}
 	assert(pMappedPtr != nullptr);
-	memcpy(pMappedPtr, &cbData, constantBufferSizeInBytes);
+	assert(pMappedBytePtr == pMappedPtr);
+
+	BYTE* pWritePtr = pMappedBytePtr;
+	memcpy(pWritePtr, &mmData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &vpData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &tempFinalMVPData, matrixSizeInBytes);
 
 
 	return result;
 }
 
-XMMATRIX Dx12HelloWorld::GetMVPMatrix(XMMATRIX& modelMatrix)
+XMMATRIX Dx12HelloWorld::GetViewProjMatrixWithExtents()
 {
 	assert(m_modelExtents.hasValidExtents == TRUE);
 	const XMVECTOR minExtent = XMVectorSet(m_modelExtents.min[0], m_modelExtents.min[1], m_modelExtents.min[2], 1.0f);
 	const XMVECTOR maxExtent = XMVectorSet(m_modelExtents.max[0], m_modelExtents.max[1], m_modelExtents.max[2], 1.0f);
-	XMMATRIX viewProj        = GetViewProjMatrix(minExtent, maxExtent);
-	const XMMATRIX mvpMatrix = modelMatrix * viewProj;
-	const XMMATRIX finalMvp  = XMMatrixTranspose(mvpMatrix);
+	XMMATRIX viewProj        = GetViewProjMatrix(minExtent, maxExtent,TRUE);
 
-	return finalMvp;
+	return viewProj;
 }
 
 HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
@@ -383,15 +408,16 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 		const tinygltf::Node& firstNodeDesc = model.nodes[0];
 		const UINT firstMesh = firstNodeDesc.mesh;
 
-		m_meshTransformInfo.hasScale       = (firstNodeDesc.scale.size() != 0);
-		m_meshTransformInfo.hasTranslation = (firstNodeDesc.translation.size() != 0);
-		m_meshTransformInfo.hasRotation    = (firstNodeDesc.rotation.size() != 0);
-		m_meshTransformInfo.hasMatrix      = (firstNodeDesc.matrix.size()   != 0);
-		m_meshTransformInfo.translation    = firstNodeDesc.translation;
-		m_meshTransformInfo.rotation       = firstNodeDesc.rotation;
-		m_meshTransformInfo.scale          = firstNodeDesc.scale;
+		DxMeshNodeTransformInfo meshTransformInfo;
 
-		const BOOL hasMatrix = (firstNodeDesc.matrix.size() != 0);
+		meshTransformInfo.hasScale       = (firstNodeDesc.scale.size() != 0);
+		meshTransformInfo.hasTranslation = (firstNodeDesc.translation.size() != 0);
+		meshTransformInfo.hasRotation    = (firstNodeDesc.rotation.size() != 0);
+		meshTransformInfo.hasMatrix      = (firstNodeDesc.matrix.size()   != 0);
+		meshTransformInfo.translation    = firstNodeDesc.translation;
+		meshTransformInfo.rotation       = firstNodeDesc.rotation;
+		meshTransformInfo.scale          = firstNodeDesc.scale;
+		AddTransformInfo(meshTransformInfo);
 
 		const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
 		const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];

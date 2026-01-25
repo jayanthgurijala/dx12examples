@@ -133,8 +133,10 @@
   <ItemGroup>
     <ClInclude Include="Dx12HelloWorld.h" />
     <ClInclude Include="Dx12SampleBase.h" />
+    <ClInclude Include="DxCamera.h" />
     <ClInclude Include="DxGltfUtils.h" />
     <ClInclude Include="DxPrintUtils.h" />
+    <ClInclude Include="dxtypes.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="WICImageLoader.h" />
@@ -144,6 +146,7 @@
     <ClCompile Include="base.cpp" />
     <ClCompile Include="Dx12HelloWorld.cpp" />
     <ClCompile Include="Dx12SampleBase.cpp" />
+    <ClCompile Include="DxCamera.cpp" />
     <ClCompile Include="DxGltfUtils.cpp" />
     <ClCompile Include="DxPrintUtils.cpp" />
     <ClCompile Include="FileReader.cpp" />
@@ -152,6 +155,7 @@
     <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\Shaders\CameraBuffer.hlsli" />
     <None Include="..\Shaders\CompileShaders.bat" />
     <None Include="..\Shaders\SimpleVSPSInterface.hlsli" />
     <None Include="packages.config" />

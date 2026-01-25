@@ -1,58 +1,15 @@
 #pragma once
 
+#include "dxtypes.h"
 #include "stdafx.h"
 #include <vector>
-#include <d3d12.h>
 #include "FileReader.h"
 #include <DirectXMath.h>
 #include <d3dx12.h>
+#include "DxCamera.h"
 
 using namespace DirectX;
-
 using namespace Microsoft::WRL;
-
-
-struct SimpleVertex
-{
-	FLOAT position[3];
-	FLOAT color[3];
-	FLOAT texCoords[2];
-};
-
-struct DxExtents
-{
-	double min[3];
-	double max[3];
-	BOOL hasValidExtents;
-};
-
-struct DxMeshNodeTransformInfo
-{
-	BOOL hasTranslation;
-	BOOL hasRotation;
-	BOOL hasScale;
-	BOOL hasMatrix;
-
-	std::vector<double> translation;
-	std::vector<double> rotation;
-	std::vector<double> scale;
-	std::vector<double> matrix;
-};
-
-struct DxIASemantic
-{
-	std::string name;
-	UINT index;
-	BOOL isIndexValid;
-	DXGI_FORMAT format;
-};
-
-struct DxDrawPrimitive
-{
-	UINT numVertices;
-	UINT numIndices;
-	BOOL isIndexedDraw;
-};
 
 class Dx12SampleBase
 {
@@ -79,7 +36,8 @@ protected:
 															   ID3D12RootSignature* signature,
 		                                                       const D3D12_INPUT_LAYOUT_DESC& iaLayout,
 														       BOOL wireframe = FALSE,
-		                                                       BOOL doubleSided = FALSE);
+		                                                       BOOL doubleSided = FALSE,
+															   BOOL useDepthStencil = FALSE);
 	HRESULT UploadCpuDataAndWaitForCompletion(void*                      cpuData,
 		                                      UINT                       dataSizeInBytes,
 		                                      ID3D12GraphicsCommandList* pcmdList,
@@ -148,15 +106,18 @@ protected:
 		return handle;
 	}
 
-	virtual DXGI_FORMAT GetBackBufferFormat();
+	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
+	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 	virtual inline UINT NumSRVsNeededForApp() { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() { return 0; }
 
-	XMMATRIX GetModelMatrix(const DxMeshNodeTransformInfo& transformInfo);
-	XMMATRIX GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent);
+	XMMATRIX GetModelMatrix_Temp();
+	XMMATRIX GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent, BOOL rotatePerFrame = FALSE);
 
 	VOID CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
+
+	VOID AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo);
 
 private:
 
@@ -205,9 +166,10 @@ private:
 	std::vector<ComPtr<ID3D12Resource>> m_rtvResources;
 	std::vector<ComPtr<ID3D12Resource>> m_dsvResources;
 
+	std::unique_ptr<DxCamera>	m_camera;
+	std::unique_ptr<FileReader>	m_assetReader;
 
-	FileReader                          m_assetReader;
-	FrameComposition                    m_simpleComposition;
+	FrameComposition			m_simpleComposition;
 
 	///@todo associate fences with command queues?
 	ComPtr<ID3D12Fence>         m_fence;

@@ -1,6 +1,7 @@
 #include "Dx12SampleBase.h"
 #include "tiny_gltf.h"
 #include "DxPrintUtils.h"
+#include <memory>
 
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
@@ -16,22 +17,17 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_srvUavCbvDescriptorSize(0),
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
-	m_samplerDescriptorSize(0)
+	m_samplerDescriptorSize(0),
+	m_camera(std::make_unique<DxCamera>(width, height)),
+	m_assetReader(std::make_unique<FileReader>())
 {
 	m_aspectRatio = (static_cast<FLOAT>(width)) / height;
-	m_assetReader = FileReader();
 }
 
 
 UINT Dx12SampleBase::GetSwapChainBufferCount()
 {
 	return 2;
-}
-
-DXGI_FORMAT Dx12SampleBase::GetBackBufferFormat()
-{
-	return DXGI_FORMAT_R8G8B8A8_UNORM;
-
 }
 
 HRESULT Dx12SampleBase::CreateDevice()
@@ -265,7 +261,7 @@ HRESULT Dx12SampleBase::CreateDsvResources(UINT numResources, BOOL createViews)
 	m_dsvResources.clear();
 	m_dsvResources.resize(numResources);
 
-	DXGI_FORMAT depthFormat = DXGI_FORMAT_D32_FLOAT;
+	DXGI_FORMAT depthFormat = GetDepthStencilFormat();
 
 	D3D12_CLEAR_VALUE clearValue  = {};
 	clearValue.Format             = depthFormat;
@@ -321,6 +317,14 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 	resourceDesc.Layout              = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	resourceDesc.SampleDesc.Count    = 1;
 
+	//@todo find a way to match these 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
+	D3D12_CLEAR_VALUE clearValue = {};
+	clearValue.Format = GetBackBufferFormat();
+	clearValue.Color[0] = 0.7f;
+	clearValue.Color[1] = 0.7f;
+	clearValue.Color[2] = 1.0f;
+	clearValue.Color[3] = 1.0f;
+
 	auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	for (UINT i=0; i<numResources; i++)
@@ -330,7 +334,7 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 			                               D3D12_HEAP_FLAG_NONE,
 										   &resourceDesc,
 										   D3D12_RESOURCE_STATE_RENDER_TARGET,
-										   nullptr,
+										   &clearValue,
 										   IID_PPV_ARGS(&m_rtvResources[i]));
 
 		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
@@ -378,7 +382,8 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	                                                                       ID3D12RootSignature* signature,
 																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
 																		   BOOL enableWireFrame,
-																		   BOOL doubleSided)
+																		   BOOL doubleSided,
+																		   BOOL useDepthStencil)
 {
 	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
 	ComPtr<ID3DBlob>            vertexShader;
@@ -387,11 +392,11 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	///@todo compileFlags = 0 for release
 	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 
-	std::string compiledVertexShaderPath = m_assetReader.GetFullAssetFilePath(vertexShaderName);
-	std::string compiledPixelShaderPath  = m_assetReader.GetFullAssetFilePath(pixelShaderName);
+	std::string compiledVertexShaderPath = m_assetReader->GetFullAssetFilePath(vertexShaderName);
+	std::string compiledPixelShaderPath  = m_assetReader->GetFullAssetFilePath(pixelShaderName);
 
-	vertexShader = m_assetReader.LoadShaderBlobFromAssets(compiledVertexShaderPath);
-	pixelShader  = m_assetReader.LoadShaderBlobFromAssets(compiledPixelShaderPath);
+	vertexShader = m_assetReader->LoadShaderBlobFromAssets(compiledVertexShaderPath);
+	pixelShader  = m_assetReader->LoadShaderBlobFromAssets(compiledPixelShaderPath);
 
 	if (vertexShader == nullptr || pixelShader == nullptr)
 	{
@@ -413,6 +418,15 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 			rast.CullMode = D3D12_CULL_MODE_NONE;
 		}
 
+
+		CD3DX12_DEPTH_STENCIL_DESC depthStencilState(D3D12_DEFAULT);
+		if (useDepthStencil == FALSE)
+		{
+			depthStencilState.DepthEnable = FALSE;
+			depthStencilState.StencilEnable = FALSE;
+		}
+
+
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 		pipelineStateDesc.InputLayout = iaLayout;
 		pipelineStateDesc.pRootSignature = signature;
@@ -420,13 +434,14 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 		pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
 		pipelineStateDesc.RasterizerState = rast;
 		pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		pipelineStateDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pipelineStateDesc.DepthStencilState = depthStencilState;
 
 		///@todo write some test cases for this
 		pipelineStateDesc.SampleMask = UINT_MAX;
 		pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		pipelineStateDesc.NumRenderTargets = 1;
 		pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
+		pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilFormat() : DXGI_FORMAT_UNKNOWN;
 
 		///@todo experiment with flags
 		pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
@@ -707,6 +722,7 @@ HRESULT Dx12SampleBase::Run(FLOAT frameDeltaTime)
 	HRESULT result = S_OK;
 
 	m_frameDeltaTime = frameDeltaTime;
+	m_camera->Update(frameDeltaTime);
 	
 	result = m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
@@ -817,98 +833,25 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 }
 
 
-XMMATRIX Dx12SampleBase::GetModelMatrix(const DxMeshNodeTransformInfo& transformInfo)
+XMMATRIX Dx12SampleBase::GetModelMatrix_Temp()
 {
-	XMMATRIX modelMatrix;
-
-	const std::vector<double>& meshTranslation = transformInfo.translation;
-	const std::vector<double>& meshRotation    = transformInfo.rotation;
-	const std::vector<double>& meshScale       = transformInfo.scale;
-
-	if (transformInfo.hasMatrix == FALSE)
-	{
-		XMVECTOR translation = (transformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
-																				    (FLOAT)meshTranslation[1],
-																					(FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
-
-		//XMVECTOR rotation =  XMMatrixIdentity();
-
-		XMVECTOR scale = (transformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
-																        (FLOAT)meshScale[1],
-			                                                            (FLOAT)meshScale[2],
-			                                                            1.0f) : XMVectorSplatOne();
-
-		XMMATRIX T = XMMatrixTranslationFromVector(translation);
-
-		///@todo find good way for this rotate by 180 degree gltf to dx RH vs LH conversion
-		XMMATRIX R = XMMatrixRotationY(XM_PI);
-		XMMATRIX S = XMMatrixScalingFromVector(scale);
-
-		modelMatrix = S * R * T;
-	}
-	else
-	{
-		const std::vector<double>& m4x4 = transformInfo.matrix;
-
-
-		///@note gltf matrix is column major but DirectX Math expects row major.
-		///      We could transpose it while construction but looks likt that is "error prone"
-		///      Taking the safer approach.
-		XMFLOAT4X4 temp =
-		{
-			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
-			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
-			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
-			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
-		};
-
-		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
-		modelMatrix = XMMatrixTranspose(tempMat);
-	}
-
-		return modelMatrix;
+	XMMATRIX modelMatrix = m_camera->GetModelMatrix_Temp(0);
+	return modelMatrix;
 }
 
-XMMATRIX Dx12SampleBase::GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent)
+XMMATRIX Dx12SampleBase::GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent, BOOL rotatePerFrame)
 {
-	static XMVECTOR up = XMVectorSet(0, 1, 0, 0);  // Y-up
 
-	///@todo possibly fix this and make a camera class
-	static FLOAT cameraRotateAngleInDeg = 0;
-	const FLOAT deltaFrameTime = GetFrameDeltaTime();
-	const FLOAT cameraSpeedInDegPerSecond = 10.0f;
-
-	///@todo use std::chrono properly
-	cameraRotateAngleInDeg += cameraSpeedInDegPerSecond * deltaFrameTime;
-
-	const XMVECTOR sceneCenter = (minExtent + maxExtent) / 2.0f;
-	const XMVECTOR sceneDiagnol = (maxExtent - minExtent);
-	const float diagLength = XMVectorGetX(XMVector3Length(sceneDiagnol)) * 1.0f;
-	const XMVECTOR cameraPosition = sceneCenter - XMVectorSet(0.0f, 0.0f, diagLength, 0.0f);
-
-	///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".
-	const XMVECTOR cameraVector     = cameraPosition - sceneCenter;
-	const XMMATRIX rotationMatrix   = XMMatrixRotationY(XMConvertToRadians(cameraRotateAngleInDeg));
-	const XMVECTOR newCameraVector  = XMVector3Transform(cameraVector, rotationMatrix);
-	const XMVECTOR newCameraPos     = newCameraVector + sceneCenter;
-
-
-	///@note camera position, camera forward vector, up direction
-	///@note this is stored in row-major order
-	const XMMATRIX view = XMMatrixLookAtLH(newCameraPos,
-									       sceneCenter,
-			                               up);
-
-
-	const FLOAT aspectRatio = ((FLOAT)m_width) / m_height;
-
-	///@note FOV, width/height, near and far clipping plane.
-	const XMMATRIX projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
-																			aspectRatio,
-																			0.1f,
-																			100.0f);
-
+	const XMMATRIX view       = m_camera->GetViewMatrix_Temp();
+	const FLOAT aspectRatio   = ((FLOAT)m_width) / m_height;
+	const XMMATRIX projection = m_camera->GetProjectionMatrix_Temp();
+	const XMMATRIX orthoProj  = XMMatrixOrthographicLH(5.0f, 5.0f, 0.01, 100.0f);
 	return view * projection;
+}
+
+VOID Dx12SampleBase::AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo)
+{
+	m_camera->AddTransformInfo(transformInfo);
 }
 
 

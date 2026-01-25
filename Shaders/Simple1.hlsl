@@ -1,14 +1,11 @@
 #include "SimpleVSPSInterface.hlsli"
-
-cbuffer MVP : register(b0)
-{
-    float4x4 g_MVP;
-}
+#include "CameraBuffer.hlsli"
 
 VSOutput_1 VSMain( VSInput_1 input )
 {
     VSOutput_1 output;
-    output.position = mul(float4(input.position, 1.0f), g_MVP);
+    float4x4 mvp = mul(g_modelMatrixT, g_viewProjT);
+    output.position = mul(float4(input.position, 1.0f), g_mvpT);
     return output;
 }
 
