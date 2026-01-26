@@ -4,8 +4,11 @@
 VSOutput_1 VSMain( VSInput_1 input )
 {
     VSOutput_1 output;
-    float4x4 mvp = mul(g_modelMatrixT, g_viewProjT);
+    
+    //if transposed on CPU then hlsl reads this as row-major
+    //in row-major, v' = v * M
     output.position = mul(float4(input.position, 1.0f), g_mvpT);
+
     return output;
 }
 

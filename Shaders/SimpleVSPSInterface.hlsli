@@ -28,6 +28,7 @@ struct VSInput_5
 struct VSOutput_5
 {
     float4 position  : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
     float3 normal    : NORMAL;
     float2 texcoord0 : TEXCOORD0;
     float2 texcoord1 : TEXCOORD1;
@@ -37,6 +38,7 @@ struct VSOutput_5
 struct PSInput_5
 {
     float4 position : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
     float3 normal   : NORMAL;
     float2 texcoord0 : TEXCOORD0;
     float2 texcoord1 : TEXCOORD1;

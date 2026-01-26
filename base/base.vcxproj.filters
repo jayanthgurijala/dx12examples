@@ -103,7 +103,9 @@
     <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
       <Filter>Assets\Shaders\Includes</Filter>
     </None>
-    <None Include="..\Shaders\CameraBuffer.hlsli" />
+    <None Include="..\Shaders\CameraBuffer.hlsli">
+      <Filter>Assets\Shaders\Includes</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Resource Include="..\Shaders\Hello.hlsl">

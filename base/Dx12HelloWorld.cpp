@@ -325,16 +325,12 @@ HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
 	const XMMATRIX tempFinalMVP    = viewProjMatrixT * modelMatrixT;
 
 	XMFLOAT4X4 mmData;
-	XMFLOAT4X4 vpData;
 	XMFLOAT4X4 mvpData;
-	XMFLOAT4X4 tempFinalMVPData;
 
 	XMStoreFloat4x4(&mmData, modelMatrixT);
-	XMStoreFloat4x4(&vpData, viewProjMatrixT);
 	XMStoreFloat4x4(&mvpData, finalMvpT);
-	XMStoreFloat4x4(&tempFinalMVPData, tempFinalMVP);
 
-	const UINT numMatrix         = 4; //modelT + viewProjT + finalMvpT
+	const UINT numMatrix         = 2; //modelT + viewProjT + finalMvpT
 	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
 	const UINT constantBufferSizeInBytes = matrixSizeInBytes * numMatrix;
 
@@ -358,11 +354,7 @@ HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
 	BYTE* pWritePtr = pMappedBytePtr;
 	memcpy(pWritePtr, &mmData, matrixSizeInBytes);
 	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &vpData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
 	memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &tempFinalMVPData, matrixSizeInBytes);
 
 
 	return result;
