@@ -24,7 +24,6 @@ private:
 	HRESULT CreatePipelineState();		///< Create RootSignature, Compile Shaders, Create Pipeline State
 	HRESULT CreatePipelineStateFromModel();
 	HRESULT CreateAppResources();
-	HRESULT CreateAndLoadVertexBuffer();
 	HRESULT CreateSceneMVPMatrix();
 	XMMATRIX GetViewProjMatrixWithExtents();
 

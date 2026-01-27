@@ -17,10 +17,9 @@ public:
 	Dx12SampleBase(UINT width, UINT height);
 	HRESULT OnInit(HWND hwnd);
 	virtual HRESULT PreRun()  { return S_OK; };
-	HRESULT Run(float frameDeltaTime);
+	HRESULT Run(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
-	FLOAT m_aspectRatio;
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
 	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
 	FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }

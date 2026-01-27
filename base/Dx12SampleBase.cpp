@@ -21,7 +21,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_camera(std::make_unique<DxCamera>(width, height)),
 	m_assetReader(std::make_unique<FileReader>())
 {
-	m_aspectRatio = (static_cast<FLOAT>(width)) / height;
+
 }
 
 

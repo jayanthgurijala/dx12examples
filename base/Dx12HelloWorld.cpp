@@ -30,7 +30,6 @@ HRESULT Dx12HelloWorld::PreRun()
 	//result = CreatePipelineState();
 	result = TestTinyGLTFLoading();
 	result = CreatePipelineStateFromModel();
-	result = CreateAndLoadVertexBuffer();
 	result = CreateAppResources();
 	return result;
 }
@@ -196,29 +195,6 @@ HRESULT Dx12HelloWorld::CreatePipelineState()
 	return result;
 }
 
-HRESULT Dx12HelloWorld::CreateAndLoadVertexBuffer()
-{
-	HRESULT result = S_OK;
-	ComPtr<ID3D12Resource> stagingBuffer;
-	D3D12_RESOURCE_STATES      vbState   = D3D12_RESOURCE_STATE_COPY_DEST;
-
-	SimpleVertex triangleVertices[] =
-	{
-		{ { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f}, {0.0f,0.0f} },
-		{ { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f}, {0.0f,0.0f} },
-		{ { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} }
-	};
-
-	const UINT vertexBufferSize = sizeof(triangleVertices);
-	m_vertexBufferSizeInBytes   = vertexBufferSize;
-	m_vertexStrideInBytes       = sizeof(SimpleVertex);
-
-	m_vertexBuffer = CreateBufferWithData(triangleVertices, vertexBufferSize);
-
-	return result;
-}
-
-
 ///@todo move it to samplebase
 HRESULT Dx12HelloWorld::CreateAppResources()
 {
@@ -233,17 +209,9 @@ HRESULT Dx12HelloWorld::CreateAppResources()
 
 HRESULT Dx12HelloWorld::RenderFrame()
 {
-
-	BOOL renderTriangle = FALSE;
-
 	ID3D12GraphicsCommandList*  pCmdList      = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle     = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle     = GetDsvCpuHeapHandle(0);
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
-	
-	vertexBufferView.BufferLocation           = m_vertexBuffer.Get()->GetGPUVirtualAddress();
-	vertexBufferView.SizeInBytes              = m_vertexBufferSizeInBytes;
-	vertexBufferView.StrideInBytes            = m_vertexStrideInBytes;
 	
 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
 	
@@ -258,16 +226,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 		                            nullptr);
 
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-	
-	if (renderTriangle == TRUE)
-	{
-		pCmdList->SetGraphicsRootSignature(m_rootSignarure.Get());
-		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		pCmdList->SetPipelineState(m_pipelineState.Get());
-		pCmdList->IASetVertexBuffers(0, 1, &vertexBufferView);
-		pCmdList->DrawInstanced(3, 1, 0, 0);
-	}
-	else
+
 	{
 		CreateSceneMVPMatrix();
 		pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
