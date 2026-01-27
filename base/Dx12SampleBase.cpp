@@ -723,7 +723,7 @@ HRESULT Dx12SampleBase::Run(FLOAT frameDeltaTime)
 
 	m_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
-	
+	CreateSceneMVPMatrix();
 	result = m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
@@ -832,26 +832,56 @@ HRESULT Dx12SampleBase::OnInit(HWND hwnd)
 	return result;
 }
 
-
-XMMATRIX Dx12SampleBase::GetModelMatrix_Temp()
-{
-	XMMATRIX modelMatrix = m_camera->GetModelMatrix_Temp(0);
-	return modelMatrix;
-}
-
-XMMATRIX Dx12SampleBase::GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent, BOOL rotatePerFrame)
-{
-
-	const XMMATRIX view       = m_camera->GetViewMatrix_Temp();
-	const FLOAT aspectRatio   = ((FLOAT)m_width) / m_height;
-	const XMMATRIX projection = m_camera->GetProjectionMatrix_Temp();
-	const XMMATRIX orthoProj  = XMMatrixOrthographicLH(5.0f, 5.0f, 0.01, 100.0f);
-	return view * projection;
-}
-
 VOID Dx12SampleBase::AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo)
 {
 	m_camera->AddTransformInfo(transformInfo);
+}
+
+HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
+{
+	HRESULT result = S_OK;
+
+	XMFLOAT4X4 mmData = m_camera->GetWorldMatrixTranspose(0);
+	XMFLOAT4X4 mvpData = m_camera->GetModelViewProjectionMatrixTranspose(0);
+
+	//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
+	XMFLOAT4X4 normalData = m_camera->GetNormalMatrixData(0);
+	XMFLOAT4 camPosition = m_camera->GetCameraPosition();
+
+	const UINT numMatrix = 3; //model matrix, MPV matrix and normal matrix
+	const UINT numFloat4 = 1;
+	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
+	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
+	const UINT constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
+		                                   (float4SizeInBytes * numFloat4);
+
+	///@todo avoid using static
+	static VOID* pMappedPtr = nullptr;
+	static BYTE* pMappedBytePtr = nullptr;
+
+	///@note constant buffer data layout
+	/// MVP matrix (16 floats)
+	if (pMappedPtr == nullptr)
+	{
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE);
+		CD3DX12_RANGE readRange(0, 0);
+		//@note specifying nullptr as read range indicates CPU can read entire resource
+		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
+		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
+	}
+	assert(pMappedPtr != nullptr);
+	assert(pMappedBytePtr == pMappedPtr);
+
+	BYTE* pWritePtr = pMappedBytePtr;
+	memcpy(pWritePtr, &mmData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &normalData, matrixSizeInBytes);
+	pWritePtr += matrixSizeInBytes;
+	memcpy(pWritePtr, &camPosition, float4SizeInBytes);
+
+	return result;
 }
 
 

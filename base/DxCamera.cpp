@@ -16,12 +16,8 @@ DxCamera::DxCamera(UINT width, UINT height) :
 VOID DxCamera::AddTransformInfo(DxMeshNodeTransformInfo transformInfo)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
-    m_transformInfoList.push_back({transformInfo, worldMatrix});
-}
-
-XMMATRIX DxCamera::GetModelMatrix(UINT index)
-{
-	return m_transformInfoList[index].modelMatrix;
+	XMMATRIX normalMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, worldMatrix));
+    m_transformInfoList.push_back({transformInfo, worldMatrix, normalMatrix});
 }
 
 VOID DxCamera::Update(FLOAT frameDeltaTIme)
@@ -126,7 +122,6 @@ XMFLOAT4X4 GetDataFromMatrix(XMMATRIX matrix)
 	return matrixData;
 }
 
-
 XMFLOAT4X4 DxCamera::GetViewProjectionMatrixTranspose()
 {
 	return GetDataFromMatrix(XMMatrixTranspose(m_viewMatrix * m_projectionMatrix));
@@ -143,25 +138,16 @@ XMFLOAT4X4 DxCamera::GetModelViewProjectionMatrixTranspose(UINT index)
 	return GetDataFromMatrix(XMMatrixTranspose(GetModelMatrix(index) * m_viewMatrix * m_projectionMatrix));
 }
 
-XMVECTOR DxCamera::GetCameraPosition()
+XMFLOAT4X4 DxCamera::GetNormalMatrixData(UINT index)
 {
-	return m_cameraPosition;
+	return GetDataFromMatrix(GetNormalMatrix(index));
 }
 
-
-XMMATRIX DxCamera::GetModelMatrix_Temp(UINT index)
+XMFLOAT4 DxCamera::GetCameraPosition()
 {
-	return GetModelMatrix(index);
-}
-
-XMMATRIX DxCamera::GetViewMatrix_Temp()
-{
-	return m_viewMatrix;
-}
-
-XMMATRIX DxCamera::GetProjectionMatrix_Temp()
-{
-	return m_projectionMatrix;
+	XMFLOAT4 camPosData;
+	XMStoreFloat4(&camPosData, m_cameraPosition);
+	return camPosData;
 }
 
 

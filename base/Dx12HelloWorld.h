@@ -25,7 +25,6 @@ private:
 	HRESULT CreatePipelineStateFromModel();
 	HRESULT CreateAppResources();
 	HRESULT CreateSceneMVPMatrix();
-	XMMATRIX GetViewProjMatrixWithExtents();
 
 	HRESULT TestTinyGLTFLoading();
 
@@ -44,7 +43,6 @@ private:
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
 	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
-	ComPtr<ID3D12Resource>                m_mvpCameraConstantBuffer;
 	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
 	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
 	DxDrawPrimitive                       m_modelDrawPrimitive;

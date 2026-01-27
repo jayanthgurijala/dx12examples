@@ -228,13 +228,12 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	{
-		CreateSceneMVPMatrix();
 		pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
 
 		///@todo get this from mode of primitive
 		pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		pCmdList->SetPipelineState(m_modelPipelineState.Get());
-		pCmdList->SetGraphicsRootConstantBufferView(0, m_mvpCameraConstantBuffer->GetGPUVirtualAddress());
+		pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
 		
 		const SIZE_T numVertexBufferViews = m_modelVbvs.size();
 		D3D12_VERTEX_BUFFER_VIEW vbv = {};
@@ -268,65 +267,6 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	RenderRtvContentsOnScreen(0);
 
 	return S_OK;
-}
-
-HRESULT Dx12HelloWorld::CreateSceneMVPMatrix()
-{
-	HRESULT result = S_OK;
-
-	const XMMATRIX modelMatrix    = GetModelMatrix_Temp();
-	const XMMATRIX viewProjMatrix = GetViewProjMatrixWithExtents();
-	const XMMATRIX mvpMatrix      = modelMatrix * viewProjMatrix;
-
-	const XMMATRIX finalMvpT       = XMMatrixTranspose(mvpMatrix);
-	const XMMATRIX modelMatrixT    = XMMatrixTranspose(modelMatrix);
-	const XMMATRIX viewProjMatrixT = XMMatrixTranspose(viewProjMatrix);
-	const XMMATRIX tempFinalMVP    = viewProjMatrixT * modelMatrixT;
-
-	XMFLOAT4X4 mmData;
-	XMFLOAT4X4 mvpData;
-
-	XMStoreFloat4x4(&mmData, modelMatrixT);
-	XMStoreFloat4x4(&mvpData, finalMvpT);
-
-	const UINT numMatrix         = 2; //modelT + viewProjT + finalMvpT
-	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
-	const UINT constantBufferSizeInBytes = matrixSizeInBytes * numMatrix;
-
-	///@todo avoid using static
-	static VOID* pMappedPtr     = nullptr;
-	static BYTE* pMappedBytePtr = nullptr;
-	
-	///@note constant buffer data layout
-	/// MVP matrix (16 floats)
-	if (pMappedPtr == nullptr)
-	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE);
-		CD3DX12_RANGE readRange(0, 0);
-		//@note specifying nullptr as read range indicates CPU can read entire resource
-		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
-		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
-	}
-	assert(pMappedPtr != nullptr);
-	assert(pMappedBytePtr == pMappedPtr);
-
-	BYTE* pWritePtr = pMappedBytePtr;
-	memcpy(pWritePtr, &mmData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
-
-
-	return result;
-}
-
-XMMATRIX Dx12HelloWorld::GetViewProjMatrixWithExtents()
-{
-	assert(m_modelExtents.hasValidExtents == TRUE);
-	const XMVECTOR minExtent = XMVectorSet(m_modelExtents.min[0], m_modelExtents.min[1], m_modelExtents.min[2], 1.0f);
-	const XMVECTOR maxExtent = XMVectorSet(m_modelExtents.max[0], m_modelExtents.max[1], m_modelExtents.max[2], 1.0f);
-	XMMATRIX viewProj        = GetViewProjMatrix(minExtent, maxExtent,TRUE);
-
-	return viewProj;
 }
 
 HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
@@ -519,8 +459,6 @@ HRESULT Dx12HelloWorld::TestTinyGLTFLoading()
 			
 		}
 	}
-
-	CreateSceneMVPMatrix();
 
 	return result;
 }

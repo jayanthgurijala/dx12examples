@@ -14,6 +14,7 @@ struct DxModelMatrix
 {
 	DxMeshNodeTransformInfo transformInfo;
 	XMMATRIX modelMatrix;
+	XMMATRIX normalMatrix;
 };
 
 class DxCamera
@@ -23,20 +24,18 @@ public:
 	XMFLOAT4X4 GetViewProjectionMatrixTranspose();
 	XMFLOAT4X4 GetWorldMatrixTranspose(UINT index);
 	XMFLOAT4X4 GetModelViewProjectionMatrixTranspose(UINT index);
-	XMVECTOR   GetCameraPosition();
+	XMFLOAT4X4 GetNormalMatrixData(UINT index);
+	XMFLOAT4   GetCameraPosition();
 	VOID Update(FLOAT frameDeltaTime);
 	DxCamera(UINT width, UINT height);
-
-	//@todo remove these once tested
-	XMMATRIX GetModelMatrix_Temp(UINT index);
-	XMMATRIX GetViewMatrix_Temp();
-	XMMATRIX GetProjectionMatrix_Temp();
 
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();
 	XMMATRIX CreateModelMatrix(const DxMeshNodeTransformInfo& transformInfo);
-	XMMATRIX GetModelMatrix(UINT index);
+
+	inline XMMATRIX GetModelMatrix(UINT index) { return m_transformInfoList[index].modelMatrix; }
+	inline XMMATRIX GetNormalMatrix(UINT index) { return m_transformInfoList[index].normalMatrix; }
 
 	std::vector<DxModelMatrix> m_transformInfoList;
 	FLOAT m_frameDeltaTime;

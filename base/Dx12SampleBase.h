@@ -105,14 +105,16 @@ protected:
 		return handle;
 	}
 
+	inline D3D12_GPU_VIRTUAL_ADDRESS GetCameraBuffer()
+	{
+		return m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
+	}
+
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 	virtual inline UINT NumSRVsNeededForApp() { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() { return 0; }
-
-	XMMATRIX GetModelMatrix_Temp();
-	XMMATRIX GetViewProjMatrix(XMVECTOR minExtent, XMVECTOR maxExtent, BOOL rotatePerFrame = FALSE);
 
 	VOID CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 
@@ -143,7 +145,7 @@ private:
 	HRESULT CreateRenderTargetDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateShaderResourceViewDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
-
+	HRESULT CreateSceneMVPMatrix();
 	UINT    GetSwapChainBufferCount();
 
 	UINT                       m_width;
@@ -169,6 +171,7 @@ private:
 	std::unique_ptr<FileReader>	m_assetReader;
 
 	FrameComposition			m_simpleComposition;
+	ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
 
 	///@todo associate fences with command queues?
 	ComPtr<ID3D12Fence>         m_fence;
