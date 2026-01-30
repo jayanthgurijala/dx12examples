@@ -137,9 +137,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="dxtypes.h" />
+    <ClInclude Include="ExampleEntryPoint.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="gltfutils.h" />
