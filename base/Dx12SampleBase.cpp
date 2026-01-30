@@ -2,6 +2,7 @@
 #include "tiny_gltf.h"
 #include "DxPrintUtils.h"
 #include <memory>
+#include <chrono>
 
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
@@ -22,6 +23,95 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_assetReader(std::make_unique<FileReader>())
 {
 
+}
+
+LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_KEYDOWN:
+		if (wParam == VK_ESCAPE)
+			PostQuitMessage(0);
+		break;
+
+	case WM_DESTROY:
+		//Post WM_QUIT with the exit code
+		PostQuitMessage(0);
+		break;
+	}
+	return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+int Dx12SampleBase::RenderLoop()
+{
+	//Main message loop
+	MSG msg = {};
+	using clock = std::chrono::high_resolution_clock;
+	using durationf32 = std::chrono::duration<float>;
+	auto previousTime = clock::now();
+
+	while (msg.message != WM_QUIT)
+	{
+
+		//process messages in the queue
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		auto currentTime = clock::now();
+
+		// deltaTime in seconds
+		durationf32 duration = (currentTime - previousTime);
+
+		NextFrame(duration.count());
+		previousTime = currentTime;
+	}
+
+	PostRun();
+
+	// Return this part of the WM_QUIT message to Windows.
+	return static_cast<char>(msg.wParam);
+}
+
+VOID Dx12SampleBase::SetupWindow(HINSTANCE hInstance, int nCmdShow)
+{
+	//@todo command line arguments
+
+	///@todo understand this w.r.t WIC
+	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
+
+	//Create window
+	WNDCLASSEX windowClass = {};
+	windowClass.cbSize = sizeof(WNDCLASSEX);
+	windowClass.style = CS_HREDRAW | CS_VREDRAW;
+	windowClass.lpfnWndProc = WindowProc;
+	windowClass.hInstance = hInstance;
+	windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	windowClass.lpszClassName = L"dx12Examples";
+	RegisterClassEx(&windowClass);
+
+	//@todo hard coded size, get it with command line arguments and a default value
+	RECT windowRect = { 0, 0, 1280, 720 };
+	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+	m_hwnd = CreateWindow(
+		windowClass.lpszClassName,
+		L"Dx12 Examples",						///@todo use app name
+		WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT,
+		CW_USEDEFAULT,
+		windowRect.right - windowRect.left,
+		windowRect.bottom - windowRect.top,
+		nullptr,
+		nullptr,
+		hInstance,
+		nullptr 								///@todo need this in the callback to WindowProc
+	);
+
+	ShowWindow(m_hwnd, nCmdShow);
 }
 
 
@@ -110,7 +200,7 @@ HRESULT Dx12SampleBase::WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue)
 }
 
 
-HRESULT Dx12SampleBase::CreateSwapChain(HWND hwnd)
+HRESULT Dx12SampleBase::CreateSwapChain()
 {
 	HRESULT    result               = S_OK;
 	const UINT swapChainBufferCount = GetSwapChainBufferCount();
@@ -133,13 +223,13 @@ HRESULT Dx12SampleBase::CreateSwapChain(HWND hwnd)
 
 	result = m_dxgiFactory7->CreateSwapChainForHwnd(
 					m_pCmdQueue.Get(),                         ///< In Dx12, Present -> needs cmdQueue. In Dx11, we pass in pDevice.
-					hwnd,
+					m_hwnd,
 					&swapChainDesc,
 					nullptr,                                  ///< Full Screen Desc
 					nullptr,                                  ///< pRestrict to Output
 					&swapChain);
 
-	result = m_dxgiFactory7->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+	result = m_dxgiFactory7->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
 	result = swapChain.As(&m_swapChain4);
 
 	m_swapChainBuffers.resize(swapChainBufferCount);
@@ -717,7 +807,7 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void*                 
 	return result;
 }
 
-HRESULT Dx12SampleBase::Run(FLOAT frameDeltaTime)
+HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 {
 	HRESULT result = S_OK;
 
@@ -804,14 +894,14 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 * Use the Device and Create CommandQueue.
 * Use Command Queue and Create swapchain and make the window association
 */
-HRESULT Dx12SampleBase::OnInit(HWND hwnd)
+HRESULT Dx12SampleBase::OnInit()
 {
 	HRESULT result = S_OK;
 
 	result = CreateDevice();
 	result = CreateCommandQueues();
 	result = CreateCommandList();
-	result = CreateSwapChain(hwnd);
+	result = CreateSwapChain();
 	result = CreateFence();
 	result = InitializeFrameComposition();
 

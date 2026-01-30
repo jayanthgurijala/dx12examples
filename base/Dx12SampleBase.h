@@ -15,14 +15,17 @@ class Dx12SampleBase
 {
 public:
 	Dx12SampleBase(UINT width, UINT height);
-	HRESULT OnInit(HWND hwnd);
+	HRESULT OnInit();
 	virtual HRESULT PreRun()  { return S_OK; };
-	HRESULT Run(FLOAT frameDeltaTime);
+	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
 	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
 	FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }
+
+	VOID SetupWindow(HINSTANCE hInstance, int nCmdShow);
+	int RenderLoop();
 
 
 protected:
@@ -120,6 +123,8 @@ protected:
 
 	VOID AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo);
 
+	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
 private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
@@ -135,7 +140,7 @@ private:
 
 	HRESULT CreateDevice();
 	HRESULT CreateCommandQueues();
-	HRESULT CreateSwapChain(HWND hWnd);
+	HRESULT CreateSwapChain();
 	HRESULT CreateCommandList();
 
 	HRESULT InitializeFrameComposition();
@@ -183,5 +188,7 @@ private:
 	UINT m_samplerDescriptorSize;
 	UINT m_rtvDescriptorSize;
 	UINT m_dsvDescriptorSize;
+
+	HWND m_hwnd;
 };
 
