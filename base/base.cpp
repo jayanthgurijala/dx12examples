@@ -12,6 +12,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    Dx12HelloWorld sample(1280, 720);
-    return Win32Application::Run(&sample, hInstance, nCmdShow);
+    Dx12HelloWorld* pSample = new Dx12HelloWorld(1280, 720);
+    pSample->SetupWindow(hInstance, nCmdShow);
+    pSample->OnInit();
+    pSample->PreRun();
+    int retval = pSample->RenderLoop();
+    pSample->PostRun();
+
+    return retval;
 }
