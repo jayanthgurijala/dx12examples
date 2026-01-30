@@ -29,6 +29,8 @@ public:
 
 	int RunApp(HINSTANCE hInstance, int nCmdShow);
 
+	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList);
+
 
 protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
@@ -120,12 +122,16 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 	virtual inline UINT NumSRVsNeededForApp() { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() { return 0; }
+	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
 
 	VOID CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 
 	VOID AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo);
 
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+	HRESULT LoadGltfFile();
+	HRESULT CreatePipelineStateFromModel();
 
 private:
 
@@ -192,5 +198,16 @@ private:
 	UINT m_dsvDescriptorSize;
 
 	HWND m_hwnd;
+
+	///@todo model resources refactor
+	std::vector<ComPtr<ID3D12Resource>>   m_modelVbBuffers;
+	ComPtr<ID3D12Resource>                m_modelIbBuffer;
+	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
+	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
+	std::vector<DxIASemantic>             m_modelIaSemantics;
+	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
+	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
+	DxDrawPrimitive                       m_modelDrawPrimitive;
+	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
 };
 

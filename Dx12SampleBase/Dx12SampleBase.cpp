@@ -4,6 +4,12 @@
 #include "DxPrintUtils.h"
 #include <memory>
 #include <chrono>
+#include "WICImageLoader.h"
+#include "gltfutils.h"
+#include "tiny_gltf.h"
+using namespace WICImageLoader;
+
+using namespace GltfUtils;
 
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
@@ -21,7 +27,10 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
 	m_camera(std::make_unique<DxCamera>(width, height)),
-	m_assetReader(std::make_unique<FileReader>())
+	m_assetReader(std::make_unique<FileReader>()),
+	m_modelDrawPrimitive{},
+	m_modelBaseColorTex2D(nullptr),
+	m_modelIbv{}
 {
 
 }
@@ -929,10 +938,118 @@ HRESULT Dx12SampleBase::OnInit()
 		CreateDepthStencilViewDescriptorHeap(numDSVsForApp);
 		CreateShaderResourceViewDescriptorHeap(numRTVsForApp + numSRVsForApp);
 		CreateRenderTargetViews(numRTVsForComposition, TRUE);
+
+		result = CreateRenderTargetResourceAndSRVs(numRTVsForApp);
+		result = CreateRenderTargetViews(numRTVsForApp, FALSE);
+		result = CreateDsvResources(numDSVsForApp);
+	}
+
+	{
+		result = LoadGltfFile();
+		result = CreatePipelineStateFromModel();
 	}
 
 	return result;
 }
+
+VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
+{
+	pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
+
+	///@todo get this from mode of primitive
+	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	pCmdList->SetPipelineState(m_modelPipelineState.Get());
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+
+	const SIZE_T numVertexBufferViews = m_modelVbvs.size();
+	D3D12_VERTEX_BUFFER_VIEW vbv = {};
+	vbv.BufferLocation = m_modelVbvs[0].BufferLocation;
+	vbv.SizeInBytes = m_modelVbvs[0].SizeInBytes;
+	vbv.StrideInBytes = m_modelVbvs[0].StrideInBytes;
+	assert(vbv.SizeInBytes > 0);
+	assert(vbv.StrideInBytes > 0);
+	assert(vbv.BufferLocation != 0);
+	pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
+
+	if (m_modelBaseColorTex2D != nullptr)
+	{
+		ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
+		pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+		pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+	}
+
+
+	if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
+	{
+		pCmdList->IASetIndexBuffer(&m_modelIbv);
+		pCmdList->DrawIndexedInstanced(m_modelDrawPrimitive.numIndices, 1, 0, 0, 0);
+	}
+	else
+	{
+		pCmdList->DrawInstanced(m_modelDrawPrimitive.numVertices, 1, 0, 0);
+	}
+}
+
+HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
+{
+	HRESULT result = S_OK;
+	ID3D12Device* pDevice = GetDevice();
+
+	const SIZE_T numAttributes = m_modelIaSemantics.size();
+	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
+	inputElementDescs.resize(numAttributes);
+
+	char vertexShaderName[64];
+	char pixelShaderName[64];
+
+	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
+	snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
+
+	for (UINT i = 0; i < numAttributes; i++)
+	{
+		const UINT semanticIndex = m_modelIaSemantics[i].isIndexValid ? m_modelIaSemantics[i].index : 0;
+		inputElementDescs[i].SemanticName = m_modelIaSemantics[i].name.c_str();
+		inputElementDescs[i].AlignedByteOffset = 0;
+		inputElementDescs[i].SemanticIndex = semanticIndex;
+		inputElementDescs[i].InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		inputElementDescs[i].InstanceDataStepRate = 0;
+		inputElementDescs[i].Format = m_modelIaSemantics[i].format;
+
+		///@note depends on VB allocation. Need gltf to DX converter to give this info
+		inputElementDescs[i].InputSlot = i;
+	}
+
+	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
+	inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
+	inputLayoutDesc.pInputElementDescs = inputElementDescs.data();
+
+	//@todo Root signature
+	//Root CBV
+	//desc table -> SRV
+	CD3DX12_ROOT_PARAMETER parameters[2] = {};
+	parameters[0].InitAsConstantBufferView(0);
+
+	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	parameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, parameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+
+
+	ComPtr<ID3DBlob> error;
+	ComPtr<ID3DBlob> signature;
+
+	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
+
+	///@todo tie up cull mode to double sided from gltf
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE, TRUE);
+
+	return result;
+}
+
 
 VOID Dx12SampleBase::AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo)
 {
@@ -986,5 +1103,197 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	return result;
 }
 
+
+HRESULT Dx12SampleBase::LoadGltfFile()
+{
+	HRESULT result = S_OK;
+	tinygltf::Model    model;
+	tinygltf::TinyGLTF loader;
+	std::string        err;
+	std::string        warn;
+	const std::string gltfFileName = GltfFileName();
+	std::string modelPath = m_assetReader->GetFullAssetFilePath(gltfFileName);
+	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, modelPath);
+	
+	/*if (!warn.empty())
+	{
+		std::cout << "Warn: " << warn << std::endl;
+	}
+	if (!err.empty())
+	{
+		std::cout << "Err: " << err << std::endl;
+	}
+	if (!ret)
+	{
+		std::cout << "Failed to parse glTF" << std::endl;
+		result = E_FAIL;
+	}*/
+
+	if (result == S_OK)
+	{
+		const tinygltf::Scene& firstScene = model.scenes[0];
+		const UINT firstNode = firstScene.nodes[0];
+		const tinygltf::Node& firstNodeDesc = model.nodes[0];
+		const UINT firstMesh = firstNodeDesc.mesh;
+
+		DxMeshNodeTransformInfo meshTransformInfo;
+
+		meshTransformInfo.hasScale = (firstNodeDesc.scale.size() != 0);
+		meshTransformInfo.hasTranslation = (firstNodeDesc.translation.size() != 0);
+		meshTransformInfo.hasRotation = (firstNodeDesc.rotation.size() != 0);
+		meshTransformInfo.hasMatrix = (firstNodeDesc.matrix.size() != 0);
+		meshTransformInfo.translation = firstNodeDesc.translation;
+		meshTransformInfo.rotation = firstNodeDesc.rotation;
+		meshTransformInfo.scale = firstNodeDesc.scale;
+		AddTransformInfo(meshTransformInfo);
+
+		const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
+		const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
+
+		const tinygltf::Accessor& accessors = model.accessors[0];
+		const SIZE_T numAccessors = model.accessors.size();
+
+		///@note load IA Layout and VB info and resources
+		{
+			m_modelVbBuffers.resize(firstPrimitive.attributes.size());
+			m_modelVbvs.resize(firstPrimitive.attributes.size());
+			m_modelIaSemantics.resize(firstPrimitive.attributes.size());
+
+			std::string positionAttributeName = "POSITION";
+
+			std::vector<std::string> supportedAttributeNames;
+			supportedAttributeNames.push_back("POSITION");
+			supportedAttributeNames.push_back("NORMAL");
+			supportedAttributeNames.push_back("TEXCOORD_0");
+			supportedAttributeNames.push_back("TEXCOORD_1");
+			supportedAttributeNames.push_back("TEXCOORD_2");
+
+			//primitive -> attribute names -> accessor index -> accessor -> bufferview -> buffer
+			auto attributeIt = supportedAttributeNames.begin();
+			UINT attrIndx = 0;
+			SIZE_T numTotalVertices = 0;
+			while (attributeIt != supportedAttributeNames.end())
+			{
+				auto it = firstPrimitive.attributes.find(*attributeIt);
+				if (it != firstPrimitive.attributes.end())
+				{
+					const std::string attributeName = it->first;
+					const int accessorIdx = it->second;
+					const tinygltf::Accessor& accessorDesc = model.accessors[accessorIdx];
+					const UINT componentDataType = accessorDesc.componentType;
+					const UINT componentVecType = accessorDesc.type;
+					const UINT componentSizeInBytes = GetComponentTypeSizeInBytes(componentDataType);
+					const UINT numComponents = GetNumComponentsInType(componentVecType);
+
+					///@note for POSITION attriubte, extents are needed to setup camera
+					if (attributeName == positionAttributeName)
+					{
+						///@todo we have min max extents
+					}
+					const int bufferViewIdx = accessorDesc.bufferView;
+					const tinygltf::BufferView bufViewDesc = model.bufferViews[bufferViewIdx];
+
+					///@todo need to support interleaved data
+					assert(bufViewDesc.byteStride == 0);
+
+					const int    bufferIdx = bufViewDesc.buffer;
+					const size_t buflength = bufViewDesc.byteLength;
+					const size_t bufOffset = bufViewDesc.byteOffset;
+
+					const size_t accessorByteOffset = accessorDesc.byteOffset;
+					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(componentDataType, componentVecType);
+					numTotalVertices += accessorDesc.count;
+					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
+					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
+					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
+
+					m_modelVbvs[attrIndx].BufferLocation = m_modelVbBuffers[attrIndx].Get()->GetGPUVirtualAddress();
+					m_modelVbvs[attrIndx].SizeInBytes = (UINT)buflength;
+					m_modelVbvs[attrIndx].StrideInBytes = componentSizeInBytes * numComponents;
+
+					auto& currentSemantic = m_modelIaSemantics[attrIndx];
+					///@todo make a string utils class to check for stuff
+					auto pos = attributeName.find("_");
+
+					if (pos != std::string::npos)
+					{
+						std::string left = attributeName.substr(0, pos);
+						std::string right = attributeName.substr(pos + 1);
+						int index = std::stoi(right);
+						currentSemantic.name = left;
+						currentSemantic.index = index;
+						currentSemantic.isIndexValid = TRUE;
+					}
+					else
+					{
+						currentSemantic.name = attributeName;
+						currentSemantic.isIndexValid = FALSE;
+					}
+					attrIndx++;
+				}
+				attributeIt++;
+			}
+			m_modelDrawPrimitive.numVertices = (UINT)(numTotalVertices);
+		}
+
+		//load index buffers
+		{
+			const int bufViewIdx = firstPrimitive.indices;
+			if (bufViewIdx != -1)
+			{
+				const tinygltf::Accessor& accessorDesc = model.accessors[bufViewIdx];
+				const int bufferViewIdx = accessorDesc.bufferView;
+				const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufferViewIdx];
+				const int bufferIdx = bufViewDesc.buffer;
+				const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
+
+				const size_t accessorByteOffset = accessorDesc.byteOffset;
+				const UINT bufferSizeInBytes = (UINT)bufViewDesc.byteLength;
+				const size_t bufferViewOffset = bufViewDesc.byteOffset;
+
+				const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
+
+
+				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes);
+				m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
+				m_modelIbv.Format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+				m_modelIbv.SizeInBytes = bufferSizeInBytes;
+				m_modelDrawPrimitive.isIndexedDraw = TRUE;
+				m_modelDrawPrimitive.numIndices = (UINT)accessorDesc.count;
+			}
+			else
+			{
+				m_modelDrawPrimitive.isIndexedDraw = FALSE;
+			}
+		}
+
+		//load materials
+		{
+			const int materialIdx = firstPrimitive.material;
+			if (materialIdx != -1)
+			{
+				const tinygltf::Material& materialDesc = model.materials[materialIdx];
+				const tinygltf::PbrMetallicRoughness& pbrMaterialRoughness = materialDesc.pbrMetallicRoughness;
+				const tinygltf::TextureInfo& baseColorTex = pbrMaterialRoughness.baseColorTexture;
+				const int                             textureIdx = baseColorTex.index;
+				const tinygltf::Texture& baseTexInfo = model.textures[textureIdx];
+				const int                             baseTexSource = baseTexInfo.source;
+				const tinygltf::Image& baseTexImage = model.images[baseTexSource];
+				const int                             bufViewIdx = baseTexImage.bufferView;
+				const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufViewIdx];
+				const tinygltf::Buffer& bufferDesc = model.buffers[bufViewDesc.buffer];
+
+				assert(bufViewDesc.byteStride == 0);
+
+				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferDesc.data[bufViewDesc.byteOffset], bufViewDesc.byteLength);
+				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
+				CreateAppSrvAtIndex(0, m_modelBaseColorTex2D.Get());
+			}
+
+		}
+	}
+
+	return result;
+}
 
 
