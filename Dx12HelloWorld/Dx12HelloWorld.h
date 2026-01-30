@@ -2,11 +2,8 @@
 
 #include "resource.h"
 #include "Dx12SampleBase.h"
-#include "FileReader.h"
-#include "stdafx.h"
 
 using namespace Microsoft::WRL;
-using namespace DirectX;
 
 class Dx12HelloWorld : public Dx12SampleBase
 {

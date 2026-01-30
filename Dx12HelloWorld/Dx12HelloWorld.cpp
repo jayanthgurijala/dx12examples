@@ -1,9 +1,9 @@
 // Dx12HelloWorld.cpp : Defines the entry point for the application.
 //
 
+#include "Dx12HelloWorld.h"
 #include "ExampleEntryPoint.h"
 #include "framework.h"
-#include "Dx12HelloWorld.h"
 #include <d3dx12.h>
 
 Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
