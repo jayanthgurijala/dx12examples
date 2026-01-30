@@ -26,16 +26,13 @@ private:
 	HRESULT CreateAppResources();
 	HRESULT CreateSceneMVPMatrix();
 
-	HRESULT TestTinyGLTFLoading();
+	HRESULT LoadGltfFile();
 
 	FileReader                  m_fileReader;
 
 	ComPtr<ID3D12RootSignature> m_rootSignarure;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
 	ComPtr<ID3D12Resource>      m_vertexBuffer;
-
-	UINT                        m_vertexBufferSizeInBytes;
-	UINT						m_vertexStrideInBytes;
 
 	///@todo model resources refactor
 	std::vector<ComPtr<ID3D12Resource>>   m_modelVbBuffers;
