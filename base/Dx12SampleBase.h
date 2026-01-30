@@ -27,6 +27,8 @@ public:
 	VOID SetupWindow(HINSTANCE hInstance, int nCmdShow);
 	int RenderLoop();
 
+	int RunApp(HINSTANCE hInstance, int nCmdShow);
+
 
 protected:
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);

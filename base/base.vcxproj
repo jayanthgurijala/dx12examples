@@ -140,7 +140,6 @@
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="WICImageLoader.h" />
-    <ClInclude Include="Win32Application.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="base.cpp" />
@@ -152,7 +151,6 @@
     <ClCompile Include="FileReader.cpp" />
     <ClCompile Include="tinygltf.cpp" />
     <ClCompile Include="WICImageLoader.cpp" />
-    <ClCompile Include="Win32Application.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Shaders\CameraBuffer.hlsli" />

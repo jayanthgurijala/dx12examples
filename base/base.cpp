@@ -1,7 +1,6 @@
 // base.cpp : Defines the entry point for the application.
 //
 
-#include "Win32Application.h"
 #include "Dx12HelloWorld.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -13,11 +12,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     Dx12HelloWorld* pSample = new Dx12HelloWorld(1280, 720);
-    pSample->SetupWindow(hInstance, nCmdShow);
-    pSample->OnInit();
-    pSample->PreRun();
-    int retval = pSample->RenderLoop();
-    pSample->PostRun();
+    int retval = pSample->RunApp(hInstance, nCmdShow);
+    delete(pSample);
 
     return retval;
 }
