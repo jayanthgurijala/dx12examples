@@ -1,9 +1,8 @@
+#include "pch.h"
 #include "FileReader.h"
 #include <stdexcept>
 #include <fstream>
 #include <vector>
-#include "pch.h"
-
 
 
 void FileReader::GetExecutablePath(_Out_writes_(pathSize) CHAR* path, UINT pathSize)

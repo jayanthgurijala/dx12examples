@@ -1,5 +1,5 @@
+#include "pch.h"
 #include "WICImageLoader.h"
-
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <vector>

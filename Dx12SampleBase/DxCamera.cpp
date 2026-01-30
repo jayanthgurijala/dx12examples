@@ -1,5 +1,5 @@
-#include "DxCamera.h"
 #include "pch.h"
+#include "DxCamera.h"
 
 DxCamera::DxCamera(UINT width, UINT height) :
     m_frameDeltaTime(0),
