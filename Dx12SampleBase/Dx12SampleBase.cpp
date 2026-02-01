@@ -597,9 +597,9 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	D3D12_INPUT_LAYOUT_DESC layout1 = {};
 	GetInputLayoutDesc_Layout1(layout1);
 	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders("FrameSimple_VS.cso",
-		"FrameSimple_PS.cso",
-		m_simpleComposition.rootSignature.Get(),
-		layout1);
+																	   "FrameSimple_PS.cso",
+		                                                               m_simpleComposition.rootSignature.Get(),
+		                                                               layout1);
 
 	///@note instead of drawing two triangles to form a quad, we draw a triangle which covers the full screen.
 	///      This helps in avoiding diagonal interpolation issues.
