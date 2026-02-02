@@ -17,6 +17,14 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
 	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
 
+	virtual HRESULT CreatePipelineStateFromModel() override;
+
+	virtual inline UINT NumRootConstantsForApp() override { return 1; }
+	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIdx) override {
+		pCmdList->SetGraphicsRoot32BitConstant(rootParamIdx, m_tesstriTessLevel, 0);
+	}
+
 private:
+	UINT m_tesstriTessLevel;
 
 };

@@ -46,3 +46,10 @@ struct DxDrawPrimitive
 	UINT numIndices;
 	BOOL isIndexedDraw;
 };
+
+struct DxMeshState
+{
+	//IALayout needs contiguous data
+	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDesc;
+	BOOL doubleSided;
+};

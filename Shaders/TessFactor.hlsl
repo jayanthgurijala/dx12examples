@@ -1,0 +1,11 @@
+#include "CameraBuffer.hlsli"
+#include "SimpleVSPSInterface.hlsli"
+
+cbuffer RootConstant : register(b0)
+{
+    uint tessLevel; // single 32-bit constant
+};
+
+
+
+

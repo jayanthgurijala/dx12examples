@@ -12,7 +12,6 @@ VSOutput_1 VSMain( VSInput_1 input )
     return output;
 }
 
-
 float4 PSMain(PSInput_1 input) : SV_TARGET
 {
     return float4(1.0f, 1.0f, 1.0f, 1.0f);

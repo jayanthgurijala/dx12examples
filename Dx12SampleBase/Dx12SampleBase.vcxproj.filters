@@ -16,6 +16,18 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{fb0f644a-9310-4cb1-8db5-f13812ad4791}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\hpp">
+      <UniqueIdentifier>{0db047b1-08e5-415e-8203-4623b7d2011d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\hlsi">
+      <UniqueIdentifier>{dd87b215-6ac2-4bba-853b-2fb70b3d4a57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\VSPS">
+      <UniqueIdentifier>{62cb3ae9-7536-4643-b93b-e614c741a50c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Tess">
+      <UniqueIdentifier>{06f8ffcd-55b1-4997-9826-775e28929861}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -48,6 +60,9 @@
     <ClInclude Include="WICImageLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DxPipelineInitializers.hpp">
+      <Filter>Source Files\hpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dx12SampleBase.cpp">
@@ -78,21 +93,27 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\Shaders\CameraBuffer.hlsli">
-      <Filter>Shaders</Filter>
+      <Filter>Shaders\hlsi</Filter>
     </None>
     <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
+      <Filter>Shaders\hlsi</Filter>
+    </None>
+    <None Include="..\Shaders\TessPassthrough.hlsl">
+      <Filter>Shaders\Tess</Filter>
+    </None>
+    <None Include="..\Shaders\Simple1.hlsl">
+      <Filter>Shaders\VSPS</Filter>
+    </None>
+    <None Include="..\Shaders\Simple5.hlsl">
+      <Filter>Shaders\VSPS</Filter>
+    </None>
+    <None Include="..\Shaders\FrameSimple.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\Shaders\FrameSimple.hlsl">
-      <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\Shaders\Simple1.hlsl">
-      <Filter>Shaders</Filter>
-    </CustomBuild>
-    <CustomBuild Include="..\Shaders\Simple5.hlsl">
-      <Filter>Shaders</Filter>
-    </CustomBuild>
+    <FxCompile Include="..\Shaders\TessFactor.hlsl">
+      <Filter>Shaders\Tess</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

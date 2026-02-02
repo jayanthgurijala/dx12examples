@@ -364,3 +364,7 @@ FodyWeavers.xsd
 /Shaders/Simple1_VS.cso
 /Shaders/Simple5_VS.cso
 /Shaders/Simple5_PS.cso
+/Shaders/FrameSimple_PS.cso
+/Shaders/FrameSimple_VS.cso
+*.cso
+/Shaders/Simple1_PS.cso

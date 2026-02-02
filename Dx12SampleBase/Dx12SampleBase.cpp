@@ -6,7 +6,8 @@
 #include <chrono>
 #include "WICImageLoader.h"
 #include "gltfutils.h"
-#include "tiny_gltf.h"
+#include "DxPipelineInitializers.hpp"
+
 using namespace WICImageLoader;
 
 using namespace GltfUtils;
@@ -56,7 +57,6 @@ int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow)
 {
 	SetupWindow(hInstance, nCmdShow);
 	OnInit();
-	PreRun();
 	int retval = RenderLoop();
 	PostRun();
 
@@ -474,68 +474,24 @@ VOID Dx12SampleBase::CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvRe
 
 }
 
-VOID Dx12SampleBase::GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1)
-{
-	// Define the vertex input layout.
-	static const D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}
-	};
-
-	layout1.NumElements = _countof(inputElementDescs);
-	layout1.pInputElementDescs = inputElementDescs;
-}
-
 ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
-	const std::string& pixelShaderName,
-	ID3D12RootSignature* signature,
-	const D3D12_INPUT_LAYOUT_DESC& iaLayout,
-	BOOL enableWireFrame,
-	BOOL doubleSided,
-	BOOL useDepthStencil)
+																		   const std::string& pixelShaderName,
+																		   ID3D12RootSignature* signature,
+																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
+																		   BOOL enableWireFrame,
+																		   BOOL doubleSided,
+																		   BOOL useDepthStencil)
 {
 	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
-	ComPtr<ID3DBlob>            vertexShader;
-	ComPtr<ID3DBlob>            pixelShader;
 
-	///@todo compileFlags = 0 for release
-	UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
+	ComPtr<ID3DBlob> pixelShader = GetCompiledShaderBlob(pixelShaderName);
 
-	std::string compiledVertexShaderPath = m_assetReader->GetFullAssetFilePath(vertexShaderName);
-	std::string compiledPixelShaderPath = m_assetReader->GetFullAssetFilePath(pixelShaderName);
-
-	vertexShader = m_assetReader->LoadShaderBlobFromAssets(compiledVertexShaderPath);
-	pixelShader = m_assetReader->LoadShaderBlobFromAssets(compiledPixelShaderPath);
-
-	if (vertexShader == nullptr || pixelShader == nullptr)
-	{
-		PrintUtils::PrintString("Unable to load shaders");
-	}
-	else
-	{
-
-		CD3DX12_RASTERIZER_DESC rast(D3D12_DEFAULT);
-
-		if (enableWireFrame == TRUE)
-		{
-			rast.CullMode = D3D12_CULL_MODE_NONE;
-			rast.FillMode = D3D12_FILL_MODE_WIREFRAME;
-		}
-
-		if (doubleSided == TRUE)
-		{
-			rast.CullMode = D3D12_CULL_MODE_NONE;
-		}
+	assert(vertexShader != nullptr && pixelShader != nullptr);
 
 
-		CD3DX12_DEPTH_STENCIL_DESC depthStencilState(D3D12_DEFAULT);
-		if (useDepthStencil == FALSE)
-		{
-			depthStencilState.DepthEnable = FALSE;
-			depthStencilState.StencilEnable = FALSE;
-		}
+	auto rast    = dxinit::GetRasterizerState();
+	auto dsState = dxinit::GetDepthStencilState(useDepthStencil);
 
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -545,7 +501,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 		pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
 		pipelineStateDesc.RasterizerState = rast;
 		pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		pipelineStateDesc.DepthStencilState = depthStencilState;
+		pipelineStateDesc.DepthStencilState = dsState;
 
 		///@todo write some test cases for this
 		pipelineStateDesc.SampleMask = UINT_MAX;
@@ -560,7 +516,6 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 		pipelineStateDesc.SampleDesc.Count = 1;
 
 		m_pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&gfxPipelineState));
-	}
 
 	return gfxPipelineState;
 }
@@ -569,37 +524,13 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 {
 	HRESULT result = S_OK;
 
-	///@note initialize root signarure
-	{
-		ComPtr<ID3DBlob> rootSigBlob;
-		ComPtr<ID3DBlob> errorBlob;
+	m_simpleComposition.rootSignature = dxinit::GetSrvDescTableRootSignature(m_pDevice.Get(), 1);
 
-		auto descriptorTable = CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-		CD3DX12_ROOT_PARAMETER rootParameters[1];
-		rootParameters[0].InitAsDescriptorTable(1,
-			&descriptorTable,
-			D3D12_SHADER_VISIBILITY_PIXEL);
-
-		CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
-		auto rootSignature = CD3DX12_ROOT_SIGNATURE_DESC(1, rootParameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-		D3D12SerializeRootSignature(&rootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &rootSigBlob, &errorBlob);
-
-		if (errorBlob != NULL)
-		{
-			OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-		}
-
-		m_pDevice->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&m_simpleComposition.rootSignature));
-	}
-
-	D3D12_INPUT_LAYOUT_DESC layout1 = {};
-	GetInputLayoutDesc_Layout1(layout1);
+	auto layout_1 = dxinit::GetInputLayoutDesc_Layout1();
 	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders("FrameSimple_VS.cso",
 																	   "FrameSimple_PS.cso",
 		                                                               m_simpleComposition.rootSignature.Get(),
-		                                                               layout1);
+		                                                               layout_1);
 
 	///@note instead of drawing two triangles to form a quad, we draw a triangle which covers the full screen.
 	///      This helps in avoiding diagonal interpolation issues.
@@ -879,6 +810,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	m_pCmdList->SetDescriptorHeaps(1, descHeaps);
 	m_pCmdList->SetGraphicsRootDescriptorTable(0, GetSrvGpuHeapHandle(rtvResourceIndex));
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
+	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
 
 	D3D12_RESOURCE_BARRIER postResourceBarriers[2];
@@ -954,13 +886,12 @@ HRESULT Dx12SampleBase::OnInit()
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 {
-	pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
 
-	///@todo get this from mode of primitive
-	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	pCmdList->SetPipelineState(m_modelPipelineState.Get());
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
 
+	pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+	AppSetRootConstantForModel(pCmdList, GetRootConstantIndex());
 	const SIZE_T numVertexBufferViews = m_modelVbvs.size();
 	D3D12_VERTEX_BUFFER_VIEW vbv = {};
 	vbv.BufferLocation = m_modelVbvs[0].BufferLocation;
@@ -989,60 +920,30 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 		pCmdList->DrawInstanced(m_modelDrawPrimitive.numVertices, 1, 0, 0);
 	}
 }
-
+/*
+* Input Layout
+* Root Signature - fixed for now?
+* Shaders
+* 
+*/
 HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
 {
 	HRESULT result = S_OK;
-	ID3D12Device* pDevice = GetDevice();
-
-	const SIZE_T numAttributes = m_modelIaSemantics.size();
-	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDescs;
-	inputElementDescs.resize(numAttributes);
 
 	char vertexShaderName[64];
 	char pixelShaderName[64];
 
+	assert(m_modelRootSignature != nullptr && m_meshState.inputElementDesc.size() > 0);
+
+	const SIZE_T numAttributes = m_meshState.inputElementDesc.size();
 	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
 	snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
 
-	for (UINT i = 0; i < numAttributes; i++)
-	{
-		const UINT semanticIndex = m_modelIaSemantics[i].isIndexValid ? m_modelIaSemantics[i].index : 0;
-		inputElementDescs[i].SemanticName = m_modelIaSemantics[i].name.c_str();
-		inputElementDescs[i].AlignedByteOffset = 0;
-		inputElementDescs[i].SemanticIndex = semanticIndex;
-		inputElementDescs[i].InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-		inputElementDescs[i].InstanceDataStepRate = 0;
-		inputElementDescs[i].Format = m_modelIaSemantics[i].format;
-
-		///@note depends on VB allocation. Need gltf to DX converter to give this info
-		inputElementDescs[i].InputSlot = i;
-	}
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
 	inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
-	inputLayoutDesc.pInputElementDescs = inputElementDescs.data();
+	inputLayoutDesc.pInputElementDescs = m_meshState.inputElementDesc.data();
 
-	//@todo Root signature
-	//Root CBV
-	//desc table -> SRV
-	CD3DX12_ROOT_PARAMETER parameters[2] = {};
-	parameters[0].InitAsConstantBufferView(0);
-
-	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-	parameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(2, parameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-
-
-	ComPtr<ID3DBlob> error;
-	ComPtr<ID3DBlob> signature;
-
-	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
-	pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 
 	///@todo tie up cull mode to double sided from gltf
 	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE, TRUE);
@@ -1101,6 +1002,63 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	memcpy(pWritePtr, &camPosition, float4SizeInBytes);
 
 	return result;
+}
+
+VOID Dx12SampleBase::CreateRootSignature()
+{
+	
+	//@todo Root signature
+	//0. Root CBV
+	//1. desc table -> SRV
+	//2. App Root Constants
+	const UINT numRootConstants = NumRootConstantsForApp();
+	const UINT numTotalRootParams = 2 + numRootConstants;
+
+	std::vector< CD3DX12_ROOT_PARAMETER> rootParameters;
+	rootParameters.resize(numTotalRootParams);
+
+	rootParameters[0].InitAsConstantBufferView(0);
+
+	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	rootParameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
+
+	///@todo generalize
+	if (numRootConstants > 0)
+	{
+		rootParameters[2].InitAsConstants(numRootConstants, 0);
+	}
+
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(numTotalRootParams, rootParameters.data(), 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+	ComPtr<ID3DBlob> error;
+	ComPtr<ID3DBlob> signature;
+
+	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+	m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
+}
+
+
+VOID Dx12SampleBase::CreateMeshState()
+{
+	m_meshState.inputElementDesc.clear();
+	const SIZE_T numAttributes = m_modelIaSemantics.size();
+	m_meshState.inputElementDesc.resize(numAttributes);
+	for (UINT i = 0; i < numAttributes; i++)
+	{
+		auto& inputElementDesc = m_meshState.inputElementDesc[i];
+		const UINT semanticIndex = m_modelIaSemantics[i].isIndexValid ? m_modelIaSemantics[i].index : 0;
+		inputElementDesc.SemanticName = m_modelIaSemantics[i].name.c_str();
+		inputElementDesc.AlignedByteOffset = 0;
+		inputElementDesc.SemanticIndex = semanticIndex;
+		inputElementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		inputElementDesc.InstanceDataStepRate = 0;
+		inputElementDesc.Format = m_modelIaSemantics[i].format;
+
+		///@note depends on VB allocation. Need gltf to DX converter to give this info
+		inputElementDesc.InputSlot = i;
+	}
 }
 
 
@@ -1292,6 +1250,9 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 		}
 	}
+
+	CreateMeshState();
+	CreateRootSignature();
 
 	return result;
 }

@@ -2,12 +2,22 @@ cd /d "%~dp0"
 
 del *.cso
 
-for %%f in (*.hlsl) do (
-    echo "================ compiling %%f =============="
-    fxc /T vs_5_0 /E VSMain /Fo "%%~nf_VS.cso" "%%f"
-    fxc /T ps_5_0 /E PSMain /Fo "%%~nf_PS.cso" "%%f"
-)
+dxc -T vs_6_0 -E VSMain -Fo FrameSimple_VS.cso FrameSimple.hlsl
+dxc -T ps_6_0 -E PSMain -Fo FrameSimple_PS.cso FrameSimple.hlsl
+
+dxc -T vs_6_0 -E VSMain -Fo Simple1_VS.cso Simple1.hlsl
+dxc -T ps_6_0 -E PSMain -Fo Simple1_PS.cso Simple1.hlsl
+
+dxc -T vs_6_0 -E VSMain -Fo Simple5_VS.cso Simple5.hlsl
+dxc -T ps_6_0 -E PSMain -Fo Simple5_PS.cso Simple5.hlsl
+
+dxc -T vs_6_0 -E VSMain -Fo TessPassthrough_VS.cso TessPassthrough.hlsl
+dxc -T hs_6_0 -E HSMain -Fo TessPassthrough_HS.cso TessPassthrough.hlsl
+dxc -T ds_6_0 -E DSMain -Fo TessPassthrough_DS.cso TessPassthrough.hlsl
+dxc -T ps_6_0 -E PSMain -Fo TessPassthrough_PS.cso TessPassthrough.hlsl
+
+copy *.cso ..\x64\Debug\	
 
 
-REM fxc /T vs_5_0 /E VSMain /Fo  Simple1_VS.cso Simple1_VS_PS.hlsl
-REM fxc /T ps_5_0 /E PSMain /Fo  Simple1_PS.cso Simple1_VS_PS.hlsl
+
+

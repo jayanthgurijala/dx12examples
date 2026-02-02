@@ -16,12 +16,11 @@ class Dx12SampleBase
 public:
 	Dx12SampleBase(UINT width, UINT height);
 	HRESULT OnInit();
-	virtual HRESULT PreRun() { return S_OK; };
 	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
 	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
-	VOID GetInputLayoutDesc_Layout1(D3D12_INPUT_LAYOUT_DESC& layout1);
+	
 	FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }
 
 	VOID SetupWindow(HINSTANCE hInstance, int nCmdShow);
@@ -33,6 +32,10 @@ public:
 
 
 protected:
+	DxMeshState m_meshState;
+	ComPtr<ID3D12RootSignature> m_modelRootSignature;
+	ComPtr<ID3D12PipelineState> m_modelPipelineState;
+
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
 	HRESULT CreateDsvResources(UINT numResources, BOOL createViews = TRUE);
@@ -117,12 +120,27 @@ protected:
 		return m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
 	}
 
+	inline ComPtr<ID3DBlob> GetCompiledShaderBlob(const std::string& shaderName)
+	{
+		ComPtr<ID3DBlob> shaderBlob;
+		std::string compiledVertexShaderPath = m_assetReader->GetFullAssetFilePath(shaderName);
+		shaderBlob = m_assetReader->LoadShaderBlobFromAssets(compiledVertexShaderPath);
+		return shaderBlob;
+	}
+
+	inline UINT GetRootConstantIndex() const
+	{
+		return 2;
+	}
+
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
 	virtual inline UINT NumSRVsNeededForApp() { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() { return 0; }
+	virtual inline UINT NumRootConstantsForApp() { return 0; }
 	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
+	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIndex) { assert(NumRootConstantsForApp() == 0); };
 
 	VOID CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 
@@ -131,7 +149,7 @@ protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	HRESULT LoadGltfFile();
-	HRESULT CreatePipelineStateFromModel();
+	virtual HRESULT CreatePipelineStateFromModel();
 
 private:
 
@@ -160,6 +178,8 @@ private:
 	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateSceneMVPMatrix();
 	UINT    GetSwapChainBufferCount();
+	VOID CreateMeshState();
+	VOID CreateRootSignature();
 
 	UINT                       m_width;
 	UINT                       m_height;
@@ -205,8 +225,7 @@ private:
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
 	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
-	ComPtr<ID3D12RootSignature>           m_modelRootSignature;
-	ComPtr<ID3D12PipelineState>           m_modelPipelineState;
+
 	DxDrawPrimitive                       m_modelDrawPrimitive;
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
 };

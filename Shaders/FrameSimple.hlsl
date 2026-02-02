@@ -1,8 +1,5 @@
 #include "SimpleVSPSInterface.hlsli"
 
-//needs a sampler and srv
-Texture2D gTexture : register(t0);
-SamplerState gSampler : register(s0);
 
 VSOutputSimpleFrameComposition VSMain(VSInputSimpleFrameComposition input)
 {
@@ -14,6 +11,9 @@ VSOutputSimpleFrameComposition VSMain(VSInputSimpleFrameComposition input)
 	return output;
 }
 
+//needs a sampler and srv
+Texture2D gTexture : register(t0);
+SamplerState gSampler : register(s0);
 
 float4 PSMain(PSInputSimpleFrameComposition input) : SV_TARGET
 {
