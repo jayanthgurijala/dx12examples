@@ -110,10 +110,8 @@
     <None Include="..\Shaders\FrameSimple.hlsl">
       <Filter>Shaders</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="..\Shaders\TessFactor.hlsl">
+    <None Include="..\Shaders\TessFactor.hlsl">
       <Filter>Shaders\Tess</Filter>
-    </FxCompile>
+    </None>
   </ItemGroup>
 </Project>

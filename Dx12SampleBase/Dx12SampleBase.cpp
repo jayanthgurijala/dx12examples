@@ -1025,7 +1025,7 @@ VOID Dx12SampleBase::CreateRootSignature()
 	///@todo generalize
 	if (numRootConstants > 0)
 	{
-		rootParameters[2].InitAsConstants(numRootConstants, 0);
+		rootParameters[2].InitAsConstants(numRootConstants, 1);
 	}
 
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
@@ -1036,6 +1036,14 @@ VOID Dx12SampleBase::CreateRootSignature()
 	ComPtr<ID3DBlob> signature;
 
 	D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+	if (error != nullptr)
+	{
+		const char* errorMsg =
+			reinterpret_cast<const char*>(error->GetBufferPointer());
+		PrintUtils::PrintString(errorMsg);
+		assert(1);
+	}
+
 	m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
 }
 
