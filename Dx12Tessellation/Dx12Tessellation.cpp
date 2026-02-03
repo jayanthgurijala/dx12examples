@@ -8,7 +8,7 @@
 #include "DxPipelineInitializers.hpp"
 
 Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
-	m_tesstriTessLevel(1),
+	m_tesstriTessLevel(2),
 	Dx12SampleBase(width, height)
 {
 }
@@ -18,10 +18,10 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 {
 	auto pDevice = GetDevice();
 
-	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob("TessPassthrough_VS.cso");
-	ComPtr<ID3DBlob> hullShader = GetCompiledShaderBlob("TessPassthrough_HS.cso");
-	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob("TessPassthrough_DS.cso");
-	ComPtr<ID3DBlob> pixelShader = GetCompiledShaderBlob("TessPassthrough_PS.cso");
+	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob("TessFactor_VS.cso");
+	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob("TessFactor_HS.cso");
+	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob("TessFactor_DS.cso");
+	ComPtr<ID3DBlob> pixelShader  = GetCompiledShaderBlob("TessFactor_PS.cso");
 
 	assert(vertexShader != nullptr && hullShader != nullptr && domainShader != nullptr && pixelShader != nullptr);
 
@@ -35,7 +35,7 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 	pipelineStateDesc.HS = CD3DX12_SHADER_BYTECODE(hullShader.Get());
 	pipelineStateDesc.DS = CD3DX12_SHADER_BYTECODE(domainShader.Get());
 
-	pipelineStateDesc.RasterizerState = dxinit::GetRasterizerState();
+	pipelineStateDesc.RasterizerState = dxinit::GetRasterizerState(D3D12_CULL_MODE_BACK, D3D12_FILL_MODE_WIREFRAME);
 	pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	pipelineStateDesc.DepthStencilState = dxinit::GetDepthStencilState();
 

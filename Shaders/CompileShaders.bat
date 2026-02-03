@@ -16,6 +16,11 @@ dxc -T hs_6_0 -E HSMain -Fo TessPassthrough_HS.cso TessPassthrough.hlsl
 dxc -T ds_6_0 -E DSMain -Fo TessPassthrough_DS.cso TessPassthrough.hlsl
 dxc -T ps_6_0 -E PSMain -Fo TessPassthrough_PS.cso TessPassthrough.hlsl
 
+dxc -T vs_6_0 -E VSMain -Fo TessFactor_VS.cso TessFactor.hlsl
+dxc -T hs_6_0 -E HSMain -Fo TessFactor_HS.cso TessFactor.hlsl
+dxc -T ds_6_0 -E DSMain -Fo TessFactor_DS.cso TessFactor.hlsl
+dxc -T ps_6_0 -E PSMain -Fo TessFactor_PS.cso TessFactor.hlsl
+
 copy *.cso ..\x64\Debug\	
 
 

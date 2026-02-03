@@ -39,7 +39,7 @@ HSOutput_5 HSMain(
     // Pass through control point position
     output.position = patch[i].position;
     output.texcoord0 = patch[i].texcoord0;
-
+    output.normal = patch[i].normal;
     return output;
 }
 
@@ -70,6 +70,8 @@ float4 PSMain(DSOutput_5 input) : SV_TARGET
     float3 sampledColor = gTexture.Sample(gSampler, input.texcoord0).xyz;
     return float4(sampledColor, 1.0f);
 };
+
+
 
 
 
