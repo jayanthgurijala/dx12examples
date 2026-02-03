@@ -3,7 +3,7 @@
 
 cbuffer RootConstant : register(b1)
 {
-    uint tessLevel; // single 32-bit constant
+    float tessLevel;
 };
 
 VSOutput_5_Tess VSMain(VSInput_5 input)

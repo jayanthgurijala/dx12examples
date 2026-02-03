@@ -21,7 +21,8 @@ protected:
 
 	virtual inline UINT NumRootConstantsForApp() override { return 1; }
 	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIdx) override {
-		pCmdList->SetGraphicsRoot32BitConstant(rootParamIdx, m_tesstriTessLevel, 0);
+		UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
+		pCmdList->SetGraphicsRoot32BitConstant(rootParamIdx, bits, 0);
 	}
 
 private:

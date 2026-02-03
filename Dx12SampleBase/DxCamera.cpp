@@ -36,7 +36,7 @@ VOID DxCamera::CreateViewMatrix()
 	static const FLOAT cameraSpeedInDegPerSecond = 10.0f;
     static XMVECTOR up        = XMVectorSet(0, 1, 0, 0);  // Y-up
     static XMVECTOR center    = XMVectorSet(0.0, 0., 0.0, 1.0);
-    m_cameraPosition          = XMVectorSet(0.0, 0.0, -10, 1.0);
+    m_cameraPosition          = XMVectorSet(0.0, 0.0, -5, 1.0);
 
 
 

@@ -63,7 +63,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 	ImGui::SameLine();
 
 	if (ImGui::Button("-"))
-		m_tesstriTessLevel -= 0.5f;
+		m_tesstriTessLevel -= 0.1f;
 
 	ImGui::SameLine();
 
@@ -73,7 +73,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 	ImGui::SameLine();
 
 	if (ImGui::Button("+"))
-		m_tesstriTessLevel += 0.5f;
+		m_tesstriTessLevel += 0.1f;
 
 	// Clamp value
 	m_tesstriTessLevel = (m_tesstriTessLevel > 20.0f) ? 20.0f : m_tesstriTessLevel;
