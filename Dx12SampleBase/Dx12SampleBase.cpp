@@ -35,8 +35,17 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_assetReader(std::make_unique<FileReader>()),
 	m_modelDrawPrimitive{},
 	m_modelBaseColorTex2D(nullptr),
-	m_modelIbv{}
+	m_modelIbv{},
+	m_hwnd(nullptr)
 {
+
+}
+
+Dx12SampleBase::~Dx12SampleBase()
+{
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 
 }
 
@@ -779,12 +788,8 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+	ImGui::Begin("Dx12Sample");
 
-	ImGui::Begin("Hello");
-	ImGui::Text("DX12 + ImGui works!");
-	static float myval = 0.5f;
-	ImGui::SliderFloat("Value", &myval, 0.0f, 1.0f);
-	ImGui::End();
 
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
 	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
@@ -831,6 +836,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
 
+	ImGui::End();
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
 	m_pCmdList->SetDescriptorHeaps(1, heaps);
 

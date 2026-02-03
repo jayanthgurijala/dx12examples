@@ -15,6 +15,7 @@ class Dx12SampleBase
 {
 public:
 	Dx12SampleBase(UINT width, UINT height);
+	~Dx12SampleBase();
 	HRESULT OnInit();
 	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };

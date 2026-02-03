@@ -25,6 +25,6 @@ protected:
 	}
 
 private:
-	UINT m_tesstriTessLevel;
+	FLOAT m_tesstriTessLevel;
 
 };

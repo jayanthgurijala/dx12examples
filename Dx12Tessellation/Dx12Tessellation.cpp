@@ -6,6 +6,7 @@
 #include "ExampleEntryPoint.h"
 #include <d3dx12.h>
 #include "DxPipelineInitializers.hpp"
+#include <imgui.h>
 
 Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
 	m_tesstriTessLevel(2),
@@ -58,6 +59,26 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 
 HRESULT Dx12Tessellation::RenderFrame()
 {
+	ImGui::Text("Tessellation");
+	ImGui::SameLine();
+
+	if (ImGui::Button("-"))
+		m_tesstriTessLevel -= 0.5f;
+
+	ImGui::SameLine();
+
+	ImGui::SetNextItemWidth(80);
+	ImGui::InputFloat("##tess", &m_tesstriTessLevel, 0, 0);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("+"))
+		m_tesstriTessLevel += 0.5f;
+
+	// Clamp value
+	m_tesstriTessLevel = (m_tesstriTessLevel > 20.0f) ? 20.0f : m_tesstriTessLevel;
+	m_tesstriTessLevel = m_tesstriTessLevel;
+
 	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
