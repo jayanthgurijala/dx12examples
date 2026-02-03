@@ -28,6 +28,18 @@
     <Filter Include="Shaders\Tess">
       <UniqueIdentifier>{06f8ffcd-55b1-4997-9826-775e28929861}</UniqueIdentifier>
     </Filter>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{ffb4378a-7731-445c-83b7-9894e7f91a29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="imgui\backends">
+      <UniqueIdentifier>{86a14651-e487-422d-812d-31c50b6e8298}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="imgui\backends\dx12">
+      <UniqueIdentifier>{2f890a65-9e79-477f-b32b-64b20161b22b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="imgui\backends\win32">
+      <UniqueIdentifier>{70c40aa5-0feb-4881-bd17-17f242c3b6ca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -63,6 +75,18 @@
     <ClInclude Include="DxPipelineInitializers.hpp">
       <Filter>Source Files\hpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\third_party\imgui\imgui.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\imgui\imgui_internal.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\imgui\backends\imgui_impl_dx12.h">
+      <Filter>imgui\backends\dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\imgui\backends\imgui_impl_win32.h">
+      <Filter>imgui\backends\win32</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dx12SampleBase.cpp">
@@ -88,6 +112,27 @@
     </ClCompile>
     <ClCompile Include="WICImageLoader.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\imgui.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\imgui_demo.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\imgui_draw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\imgui_tables.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\imgui_widgets.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>imgui\backends\dx12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>imgui\backends\win32</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

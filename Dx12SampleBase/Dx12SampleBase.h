@@ -62,7 +62,7 @@ protected:
 
 	inline ID3D12Device* GetDevice() { return m_pDevice.Get(); }
 	inline ID3D12GraphicsCommandList* GetCmdList() { return m_pCmdList.Get(); }
-	inline UINT                       GetAppRTVStartIndex() { return GetSwapChainBufferCount(); }
+	inline UINT                       GetAppRTVStartIndex() { return GetBackBufferCount(); }
 	inline UINT                       GetWidth() { return m_width; }
 	inline UINT                       GetHeight() { return m_height; }
 
@@ -176,8 +176,9 @@ private:
 	HRESULT CreateRenderTargetDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateShaderResourceViewDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
+	VOID Imgui_CreateDescriptorHeap();
 	HRESULT CreateSceneMVPMatrix();
-	UINT    GetSwapChainBufferCount();
+	UINT    GetBackBufferCount();
 	VOID CreateMeshState();
 	VOID CreateRootSignature();
 
@@ -228,5 +229,7 @@ private:
 
 	DxDrawPrimitive                       m_modelDrawPrimitive;
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
+
+	ComPtr<ID3D12DescriptorHeap>          m_imguiDescHeap;
 };
 

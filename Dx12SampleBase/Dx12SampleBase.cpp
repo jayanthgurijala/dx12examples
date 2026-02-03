@@ -7,6 +7,10 @@
 #include "WICImageLoader.h"
 #include "gltfutils.h"
 #include "DxPipelineInitializers.hpp"
+#include <imgui.h>
+#include <backends/imgui_impl_win32.h>
+#include <backends/imgui_impl_dx12.h>
+#include <backends/imgui_impl_win32.cpp>
 
 using namespace WICImageLoader;
 
@@ -38,6 +42,9 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 
 LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+		return true;
+
 	switch (message)
 	{
 	case WM_KEYDOWN:
@@ -136,7 +143,7 @@ VOID Dx12SampleBase::SetupWindow(HINSTANCE hInstance, int nCmdShow)
 }
 
 
-UINT Dx12SampleBase::GetSwapChainBufferCount()
+UINT Dx12SampleBase::GetBackBufferCount()
 {
 	return 2;
 }
@@ -224,7 +231,7 @@ HRESULT Dx12SampleBase::WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue)
 HRESULT Dx12SampleBase::CreateSwapChain()
 {
 	HRESULT    result = S_OK;
-	const UINT swapChainBufferCount = GetSwapChainBufferCount();
+	const UINT swapChainBufferCount = GetBackBufferCount();
 
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = swapChainBufferCount;
@@ -318,7 +325,7 @@ HRESULT Dx12SampleBase::CreateDepthStencilViewDescriptorHeap(UINT numDescriptors
 HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 {
 	HRESULT    result = S_OK;
-	const UINT start = (isInternal == TRUE) ? 0 : GetSwapChainBufferCount();
+	const UINT start = (isInternal == TRUE) ? 0 : GetBackBufferCount();
 	UINT	   rtvOffset = 0;
 
 	for (UINT i = start; i < start + numRTVs; i++)
@@ -345,7 +352,7 @@ HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
 
 D3D12_CPU_DESCRIPTOR_HANDLE Dx12SampleBase::GetRenderTargetView(UINT rtvIndex, BOOL isInternal)
 {
-	const UINT rtvOffset = (isInternal == TRUE) ? 0 : GetSwapChainBufferCount();
+	const UINT rtvOffset = (isInternal == TRUE) ? 0 : GetBackBufferCount();
 	auto rtvHandle = GetRtvCpuHeapHandle(rtvIndex + rtvOffset);
 
 	return rtvHandle;
@@ -768,6 +775,17 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	CreateSceneMVPMatrix();
 	result = m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
+	//@todo only for integrating and testing imgui
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::Begin("Hello");
+	ImGui::Text("DX12 + ImGui works!");
+	static float myval = 0.5f;
+	ImGui::SliderFloat("Value", &myval, 0.0f, 1.0f);
+	ImGui::End();
+
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
 	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
 
@@ -812,6 +830,16 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
+
+	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
+	m_pCmdList->SetDescriptorHeaps(1, heaps);
+
+	ImGui::Render();
+
+	ImGui_ImplDX12_RenderDrawData(
+		ImGui::GetDrawData(),
+		m_pCmdList.Get()
+	);
 
 	D3D12_RESOURCE_BARRIER postResourceBarriers[2];
 
@@ -860,7 +888,7 @@ HRESULT Dx12SampleBase::OnInit()
 
 	///@todo refactor into a function
 	{
-		const UINT numRTVsForComposition = GetSwapChainBufferCount();
+		const UINT numRTVsForComposition = GetBackBufferCount();
 		const UINT numRTVsForApp = NumRTVsNeededForApp();
 		const UINT numSRVsForApp = NumSRVsNeededForApp();
 		const UINT numDSVsForApp = NumDSVsNeededForApp();
@@ -879,6 +907,39 @@ HRESULT Dx12SampleBase::OnInit()
 	{
 		result = LoadGltfFile();
 		result = CreatePipelineStateFromModel();
+	}
+
+	///@todo seperate it out
+	{
+		Imgui_CreateDescriptorHeap();
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   // optional
+		//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;       // optional
+		ImGui::StyleColorsDark();
+		ImGui_ImplWin32_Init(m_hwnd);
+
+		ImGui_ImplDX12_InitInfo init_info = {};
+		init_info.Device = m_pDevice.Get();
+		init_info.NumFramesInFlight = GetBackBufferCount(); // usually 2 or 3
+		init_info.RTVFormat = GetBackBufferFormat();  // your swapchain format
+
+		///@todo avoid legacy path
+		init_info.SrvDescriptorHeap = m_imguiDescHeap.Get();
+		init_info.LegacySingleSrvCpuDescriptor = m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart();
+		init_info.LegacySingleSrvGpuDescriptor = m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart();
+
+
+		init_info.CommandQueue = m_pCmdQueue.Get();
+
+		// Optional: provide allocation callbacks
+		init_info.SrvDescriptorAllocFn = nullptr; // simple sample
+		init_info.SrvDescriptorFreeFn = nullptr;
+
+		ImGui_ImplDX12_Init(&init_info);
+
 	}
 
 	return result;
@@ -920,12 +981,10 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 		pCmdList->DrawInstanced(m_modelDrawPrimitive.numVertices, 1, 0, 0);
 	}
 }
-/*
-* Input Layout
-* Root Signature - fixed for now?
-* Shaders
-* 
-*/
+
+
+
+
 HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
 {
 	HRESULT result = S_OK;
@@ -1263,6 +1322,22 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 	CreateRootSignature();
 
 	return result;
+}
+
+
+
+//<------------------------------------------- Imgui ----------------------------------------->
+VOID Dx12SampleBase::Imgui_CreateDescriptorHeap()
+{
+	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	desc.NumDescriptors = 64;                     // font + optional images
+	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	desc.NodeMask = 0;
+;
+	m_pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imguiDescHeap));
+
+
 }
 
 
