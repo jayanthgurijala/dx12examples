@@ -155,7 +155,7 @@
     <ClInclude Include="..\third_party\imgui\imgui_internal.h" />
     <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
-    <ClInclude Include="DxPipelineInitializers.hpp" />
+    <ClInclude Include="dxhelper.hpp" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="dxtypes.h" />
     <ClInclude Include="ExampleEntryPoint.h" />

@@ -16,7 +16,7 @@ class Dx12SampleBase
 public:
 	Dx12SampleBase(UINT width, UINT height);
 	~Dx12SampleBase();
-	HRESULT OnInit();
+	virtual HRESULT OnInit();
 	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
@@ -56,7 +56,7 @@ protected:
 		D3D12_RESOURCE_STATES      dstStateBefore,
 		D3D12_RESOURCE_STATES      dstStateAfter);
 	HRESULT WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue);
-	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap = FALSE);
+	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap = FALSE, const wchar_t* resourceName = nullptr);
 
 	///@note gltf basecolor formats are sRGB
 	ComPtr<ID3D12Resource> CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
@@ -134,6 +134,30 @@ protected:
 		return 2;
 	}
 
+	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT index)
+	{
+		return m_modelIbv;
+	}
+
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelVertexBufferView(UINT index)
+	{
+		return m_modelVbvs[m_modelPositionVbIndex];
+	}
+
+	inline DxDrawPrimitive& GetDrawInfo(UINT index)
+	{
+		return m_modelDrawPrimitive;
+	}
+
+	inline DXGI_FORMAT GetVertexBufferFormat(UINT index)
+	{
+		auto& positionInfo = m_modelIaSemantics[m_modelPositionVbIndex];
+
+		assert(positionInfo.name == "POSITION");
+
+		return positionInfo.format;
+	}
+
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 	virtual inline UINT NumRTVsNeededForApp() { return 0; }
@@ -151,6 +175,9 @@ protected:
 
 	HRESULT LoadGltfFile();
 	virtual HRESULT CreatePipelineStateFromModel();
+
+	VOID StartBuildingAccelerationStructures();
+	VOID ExecuteBuildAccelerationStructures();
 
 private:
 
@@ -227,6 +254,7 @@ private:
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
 	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
+	UINT                                  m_modelPositionVbIndex;
 
 	DxDrawPrimitive                       m_modelDrawPrimitive;
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;

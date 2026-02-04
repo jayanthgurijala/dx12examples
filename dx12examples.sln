@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx12HelloWorld", "Dx12Hello
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx12Tessellation", "Dx12Tessellation\Dx12Tessellation.vcxproj", "{E69F0444-2F36-4709-93E4-8B6316525A7E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx12Raytracing", "Dx12Raytracing\Dx12Raytracing.vcxproj", "{BF267BF8-EB96-4170-9F69-8A672AC67223}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,14 @@ Global
 		{E69F0444-2F36-4709-93E4-8B6316525A7E}.Release|x64.Build.0 = Release|x64
 		{E69F0444-2F36-4709-93E4-8B6316525A7E}.Release|x86.ActiveCfg = Release|Win32
 		{E69F0444-2F36-4709-93E4-8B6316525A7E}.Release|x86.Build.0 = Release|Win32
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Debug|x64.ActiveCfg = Debug|x64
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Debug|x64.Build.0 = Debug|x64
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Debug|x86.ActiveCfg = Debug|Win32
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Debug|x86.Build.0 = Debug|Win32
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Release|x64.ActiveCfg = Release|x64
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Release|x64.Build.0 = Release|x64
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Release|x86.ActiveCfg = Release|Win32
+		{BF267BF8-EB96-4170-9F69-8A672AC67223}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

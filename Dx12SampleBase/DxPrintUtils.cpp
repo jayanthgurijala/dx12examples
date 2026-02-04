@@ -26,4 +26,14 @@ namespace PrintUtils
 		OutputDebugStringA(stringMessage);
 		OutputDebugStringA("\n");
 	}
+
+	void PrintBufferAddressRange(ID3D12Resource* pResource)
+	{
+		UINT64 startGpuVA = pResource->GetGPUVirtualAddress();
+		const auto& resourceDesc = pResource->GetDesc();
+		UINT64 sizeInBytes = resourceDesc.Width;
+		wchar_t buf[128];
+		swprintf_s(buf, L"Buffer GpuVA Start: 0x%llx End: 0x%llx Size: 0x%llu\n", startGpuVA, startGpuVA + resourceDesc.Width, resourceDesc.Width);
+		OutputDebugString(buf);
+	}
 }

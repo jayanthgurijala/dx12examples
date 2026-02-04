@@ -72,7 +72,7 @@
     <ClInclude Include="WICImageLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DxPipelineInitializers.hpp">
+    <ClInclude Include="dxhelper.hpp">
       <Filter>Source Files\hpp</Filter>
     </ClInclude>
     <ClInclude Include="..\third_party\imgui\imgui.h">

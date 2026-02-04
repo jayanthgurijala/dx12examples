@@ -5,7 +5,7 @@
 #include "Dx12Tessellation.h"
 #include "ExampleEntryPoint.h"
 #include <d3dx12.h>
-#include "DxPipelineInitializers.hpp"
+#include "dxhelper.hpp"
 #include <imgui.h>
 
 Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
@@ -36,9 +36,9 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 	pipelineStateDesc.HS = CD3DX12_SHADER_BYTECODE(hullShader.Get());
 	pipelineStateDesc.DS = CD3DX12_SHADER_BYTECODE(domainShader.Get());
 
-	pipelineStateDesc.RasterizerState = dxinit::GetRasterizerState(D3D12_CULL_MODE_BACK, D3D12_FILL_MODE_WIREFRAME);
+	pipelineStateDesc.RasterizerState = dxhelper::GetRasterizerState(D3D12_CULL_MODE_BACK, D3D12_FILL_MODE_WIREFRAME);
 	pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	pipelineStateDesc.DepthStencilState = dxinit::GetDepthStencilState();
+	pipelineStateDesc.DepthStencilState = dxhelper::GetDepthStencilState();
 
 	///@todo write some test cases for this
 	pipelineStateDesc.SampleMask = UINT_MAX;

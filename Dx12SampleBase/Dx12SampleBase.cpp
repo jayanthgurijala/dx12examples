@@ -6,7 +6,7 @@
 #include <chrono>
 #include "WICImageLoader.h"
 #include "gltfutils.h"
-#include "DxPipelineInitializers.hpp"
+#include "dxhelper.hpp"
 #include <imgui.h>
 #include <backends/imgui_impl_win32.h>
 #include <backends/imgui_impl_dx12.h>
@@ -506,8 +506,8 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	assert(vertexShader != nullptr && pixelShader != nullptr);
 
 
-	auto rast    = dxinit::GetRasterizerState();
-	auto dsState = dxinit::GetDepthStencilState(useDepthStencil);
+	auto rast    = dxhelper::GetRasterizerState();
+	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil);
 
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -540,9 +540,9 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 {
 	HRESULT result = S_OK;
 
-	m_simpleComposition.rootSignature = dxinit::GetSrvDescTableRootSignature(m_pDevice.Get(), 1);
+	m_simpleComposition.rootSignature = dxhelper::GetSrvDescTableRootSignature(m_pDevice.Get(), 1);
 
-	auto layout_1 = dxinit::GetInputLayoutDesc_Layout1();
+	auto layout_1 = dxhelper::GetInputLayoutDesc_Layout1();
 	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders("FrameSimple_VS.cso",
 																	   "FrameSimple_PS.cso",
 		                                                               m_simpleComposition.rootSignature.Get(),
@@ -565,7 +565,7 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	};
 	UINT dataSizeInBytes = sizeof(fullScreenTri);
 
-	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes);
+	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes, FALSE, L"FrameVB");
 
 	m_simpleComposition.vertexBufferView.BufferLocation = m_simpleComposition.vertexBuffer->GetGPUVirtualAddress();
 	m_simpleComposition.vertexBufferView.SizeInBytes = dataSizeInBytes;
@@ -576,24 +576,14 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	return result;
 }
 
-ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap)
+ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap, const wchar_t* resourceName)
 {
 	ID3D12GraphicsCommandList* pCmdList = m_pCmdList.Get();
 	ID3D12CommandQueue* pCmdQueue = m_pCmdQueue.Get();
 
 	ComPtr<ID3D12Resource> bufferResource;
 
-	D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
-
-	auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
-	auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeInBytes);
-
-	m_pDevice->CreateCommittedResource(&heapProps,
-		D3D12_HEAP_FLAG_NONE,
-		&resourceDesc,
-		D3D12_RESOURCE_STATE_COMMON,
-		nullptr,
-		IID_PPV_ARGS(&bufferResource));
+	dxhelper::AllocateBufferResource(m_pDevice.Get(), sizeInBytes, &bufferResource, isUploadHeap, L"");
 
 	if (cpuData != NULL && sizeInBytes > 0)
 	{
@@ -1048,7 +1038,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	/// MVP matrix (16 floats)
 	if (pMappedPtr == nullptr)
 	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE);
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE, L"MVP");
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
@@ -1220,6 +1210,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					if (attributeName == positionAttributeName)
 					{
 						///@todo we have min max extents
+						m_modelPositionVbIndex = attrIndx;
 					}
 					const int bufferViewIdx = accessorDesc.bufferView;
 					const tinygltf::BufferView bufViewDesc = model.bufferViews[bufferViewIdx];
@@ -1236,7 +1227,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					numTotalVertices += accessorDesc.count;
 					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
 					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
-					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength);
+					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength, FALSE, L"VertexBufferN");
 
 					m_modelVbvs[attrIndx].BufferLocation = m_modelVbBuffers[attrIndx].Get()->GetGPUVirtualAddress();
 					m_modelVbvs[attrIndx].SizeInBytes = (UINT)buflength;
@@ -1285,7 +1276,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 				const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
 
 
-				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes);
+				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes, FALSE, L"ModelIndexBuffer");
 				m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
 				m_modelIbv.Format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
 				m_modelIbv.SizeInBytes = bufferSizeInBytes;
@@ -1340,10 +1331,19 @@ VOID Dx12SampleBase::Imgui_CreateDescriptorHeap()
 	desc.NumDescriptors = 64;                     // font + optional images
 	desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	desc.NodeMask = 0;
-;
 	m_pDevice->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imguiDescHeap));
-
-
 }
 
+//<----------------------------------------- Ray Tracing ------------------------------------->
+VOID Dx12SampleBase::ExecuteBuildAccelerationStructures()
+{
+	m_pCmdList->Close();
+	ID3D12CommandList* cmdLists[] = { m_pCmdList.Get() };
+	m_pCmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+}
 
+VOID Dx12SampleBase::StartBuildingAccelerationStructures()
+{
+	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+}

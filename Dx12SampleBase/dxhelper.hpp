@@ -3,7 +3,7 @@
 #include <d3d12.h>
 #include <d3dx12.h>
 
-namespace dxinit
+namespace dxhelper
 {
 	inline D3D12_INPUT_LAYOUT_DESC GetInputLayoutDesc_Layout1()
 	{
@@ -64,5 +64,41 @@ namespace dxinit
 		depthStencilState.DepthEnable = enableDepth;
 		depthStencilState.StencilEnable = enableStencil;
 		return depthStencilState;
+	}
+
+	inline void AllocateUAVBuffers(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource **ppResource, const wchar_t* resourceName = nullptr, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON)
+	{
+		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		pDevice->CreateCommittedResource(&uploadHeapProperties,
+			                             D3D12_HEAP_FLAG_NONE,
+			                             &bufferDesc,
+			                             initialResourceState,
+			                             nullptr,
+									     IID_PPV_ARGS(ppResource));
+
+		if (resourceName)
+		{
+			(*ppResource)->SetName(resourceName);
+		}
+	}
+
+	inline void AllocateBufferResource(ID3D12Device* pDevice, UINT64 bufferSizeInBytes, ID3D12Resource** ppResource, BOOL isUploadHeap, const wchar_t* resourceName = nullptr, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON)
+	{
+		D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
+
+		auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
+		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSizeInBytes);
+
+		pDevice->CreateCommittedResource(&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(ppResource));
+		if (resourceName)
+		{
+			(*ppResource)->SetName(resourceName);
+		}
 	}
 }
