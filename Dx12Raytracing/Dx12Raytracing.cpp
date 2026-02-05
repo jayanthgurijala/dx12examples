@@ -83,8 +83,8 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
 	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
 	
-	dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_blasResultBuffer, L"BlasResult", resultState);
-	dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &m_blasScratchBuffer, L"BlasScratch", scratchState);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_blasResultBuffer, L"BlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &m_blasScratchBuffer, L"BlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
 
 	PrintUtils::PrintBufferAddressRange(m_blasResultBuffer.Get());
 	PrintUtils::PrintBufferAddressRange(m_blasScratchBuffer.Get());
@@ -99,7 +99,8 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
 	instanceDesc.InstanceMask = 1;
 	instanceDesc.AccelerationStructure = m_blasResultBuffer->GetGPUVirtualAddress();
-	dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), sizeof(instanceDesc), &m_instanceDescBuffer);
+	//dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), sizeof(instanceDesc), &m_instanceDescBuffer);
+	CreateBufferWithData(&instanceDesc, sizeof(instanceDesc), L"RayTracing_InstanceDesc", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
@@ -111,8 +112,8 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
 	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-	dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_tlasResultBuffer, L"TlasResult", resultState);
-	dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes, &m_tlasScratchBuffer, L"TlasScratch", scratchState);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_tlasResultBuffer, L"TlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), topLevelPrebuildInfo.ScratchDataSizeInBytes, &m_tlasScratchBuffer, L"TlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
 	topLevelBuildDesc.Inputs = topLevelInputs;
@@ -164,7 +165,6 @@ VOID Dx12Raytracing::CreateRtPSO()
 	shaderConfigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
 	shaderConfigSubObject.pDesc = &shaderConfig;
 
-	m_globalRootSignature = CreateRTUAVOutAndASGlobalRootSig();
 	D3D12_GLOBAL_ROOT_SIGNATURE globalRootSigDesc = {};
 	globalRootSigDesc.pGlobalRootSignature = m_globalRootSignature.Get();
 
@@ -209,26 +209,57 @@ VOID Dx12Raytracing::BuildShaderTables()
 	assert(raygenShaderID != nullptr && missShaderID != nullptr && hitgroupID != nullptr);
 
 	const UINT shaderRecordSize = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT; // 32 bytes
-	
-	BYTE* sbtData = static_cast<BYTE*>(malloc(shaderRecordSize * 3));
-	memcpy(sbtData, raygenShaderID, shaderRecordSize);
-	memcpy(sbtData + shaderRecordSize, hitgroupID, shaderRecordSize);
-	memcpy(sbtData + 2 * shaderRecordSize, missShaderID, shaderRecordSize);
+	const UINT sectionAlignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;  //64 bytes alignment
 
-	m_shaderBindingTable = CreateBufferWithData(sbtData, shaderRecordSize * 3, FALSE, L"ShaderBindingTable");
+	UINT64 rayGenTableSize   = shaderRecordSize;
+	UINT64 rayGenAlignedSize = dxhelper::DxAlign(rayGenTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+	UINT64 hitGroupTableSize   = shaderRecordSize;
+	UINT64 hitGroupAlignedSize = dxhelper::DxAlign(hitGroupTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+	UINT64 missTableSize        = shaderRecordSize;
+	UINT64 missTableAlignedSize = dxhelper::DxAlign(missTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+
+	const UINT64 sbtTableTotalSize = rayGenAlignedSize + hitGroupAlignedSize + missTableAlignedSize;
+	BYTE* sbtDataStart = static_cast<BYTE*>(malloc(sbtTableTotalSize));
+	BYTE* sbtDataWritePtr = sbtDataStart;
+	memcpy(sbtDataWritePtr, raygenShaderID, rayGenTableSize);
+	sbtDataWritePtr += rayGenAlignedSize;
+
+	memcpy(sbtDataWritePtr, hitgroupID, hitGroupTableSize);
+	sbtDataWritePtr += hitGroupAlignedSize;
+
+	memcpy(sbtDataWritePtr, missShaderID, missTableSize);
+
+	m_shaderBindingTable = CreateBufferWithData(sbtDataStart, sbtTableTotalSize, L"ShaderBindingTable");
 
 	m_rayGenBaseAddress.StartAddress = m_shaderBindingTable->GetGPUVirtualAddress();
 	m_rayGenBaseAddress.SizeInBytes = shaderRecordSize;
 
-	m_hitTableBaseAddress.StartAddress = m_rayGenBaseAddress.StartAddress + shaderRecordSize;
+	m_hitTableBaseAddress.StartAddress = m_rayGenBaseAddress.StartAddress + rayGenAlignedSize;
 	m_hitTableBaseAddress.SizeInBytes = shaderRecordSize;
 	m_hitTableBaseAddress.StrideInBytes = shaderRecordSize;
 
-	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + shaderRecordSize;
+	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupAlignedSize;
 	m_missTableBaseAddress.SizeInBytes = shaderRecordSize;
 	m_missTableBaseAddress.StrideInBytes = shaderRecordSize;
 
-	free(sbtData);
+	free(sbtDataStart);
+}
+
+VOID Dx12Raytracing::CreateUAVOutput()
+{
+	dxhelper::AllocateTexture2DResource(m_dxrDevice.Get(),
+		                                &m_uavOutputResource,
+		                                GetWidth(),
+		                                GetHeight(),
+		                                GetBackBufferFormat(),
+		                                L"RayTracingUAVOutput",
+		                                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		                                nullptr,
+		                                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
 HRESULT Dx12Raytracing::RenderFrame()
@@ -242,6 +273,14 @@ HRESULT Dx12Raytracing::RenderFrame()
 	dispatchRaysDesc.MissShaderTable = m_missTableBaseAddress;
 
 	m_dxrCommandList->SetPipelineState1(m_rtpso.Get());
+	m_dxrCommandList->SetComputeRootSignature(m_globalRootSignature.Get());
+	
+	ID3D12DescriptorHeap* descriptorHeaps[] = { GetSrvDescriptorHeap() };
+	m_dxrCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	//Root args required - UAV in the descriptor heap and Accelaration structure
+	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+	m_dxrCommandList->SetComputeRootShaderResourceView(2, m_tlasResultBuffer->GetGPUVirtualAddress());
 
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);
 	return S_OK;

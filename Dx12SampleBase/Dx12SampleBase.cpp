@@ -25,7 +25,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_fenceEvent(0),
 	m_frameDeltaTime(0),
 	m_dsvDescHeap(nullptr),
-	m_srvDescHeap(nullptr),
+	m_srvUavCbvDescHeap(nullptr),
 	m_rtvDescHeap(nullptr),
 	m_srvUavCbvDescriptorSize(0),
 	m_rtvDescriptorSize(0),
@@ -313,7 +313,7 @@ HRESULT Dx12SampleBase::CreateShaderResourceViewDescriptorHeap(UINT numDescripto
 	descHeapDesc.NumDescriptors = numDescriptors;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_srvDescHeap));
+	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_srvUavCbvDescHeap));
 	return result;
 }
 
@@ -395,18 +395,17 @@ HRESULT Dx12SampleBase::CreateDsvResources(UINT numResources, BOOL createViews)
 	clearValue.DepthStencil.Depth = 1.0f;
 	clearValue.DepthStencil.Stencil = 0;
 
-	const auto dsvDesc = CD3DX12_RESOURCE_DESC::Tex2D(depthFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-	const auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
 	for (UINT i = 0; i < numResources; i++)
 	{
-		m_pDevice->CreateCommittedResource(&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&dsvDesc,
-			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&clearValue,
-			IID_PPV_ARGS(&m_dsvResources[i]));
-
+		dxhelper::AllocateTexture2DResource(m_pDevice.Get(),
+			                                &m_dsvResources[i],
+			                                m_width,
+			                                m_height,
+			                                depthFormat,
+			                                L"SampleBaseDepthResN",
+			                                D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			                                &clearValue,
+			                                D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 		if (createViews == TRUE)
 		{
 			assert(m_dsvDescHeap != nullptr && m_dsvDescHeap->GetDesc().NumDescriptors == numResources);
@@ -430,20 +429,6 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 	m_rtvResources.clear();
 	m_rtvResources.resize(numResources);
 
-	///@note CD3DX12_RESOURCE_DESC::Tex2D(GetBackBufferFormat(), m_width, m_height);
-
-	D3D12_RESOURCE_DESC resourceDesc = {};
-	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resourceDesc.Format = GetBackBufferFormat();
-	resourceDesc.MipLevels = 1;
-	resourceDesc.Alignment = 0;
-	resourceDesc.DepthOrArraySize = 1;
-	resourceDesc.Width = m_width;
-	resourceDesc.Height = m_height;
-	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resourceDesc.SampleDesc.Count = 1;
-
 	//@todo find a way to match these 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
 	D3D12_CLEAR_VALUE clearValue = {};
 	clearValue.Format = GetBackBufferFormat();
@@ -456,17 +441,20 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 
 	for (UINT i = 0; i < numResources; i++)
 	{
-		auto srvHandle = GetSrvCpuHeapHandle(i);
-		m_pDevice->CreateCommittedResource(&heapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			&clearValue,
-			IID_PPV_ARGS(&m_rtvResources[i]));
+		auto srvHandle = GetSrvUavCBvCpuHeapHandle(i);
+		dxhelper::AllocateTexture2DResource(m_pDevice.Get(),
+			                                &m_rtvResources[i],
+			                                m_width,
+			                                m_height,
+			                                GetBackBufferFormat(),
+			                                L"BaseRtvN",
+			                                D3D12_RESOURCE_STATE_RENDER_TARGET,
+			                                &clearValue,
+			                                D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
 		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
-			nullptr,
-			srvHandle);
+						                    nullptr,
+						                    srvHandle);
 	}
 
 	return result;
@@ -479,16 +467,26 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 * 1. N SRV descriptors for RTV composition NumRTVsNeededForApp()
 *		- These are created when app creates RTV resources CreateRenderTargetResourceAndSRVs
 *
-* 2. M descriptors requested by application NumSRVsNeededForApp()
+* 2. M SRV descriptors requested by application NumSRVsNeededForApp()
+* 3. P UAV descriptors
 *
 */
-VOID Dx12SampleBase::CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource)
+VOID Dx12SampleBase::CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource)
 {
 	const UINT appSrvStartIndex = NumRTVsNeededForApp();	//see comment above
-	auto srvHandle = GetSrvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
 	m_pDevice->CreateShaderResourceView(srvResource, nullptr, srvHandle);
 
 }
+
+VOID Dx12SampleBase::CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource)
+{
+	const UINT uavStartIndexInDescriptorHeap = NumRTVsNeededForApp() + NumSRVsNeededForApp();
+	auto uavHandle = GetSrvUavCBvCpuHeapHandle(uavStartIndexInDescriptorHeap + appUavIndex);
+	m_pDevice->CreateShaderResourceView(uavResource, nullptr, uavHandle);
+}
+
+//VOID Dx12SampleBase::Create
 
 ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
 																		   const std::string& pixelShaderName,
@@ -565,7 +563,7 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	};
 	UINT dataSizeInBytes = sizeof(fullScreenTri);
 
-	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes, FALSE, L"FrameVB");
+	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes, L"FrameVB");
 
 	m_simpleComposition.vertexBufferView.BufferLocation = m_simpleComposition.vertexBuffer->GetGPUVirtualAddress();
 	m_simpleComposition.vertexBufferView.SizeInBytes = dataSizeInBytes;
@@ -576,14 +574,17 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	return result;
 }
 
-ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap, const wchar_t* resourceName)
+ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData,
+															UINT sizeInBytes,
+														    const wchar_t* resourceName,
+													        D3D12_RESOURCE_FLAGS flags,
+	                                                        D3D12_RESOURCE_STATES initialResourceState,
+	                                                        BOOL isUploadHeap)
 {
 	ID3D12GraphicsCommandList* pCmdList = m_pCmdList.Get();
 	ID3D12CommandQueue* pCmdQueue = m_pCmdQueue.Get();
-
 	ComPtr<ID3D12Resource> bufferResource;
-
-	dxhelper::AllocateBufferResource(m_pDevice.Get(), sizeInBytes, &bufferResource, isUploadHeap, resourceName);
+	dxhelper::AllocateBufferResource(m_pDevice.Get(), sizeInBytes, &bufferResource, resourceName, flags, initialResourceState, isUploadHeap);
 
 	if (cpuData != NULL && sizeInBytes > 0)
 	{
@@ -614,9 +615,6 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 		nullptr,
 		IID_PPV_ARGS(&texture2D));
 
-	auto queryDesc = texture2D.Get()->GetDesc();
-
-
 	if (cpuData != NULL && sizeInBytes > 0)
 	{
 		UploadCpuDataAndWaitForCompletion(cpuData,
@@ -629,20 +627,6 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 	}
 
 	return texture2D;
-}
-
-ComPtr<ID3D12RootSignature> Dx12SampleBase::CreateRTUAVOutAndASGlobalRootSig()
-{
-	ComPtr<ID3D12RootSignature> rtGobalRootSig;
-	CD3DX12_DESCRIPTOR_RANGE uavRange;
-	uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-	CD3DX12_ROOT_PARAMETER rootParameters[2];
-	rootParameters[0].InitAsDescriptorTable(1, &uavRange, D3D12_SHADER_VISIBILITY_ALL);
-	rootParameters[1].InitAsShaderResourceView(0);
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, rootParameters);
-	dxhelper::CreateRootSignature(m_pDevice.Get(), rootSigDesc, &rtGobalRootSig);
-	return rtGobalRootSig;
 }
 
 HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
@@ -794,7 +778,6 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	ImGui::NewFrame();
 	ImGui::Begin("Dx12Sample");
 
-
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
 	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
 
@@ -802,6 +785,19 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	m_pCmdList->RSSetScissorRects(1, &rect);
 
 	result = RenderFrame();
+
+	ImGui::End();
+
+	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
+	m_pCmdList->SetDescriptorHeaps(1, heaps);
+	ImGui::Render();
+
+	ImGui_ImplDX12_RenderDrawData(
+		ImGui::GetDrawData(),
+		m_pCmdList.Get()
+	);
+
+	RenderRtvContentsOnScreen(0);
 
 	return result;
 }
@@ -830,6 +826,11 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(currentFrameIndex, TRUE);
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 
+	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
+	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
+	m_pCmdList->RSSetViewports(1, &viewPort);
+	m_pCmdList->RSSetScissorRects(1, &rect);
+
 	m_pCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	m_pCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_pCmdList->SetPipelineState(m_simpleComposition.pipelineState.Get());
@@ -839,17 +840,6 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen(UINT rtvResourceIndex)
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
-
-	ImGui::End();
-	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
-	m_pCmdList->SetDescriptorHeaps(1, heaps);
-
-	ImGui::Render();
-
-	ImGui_ImplDX12_RenderDrawData(
-		ImGui::GetDrawData(),
-		m_pCmdList.Get()
-	);
 
 	D3D12_RESOURCE_BARRIER postResourceBarriers[2];
 
@@ -912,6 +902,9 @@ HRESULT Dx12SampleBase::OnInit()
 		result = CreateRenderTargetResourceAndSRVs(numRTVsForApp);
 		result = CreateRenderTargetViews(numRTVsForApp, FALSE);
 		result = CreateDsvResources(numDSVsForApp);
+
+		//For now this is a global root rignature for all workloads.
+		CreateRootSignature();
 	}
 
 	{
@@ -957,12 +950,11 @@ HRESULT Dx12SampleBase::OnInit()
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 {
-
 	pCmdList->SetPipelineState(m_modelPipelineState.Get());
-
-	pCmdList->SetGraphicsRootSignature(m_modelRootSignature.Get());
+	pCmdList->SetGraphicsRootSignature(m_globalRootSignature.Get());
 	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
 	AppSetRootConstantForModel(pCmdList, GetRootConstantIndex());
+
 	const SIZE_T numVertexBufferViews = m_modelVbvs.size();
 	D3D12_VERTEX_BUFFER_VIEW vbv = {};
 	vbv.BufferLocation = m_modelVbvs[0].BufferLocation;
@@ -1002,7 +994,7 @@ HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
 	char vertexShaderName[64];
 	char pixelShaderName[64];
 
-	assert(m_modelRootSignature != nullptr && m_meshState.inputElementDesc.size() > 0);
+	assert(m_globalRootSignature != nullptr && m_meshState.inputElementDesc.size() > 0);
 
 	const SIZE_T numAttributes = m_meshState.inputElementDesc.size();
 	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
@@ -1015,7 +1007,7 @@ HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
 
 
 	///@todo tie up cull mode to double sided from gltf
-	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_modelRootSignature.Get(), inputLayoutDesc, FALSE, TRUE, TRUE);
+	m_modelPipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, m_globalRootSignature.Get(), inputLayoutDesc, FALSE, TRUE, TRUE);
 
 	return result;
 }
@@ -1052,7 +1044,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	/// MVP matrix (16 floats)
 	if (pMappedPtr == nullptr)
 	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, TRUE, L"MVP");
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, L"MVP", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
@@ -1075,30 +1067,66 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 
 VOID Dx12SampleBase::CreateRootSignature()
 {
-	
 	//@todo Root signature
-	//0. Root CBV
-	//1. desc table -> SRV
-	//2. App Root Constants
-	const UINT numRootConstants = NumRootConstantsForApp();
-	const UINT numTotalRootParams = 2 + numRootConstants;
+	//0. Root CBV, MVP for VSPS draws, TBD for raytracing
+	//1. desc table -> SRV and UAV (model texture and RT Output)
+	//2. App Root Constants (Tessellation constant) - many root constants use one slot but consume available limited 64 slots
+	//2 or 3. Root SRVs
+	const UINT numCBVs               = 1;			                      // for now this is managed by Sample Base
+	const UINT numDescTables         = 1;                                 // SRVs required by model is setup in RenderModel   
+	const UINT numRootConstants      = NumRootConstantsForApp();          // Virtual function to set this   
+	const UINT numRootSrvDescriptors = NumRootSrvDescriptorsForApp();     // Virtual function to set this as well
+	const UINT numTotalRootParams = numCBVs + numDescTables + numRootConstants + numRootSrvDescriptors;
+	std::vector<CD3DX12_ROOT_PARAMETER> rootParameters;
+	std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges;
+	UINT numRanges = 0;
 
-	std::vector< CD3DX12_ROOT_PARAMETER> rootParameters;
-	rootParameters.resize(numTotalRootParams);
-
-	rootParameters[0].InitAsConstantBufferView(0);
-
-	CD3DX12_DESCRIPTOR_RANGE srvDescRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-	rootParameters[1].InitAsDescriptorTable(1, &srvDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-	///@todo generalize
-	if (numRootConstants > 0)
+	///@note Initialize descriptor table ranges
 	{
-		rootParameters[2].InitAsConstants(numRootConstants, 1);
+		const UINT numSRVsInRange = NumSRVsNeededForApp();
+		const UINT numUAVsInRange = NumUAVsNeededForApp();
+		numRanges += (numSRVsInRange > 0) ? 1 : 0;
+		numRanges += (numUAVsInRange > 0) ? 1 : 0;
+
+		descTableRanges.resize(numRanges);
+
+		UINT rangeIndex = 0;
+		if (numSRVsInRange > 0)
+		{
+			descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numSRVsInRange, 0);
+			rangeIndex++;
+		}
+
+		if (numUAVsInRange > 0)
+		{
+			descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, numUAVsInRange, 0);
+			rangeIndex++;
+		}
 	}
 
-	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	UINT rootParamIndx = 0;
+	rootParameters.resize(numTotalRootParams);
+	rootParameters[rootParamIndx].InitAsConstantBufferView(0);
+	rootParamIndx++;
 
+	rootParameters[rootParamIndx].InitAsDescriptorTable(numRanges, descTableRanges.data(), D3D12_SHADER_VISIBILITY_ALL);
+	rootParamIndx++;
+
+	if (numRootConstants > 0)
+	{
+		rootParameters[rootParamIndx].InitAsConstants(numRootConstants, 1);
+		rootParamIndx++;
+	}
+
+	for (UINT i = 0; i < numRootSrvDescriptors; i++)
+	{
+		rootParameters[rootParamIndx].InitAsShaderResourceView(NumSRVsNeededForApp() + i);
+		rootParamIndx++;
+	}
+
+	assert(rootParamIndx == numTotalRootParams);
+
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(numTotalRootParams, rootParameters.data(), 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	ComPtr<ID3DBlob> error;
@@ -1113,7 +1141,7 @@ VOID Dx12SampleBase::CreateRootSignature()
 		assert(1);
 	}
 
-	m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_modelRootSignature));
+	m_pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_globalRootSignature));
 }
 
 
@@ -1241,7 +1269,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(componentDataType, componentVecType);
 					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
 					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
-					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength, FALSE, L"VertexBufferN");
+					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength, L"VertexBufferN");
 
 					m_modelVbvs[attrIndx].BufferLocation = m_modelVbBuffers[attrIndx].Get()->GetGPUVirtualAddress();
 					m_modelVbvs[attrIndx].SizeInBytes = (UINT)buflength;
@@ -1290,7 +1318,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 				const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
 
 
-				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes, FALSE, L"ModelIndexBuffer");
+				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes, L"ModelIndexBuffer");
 				m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
 				m_modelIbv.Format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
 				m_modelIbv.SizeInBytes = bufferSizeInBytes;
@@ -1323,14 +1351,13 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferDesc.data[bufViewDesc.byteOffset], bufViewDesc.byteLength);
 				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
-				CreateAppSrvAtIndex(0, m_modelBaseColorTex2D.Get());
+				CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
 			}
 
 		}
 	}
 
 	CreateMeshState();
-	CreateRootSignature();
 
 	return result;
 }

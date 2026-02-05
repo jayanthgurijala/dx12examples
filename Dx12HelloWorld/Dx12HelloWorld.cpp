@@ -34,8 +34,6 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	RenderModel(pCmdList);
 
-	RenderRtvContentsOnScreen(0);
-
 	return S_OK;
 }
 

@@ -29,7 +29,7 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 	//m_modelPipelineState
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 	pipelineStateDesc.InputLayout = {m_meshState.inputElementDesc.data(), static_cast<UINT>(m_meshState.inputElementDesc.size())};
-	pipelineStateDesc.pRootSignature = m_modelRootSignature.Get();
+	pipelineStateDesc.pRootSignature = m_globalRootSignature.Get();
 	
 	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
 	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
@@ -99,8 +99,6 @@ HRESULT Dx12Tessellation::RenderFrame()
 
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
 	RenderModel(pCmdList);
-
-	RenderRtvContentsOnScreen(0);
 
 	return S_OK;
 }

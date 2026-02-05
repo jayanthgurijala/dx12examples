@@ -34,7 +34,7 @@ public:
 
 protected:
 	DxMeshState m_meshState;
-	ComPtr<ID3D12RootSignature> m_modelRootSignature;
+	ComPtr<ID3D12RootSignature> m_globalRootSignature;
 	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
@@ -56,12 +56,15 @@ protected:
 		D3D12_RESOURCE_STATES      dstStateBefore,
 		D3D12_RESOURCE_STATES      dstStateAfter);
 	HRESULT WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue);
-	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData, UINT sizeInBytes, BOOL isUploadHeap = FALSE, const wchar_t* resourceName = nullptr);
+	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData,
+											    UINT sizeInBytes,
+											    const wchar_t* resourceName,
+											    D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
+											    D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON,
+											    BOOL isUploadHeap = FALSE);
 
 	///@note gltf basecolor formats are sRGB
 	ComPtr<ID3D12Resource> CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
-
-	ComPtr<ID3D12RootSignature> CreateRTUAVOutAndASGlobalRootSig();
 
 	inline ID3D12Device* GetDevice() { return m_pDevice.Get(); }
 	inline ID3D12GraphicsCommandList* GetCmdList() { return m_pCmdList.Get(); }
@@ -71,7 +74,7 @@ protected:
 
 	inline ID3D12DescriptorHeap* GetSrvDescriptorHeap()
 	{
-		return m_srvDescHeap.Get();
+		return m_srvUavCbvDescHeap.Get();
 	}
 
 	template<typename HandleType>
@@ -81,9 +84,9 @@ protected:
 		handle.Offset(index, descriptorSize);
 	}
 
-	inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetSrvCpuHeapHandle(UINT index)
+	inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetSrvUavCBvCpuHeapHandle(UINT index)
 	{
-		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_srvDescHeap->GetCPUDescriptorHandleForHeapStart());
+		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_srvUavCbvDescHeap->GetCPUDescriptorHandleForHeapStart());
 		OffsetHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(handle, index, m_srvUavCbvDescriptorSize);
 
 		return handle;
@@ -91,7 +94,7 @@ protected:
 
 	inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetSrvGpuHeapHandle(UINT index)
 	{
-		auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvDescHeap->GetGPUDescriptorHandleForHeapStart());
+		auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvUavCbvDescHeap->GetGPUDescriptorHandleForHeapStart());
 		OffsetHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(handle, index, m_srvUavCbvDescriptorSize);
 		return handle;
 	}
@@ -162,14 +165,19 @@ protected:
 
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
-	virtual inline UINT NumRTVsNeededForApp() { return 0; }
-	virtual inline UINT NumSRVsNeededForApp() { return 0; }
-	virtual inline UINT NumDSVsNeededForApp() { return 0; }
-	virtual inline UINT NumRootConstantsForApp() { return 0; }
+
+	virtual inline UINT NumRTVsNeededForApp()         { return 0; }
+	virtual inline UINT NumSRVsNeededForApp()         { return 0; }
+	virtual inline UINT NumDSVsNeededForApp()         { return 0; }
+	virtual inline UINT NumUAVsNeededForApp()         { return 0; }
+	virtual inline UINT NumRootConstantsForApp()      { return 0; }
+	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
+
 	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
 	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIndex) { assert(NumRootConstantsForApp() == 0); };
 
-	VOID CreateAppSrvAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
+	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
+	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
 
 	VOID AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo);
 
@@ -222,7 +230,7 @@ private:
 
 	ComPtr<ID3D12DescriptorHeap>        m_rtvDescHeap;
 	ComPtr<ID3D12DescriptorHeap>        m_dsvDescHeap;
-	ComPtr<ID3D12DescriptorHeap>        m_srvDescHeap;
+	ComPtr<ID3D12DescriptorHeap>        m_srvUavCbvDescHeap;
 	ComPtr<ID3D12CommandAllocator>      m_pCommandAllocator;
 	ComPtr<ID3D12GraphicsCommandList>   m_pCmdList;
 

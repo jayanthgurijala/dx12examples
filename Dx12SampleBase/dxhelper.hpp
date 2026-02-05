@@ -64,39 +64,58 @@ namespace dxhelper
 		return depthStencilState;
 	}
 
-	inline void AllocateUAVBuffers(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource **ppResource, const wchar_t* resourceName = nullptr, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON)
-	{
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		pDevice->CreateCommittedResource(&uploadHeapProperties,
-			                             D3D12_HEAP_FLAG_NONE,
-			                             &bufferDesc,
-			                             initialResourceState,
-			                             nullptr,
-									     IID_PPV_ARGS(ppResource));
-
-		if (resourceName)
-		{
-			(*ppResource)->SetName(resourceName);
-		}
-	}
-
-	inline void AllocateBufferResource(ID3D12Device* pDevice, UINT64 bufferSizeInBytes, ID3D12Resource** ppResource, BOOL isUploadHeap, const wchar_t* resourceName = nullptr, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON)
+	inline void AllocateBufferResource(ID3D12Device* pDevice,
+		                               UINT64 bufferSizeInBytes,
+		                               ID3D12Resource** ppResource,
+		                               const wchar_t* resourceName = nullptr,
+									   D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
+		                               D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON,
+									   BOOL isUploadHeap = FALSE)
 	{
 		D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
-
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
-		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSizeInBytes);
+		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSizeInBytes, flags);
 
 		pDevice->CreateCommittedResource(&heapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_COMMON,
+			initialResourceState,
 			nullptr,
 			IID_PPV_ARGS(ppResource));
 		if (resourceName)
 		{
 			(*ppResource)->SetName(resourceName);
 		}
+	}
+
+	inline void AllocateTexture2DResource(ID3D12Device* pDevice,
+		                                  ID3D12Resource** ppResource,
+		                                  UINT64 width,
+		                                  UINT height,
+		                                  DXGI_FORMAT format,
+										  const wchar_t* resourceName = nullptr,
+									      D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON,
+										  D3D12_CLEAR_VALUE* optimizedClearValue = nullptr,
+		                                  D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
+										  D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT)
+	{
+		auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
+		auto resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1, 1, 0, flags);
+
+		pDevice->CreateCommittedResource(&heapProps,
+										 D3D12_HEAP_FLAG_NONE,
+										 &resourceDesc,
+			                             initialState,
+										 optimizedClearValue,
+										 IID_PPV_ARGS(ppResource));
+		if (resourceName)
+		{
+			(*ppResource)->SetName(resourceName);
+		}
+	}
+
+	inline UINT64 DxAlign(UINT64 value, UINT alignment)
+	{
+		return (value + (alignment - 1)) & ~(alignment - 1);
 	}
 }
