@@ -583,7 +583,7 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData, UINT 
 
 	ComPtr<ID3D12Resource> bufferResource;
 
-	dxhelper::AllocateBufferResource(m_pDevice.Get(), sizeInBytes, &bufferResource, isUploadHeap, L"");
+	dxhelper::AllocateBufferResource(m_pDevice.Get(), sizeInBytes, &bufferResource, isUploadHeap, resourceName);
 
 	if (cpuData != NULL && sizeInBytes > 0)
 	{
@@ -629,6 +629,20 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 	}
 
 	return texture2D;
+}
+
+ComPtr<ID3D12RootSignature> Dx12SampleBase::CreateRTUAVOutAndASGlobalRootSig()
+{
+	ComPtr<ID3D12RootSignature> rtGobalRootSig;
+	CD3DX12_DESCRIPTOR_RANGE uavRange;
+	uavRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+	CD3DX12_ROOT_PARAMETER rootParameters[2];
+	rootParameters[0].InitAsDescriptorTable(1, &uavRange, D3D12_SHADER_VISIBILITY_ALL);
+	rootParameters[1].InitAsShaderResourceView(0);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, rootParameters);
+	dxhelper::CreateRootSignature(m_pDevice.Get(), rootSigDesc, &rtGobalRootSig);
+	return rtGobalRootSig;
 }
 
 HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
@@ -1211,6 +1225,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					{
 						///@todo we have min max extents
 						m_modelPositionVbIndex = attrIndx;
+						numTotalVertices += accessorDesc.count;
 					}
 					const int bufferViewIdx = accessorDesc.bufferView;
 					const tinygltf::BufferView bufViewDesc = model.bufferViews[bufferViewIdx];
@@ -1224,7 +1239,6 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 					const size_t accessorByteOffset = accessorDesc.byteOffset;
 					m_modelIaSemantics[attrIndx].format = GltfGetDxgiFormat(componentDataType, componentVecType);
-					numTotalVertices += accessorDesc.count;
 					const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
 					const unsigned char* attributedata = bufferDesc.data.data() + accessorByteOffset + bufOffset; //upto buf length, makes up one resource
 					m_modelVbBuffers[attrIndx] = CreateBufferWithData((void*)attributedata, (UINT)buflength, FALSE, L"VertexBufferN");
@@ -1340,10 +1354,10 @@ VOID Dx12SampleBase::ExecuteBuildAccelerationStructures()
 	m_pCmdList->Close();
 	ID3D12CommandList* cmdLists[] = { m_pCmdList.Get() };
 	m_pCmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
-	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 }
 
 VOID Dx12SampleBase::StartBuildingAccelerationStructures()
 {
 	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 }
+

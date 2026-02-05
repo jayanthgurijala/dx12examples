@@ -21,6 +21,8 @@ protected:
 
 private:
 	VOID BuildBlasAndTlas();
+	VOID CreateRtPSO();
+	VOID BuildShaderTables();
 
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
@@ -31,5 +33,15 @@ private:
 	ComPtr<ID3D12Resource> m_instanceDescBuffer;
 	ComPtr<ID3D12Resource> m_tlasScratchBuffer;
 	ComPtr<ID3D12Resource> m_tlasResultBuffer;
+
+	ComPtr<ID3D12RootSignature> m_globalRootSignature;
+
+	ComPtr<ID3D12StateObject> m_rtpso;
+
+	ComPtr<ID3D12Resource> m_shaderBindingTable;
+
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE m_rayGenBaseAddress;
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_hitTableBaseAddress;
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_missTableBaseAddress;
 };
 

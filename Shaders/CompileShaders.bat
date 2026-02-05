@@ -21,6 +21,8 @@ dxc -T hs_6_0 -E HSMain -Fo TessFactor_HS.cso TessFactor.hlsl
 dxc -T ds_6_0 -E DSMain -Fo TessFactor_DS.cso TessFactor.hlsl
 dxc -T ps_6_0 -E PSMain -Fo TessFactor_PS.cso TessFactor.hlsl
 
+dxc /T lib_6_6 /Fo RaytraceSimpleCHS.cso RaytraceSimpleCHS.hlsl
+
 copy *.cso ..\x64\Debug\	
 
 

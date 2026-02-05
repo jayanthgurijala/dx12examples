@@ -40,6 +40,12 @@
     <Filter Include="imgui\backends\win32">
       <UniqueIdentifier>{70c40aa5-0feb-4881-bd17-17f242c3b6ca}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\RayTracing">
+      <UniqueIdentifier>{f09d8aca-324f-4c03-a7ce-48dcab1cb39e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\RayTracing\hlsli">
+      <UniqueIdentifier>{597118c7-8e3e-411d-8d08-ea2d47dc8b3b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -157,6 +163,12 @@
     </None>
     <None Include="..\Shaders\TessFactor.hlsl">
       <Filter>Shaders\Tess</Filter>
+    </None>
+    <None Include="..\Shaders\Raytracing.hlsli">
+      <Filter>Shaders\RayTracing\hlsli</Filter>
+    </None>
+    <None Include="..\Shaders\RaytraceSimpleCHS.hlsl">
+      <Filter>Shaders\RayTracing</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -21,31 +21,29 @@ namespace dxhelper
 		return layout;
 	}
 
-	inline ComPtr<ID3D12RootSignature> GetSrvDescTableRootSignature(ID3D12Device* pDevice, UINT numSRVs)
+	inline void CreateRootSignature(ID3D12Device *pDevice, CD3DX12_ROOT_SIGNATURE_DESC& rootSignatureDesc, ID3D12RootSignature** ppRootSignature)
 	{
-		ComPtr<ID3D12RootSignature> rootSignature;
-
 		ComPtr<ID3DBlob> rootSigBlob;
 		ComPtr<ID3DBlob> errorBlob;
-
-		auto descriptorTable = CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-
-		CD3DX12_ROOT_PARAMETER rootParameters[1];
-		rootParameters[0].InitAsDescriptorTable(1,
-			&descriptorTable,
-			D3D12_SHADER_VISIBILITY_PIXEL);
-
-		CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
-		auto rootSignatureDesc = CD3DX12_ROOT_SIGNATURE_DESC(1, rootParameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
 		D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSigBlob, &errorBlob);
-
 		if (errorBlob != NULL)
 		{
 			OutputDebugStringA((char*)errorBlob->GetBufferPointer());
 		}
+		pDevice->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(ppRootSignature));
+	}
 
-		pDevice->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	inline ComPtr<ID3D12RootSignature> GetSrvDescTableRootSignature(ID3D12Device* pDevice, UINT numSRVs)
+	{
+		ComPtr<ID3D12RootSignature> rootSignature;
+		auto descriptorTable = CD3DX12_DESCRIPTOR_RANGE(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		rootParameters[0].InitAsDescriptorTable(1,
+			&descriptorTable,
+			D3D12_SHADER_VISIBILITY_PIXEL);
+		CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
+		auto rootSignatureDesc = CD3DX12_ROOT_SIGNATURE_DESC(1, rootParameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		CreateRootSignature(pDevice, rootSignatureDesc, &rootSignature);
 		return rootSignature;
 	}
 

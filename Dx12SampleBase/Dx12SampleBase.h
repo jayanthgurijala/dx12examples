@@ -61,6 +61,8 @@ protected:
 	///@note gltf basecolor formats are sRGB
 	ComPtr<ID3D12Resource> CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 
+	ComPtr<ID3D12RootSignature> CreateRTUAVOutAndASGlobalRootSig();
+
 	inline ID3D12Device* GetDevice() { return m_pDevice.Get(); }
 	inline ID3D12GraphicsCommandList* GetCmdList() { return m_pCmdList.Get(); }
 	inline UINT                       GetAppRTVStartIndex() { return GetBackBufferCount(); }
