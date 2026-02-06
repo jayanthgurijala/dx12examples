@@ -53,3 +53,18 @@ struct DxMeshState
 	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDesc;
 	BOOL doubleSided;
 };
+
+enum DxAppFrameType
+{
+	DxFrameRTVIndex = 0,
+	DxFrameResource = 1,
+	DxFrameInvalid  = 2
+};
+
+struct DxAppFrameInfo
+{
+	UINT rtvIndex;
+	ID3D12Resource* pFrameResource;
+	D3D12_RESOURCE_STATES pResState;
+	DxAppFrameType type;
+};

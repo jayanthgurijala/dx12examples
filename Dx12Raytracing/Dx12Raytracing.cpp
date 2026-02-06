@@ -6,7 +6,7 @@
 #include "ExampleEntryPoint.h"
 #include "framework.h"
 #include <d3dx12.h>
-#include "dxhelper.hpp"
+#include "dxhelper.h"
 #include "DxPrintUtils.h"
 
 static std::wstring s_hitgroup_1 = L"Hitgroup_1";
@@ -40,6 +40,7 @@ HRESULT Dx12Raytracing::OnInit()
 	BuildBlasAndTlas();
 	CreateRtPSO();
 	BuildShaderTables();
+	CreateUAVOutput();
 
 	return S_OK;
 }
@@ -99,9 +100,8 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
 	instanceDesc.InstanceMask = 1;
 	instanceDesc.AccelerationStructure = m_blasResultBuffer->GetGPUVirtualAddress();
-	//dxhelper::AllocateUAVBuffers(m_dxrDevice.Get(), sizeof(instanceDesc), &m_instanceDescBuffer);
-	CreateBufferWithData(&instanceDesc, sizeof(instanceDesc), L"RayTracing_InstanceDesc", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
+	m_instanceDescBuffer = CreateBufferWithData(&instanceDesc, sizeof(instanceDesc), L"RayTracing_InstanceDesc", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
 	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
@@ -264,6 +264,8 @@ VOID Dx12Raytracing::CreateUAVOutput()
 
 HRESULT Dx12Raytracing::RenderFrame()
 {
+	SetFrameInfo(m_uavOutputResource.Get(), UINT_MAX, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
 	D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
 	dispatchRaysDesc.Width = GetWidth();
 	dispatchRaysDesc.Height = GetHeight();
@@ -272,11 +274,10 @@ HRESULT Dx12Raytracing::RenderFrame()
 	dispatchRaysDesc.HitGroupTable = m_hitTableBaseAddress;
 	dispatchRaysDesc.MissShaderTable = m_missTableBaseAddress;
 
-	m_dxrCommandList->SetPipelineState1(m_rtpso.Get());
-	m_dxrCommandList->SetComputeRootSignature(m_globalRootSignature.Get());
-	
 	ID3D12DescriptorHeap* descriptorHeaps[] = { GetSrvDescriptorHeap() };
 	m_dxrCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	m_dxrCommandList->SetPipelineState1(m_rtpso.Get());
+	m_dxrCommandList->SetComputeRootSignature(m_globalRootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
 	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppSrvGpuHandle(0));

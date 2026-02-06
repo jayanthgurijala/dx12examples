@@ -5,7 +5,7 @@
 #include "Dx12Tessellation.h"
 #include "ExampleEntryPoint.h"
 #include <d3dx12.h>
-#include "dxhelper.hpp"
+#include "dxhelper.h"
 #include <imgui.h>
 
 Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
@@ -19,6 +19,17 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 {
 	auto pDevice = GetDevice();
 
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	dxhelper::DxCreateRootSignature(
+		pDevice,
+		&m_pRootSignature,
+		{
+			0_rcbv,
+			"srv_1_0,uav_0_0,cbv_0_0"_dt,
+			"1_1"_rc
+		},
+		{ staticSampler });
+
 	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob("TessFactor_VS.cso");
 	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob("TessFactor_HS.cso");
 	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob("TessFactor_DS.cso");
@@ -29,7 +40,7 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 	//m_modelPipelineState
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 	pipelineStateDesc.InputLayout = {m_meshState.inputElementDesc.data(), static_cast<UINT>(m_meshState.inputElementDesc.size())};
-	pipelineStateDesc.pRootSignature = m_globalRootSignature.Get();
+	pipelineStateDesc.pRootSignature = m_pRootSignature.Get();
 	
 	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
 	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
@@ -59,6 +70,8 @@ HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
 
 HRESULT Dx12Tessellation::RenderFrame()
 {
+	SetFrameInfo(nullptr, 0);
+
 	ImGui::Text("Tessellation");
 	ImGui::SameLine();
 
@@ -98,6 +111,18 @@ HRESULT Dx12Tessellation::RenderFrame()
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
+	pCmdList->SetPipelineState(m_modelPipelineState.Get());
+	pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());
+	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
+	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+
+
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+	pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+
+	UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
+	pCmdList->SetGraphicsRoot32BitConstant(2, bits, 0);
+
 	RenderModel(pCmdList);
 
 	return S_OK;

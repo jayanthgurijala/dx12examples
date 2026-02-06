@@ -78,9 +78,6 @@
     <ClInclude Include="WICImageLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dxhelper.hpp">
-      <Filter>Source Files\hpp</Filter>
-    </ClInclude>
     <ClInclude Include="..\third_party\imgui\imgui.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -92,6 +89,9 @@
     </ClInclude>
     <ClInclude Include="..\third_party\imgui\backends\imgui_impl_win32.h">
       <Filter>imgui\backends\win32</Filter>
+    </ClInclude>
+    <ClInclude Include="dxhelper.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -139,6 +139,9 @@
     </ClCompile>
     <ClCompile Include="..\third_party\imgui\backends\imgui_impl_win32.cpp">
       <Filter>imgui\backends\win32</Filter>
+    </ClCompile>
+    <ClCompile Include="dxhelper.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

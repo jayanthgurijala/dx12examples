@@ -1,7 +1,7 @@
 #include "Raytracing.hlsli"
 
 RaytracingAccelerationStructure Scene : register(t1, space0);
-RWTexture2D<float4> UAVOutput : register(u0);
+RWTexture2D<float4> UAVOutput : register(u0, space0);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 

@@ -155,7 +155,7 @@
     <ClInclude Include="..\third_party\imgui\imgui_internal.h" />
     <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
-    <ClInclude Include="dxhelper.hpp" />
+    <ClInclude Include="dxhelper.h" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="dxtypes.h" />
     <ClInclude Include="ExampleEntryPoint.h" />
@@ -189,6 +189,7 @@
     </ClCompile>
     <ClCompile Include="Dx12SampleBase.cpp" />
     <ClCompile Include="DxCamera.cpp" />
+    <ClCompile Include="dxhelper.cpp" />
     <ClCompile Include="DxPrintUtils.cpp" />
     <ClCompile Include="FileReader.cpp" />
     <ClCompile Include="gltfutils.cpp" />

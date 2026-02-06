@@ -2,6 +2,80 @@
 
 #include <d3d12.h>
 #include <d3dx12.h>
+#include "DxPrintUtils.h"
+
+using namespace Microsoft::WRL;
+
+inline CD3DX12_ROOT_PARAMETER operator ""_rcbv(unsigned long long shaderRegister)
+{
+	auto rootCbv = CD3DX12_ROOT_PARAMETER();
+	rootCbv.InitAsConstantBufferView(shaderRegister);
+	return rootCbv;
+}
+
+inline CD3DX12_ROOT_PARAMETER operator ""_rsrv(unsigned long long shaderRegister)
+{
+	auto rootSrv = CD3DX12_ROOT_PARAMETER();
+	rootSrv.InitAsShaderResourceView(shaderRegister);
+	return rootSrv;
+}
+
+inline CD3DX12_ROOT_PARAMETER operator ""_uav(unsigned long long shaderRegister)
+{
+	auto rootUav = CD3DX12_ROOT_PARAMETER();
+	rootUav.InitAsUnorderedAccessView(shaderRegister);
+	return rootUav;
+}
+
+inline CD3DX12_ROOT_PARAMETER operator ""_rc(const char* str, size_t)
+{
+	UINT num32bitValues, shaderRegister;
+	int numRead = sscanf_s(str, "%u_%u", &num32bitValues, &shaderRegister);
+	auto rootConstant = CD3DX12_ROOT_PARAMETER();
+	rootConstant.InitAsConstants(num32bitValues, shaderRegister);
+	return rootConstant;
+}
+
+///@note syntax is "srv_count_base,uav_count_base,cbv_count,base"
+inline CD3DX12_ROOT_PARAMETER operator ""_dt(const char* str, size_t)
+{
+	CD3DX12_ROOT_PARAMETER descriptorTable = {};
+
+	UINT srvCount, srvBase, uavCount, uavBase, cbvCount, cbvBase;
+	int numRead = sscanf_s(str, "srv_%u_%u,uav_%u_%u,cbv_%u_%u", &srvCount, &srvBase, &uavCount, &uavBase, &cbvCount, &cbvBase);
+	auto rootDt = CD3DX12_ROOT_PARAMETER();
+	UINT numRanges = 0;
+	numRanges += (srvCount > 0) ? 1 : 0;
+	numRanges += (uavCount > 0) ? 1 : 0;
+	numRanges += (cbvCount > 0) ? 1 : 0;
+
+	///@todo bad! Fix!
+	static std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges;
+
+	descTableRanges.resize(numRanges);
+
+	UINT rangeIndex = 0;
+	if (srvCount > 0)
+	{
+		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, srvCount, 0);
+		rangeIndex++;
+	}
+
+	if (uavCount > 0)
+	{
+		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, uavCount, 0);
+		rangeIndex++;
+	}
+
+	if (cbvCount > 0)
+	{
+		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, cbvCount, 0);
+		rangeIndex++;
+	}
+
+	descriptorTable.InitAsDescriptorTable(numRanges, descTableRanges.data(), D3D12_SHADER_VISIBILITY_ALL);
+	return descriptorTable;
+}
 
 namespace dxhelper
 {
@@ -21,7 +95,7 @@ namespace dxhelper
 		return layout;
 	}
 
-	inline void CreateRootSignature(ID3D12Device *pDevice, CD3DX12_ROOT_SIGNATURE_DESC& rootSignatureDesc, ID3D12RootSignature** ppRootSignature)
+	inline void CreateRootSignature_Temp(ID3D12Device *pDevice, CD3DX12_ROOT_SIGNATURE_DESC& rootSignatureDesc, ID3D12RootSignature** ppRootSignature)
 	{
 		ComPtr<ID3DBlob> rootSigBlob;
 		ComPtr<ID3DBlob> errorBlob;
@@ -43,7 +117,7 @@ namespace dxhelper
 			D3D12_SHADER_VISIBILITY_PIXEL);
 		CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
 		auto rootSignatureDesc = CD3DX12_ROOT_SIGNATURE_DESC(1, rootParameters, 1, &staticSampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-		CreateRootSignature(pDevice, rootSignatureDesc, &rootSignature);
+		CreateRootSignature_Temp(pDevice, rootSignatureDesc, &rootSignature);
 		return rootSignature;
 	}
 
@@ -117,5 +191,33 @@ namespace dxhelper
 	inline UINT64 DxAlign(UINT64 value, UINT alignment)
 	{
 		return (value + (alignment - 1)) & ~(alignment - 1);
+	}
+
+	inline VOID DxCreateRootSignature(
+		ID3D12Device* pDevice,
+		ID3D12RootSignature** ppRootSignature,
+		const std::vector<CD3DX12_ROOT_PARAMETER>& rootParameters,
+		const std::vector< CD3DX12_STATIC_SAMPLER_DESC>& staticSampleDesc)
+	{
+		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(
+			rootParameters.size(), 
+			rootParameters.data(),
+			staticSampleDesc.size(),
+			staticSampleDesc.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		ComPtr<ID3DBlob> error;
+		ComPtr<ID3DBlob> signature;
+
+		D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error);
+		if (error != nullptr)
+		{
+			const char* errorMsg =
+				reinterpret_cast<const char*>(error->GetBufferPointer());
+			PrintUtils::PrintString(errorMsg);
+			assert(1);
+		}
+
+		pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(ppRootSignature));
 	}
 }

@@ -20,7 +20,7 @@ public:
 	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
-	HRESULT RenderRtvContentsOnScreen(UINT rtvResIndex);
+	HRESULT RenderRtvContentsOnScreen();
 	
 	FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }
 
@@ -34,7 +34,6 @@ public:
 
 protected:
 	DxMeshState m_meshState;
-	ComPtr<ID3D12RootSignature> m_globalRootSignature;
 	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
 	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
@@ -157,10 +156,16 @@ protected:
 	inline DXGI_FORMAT GetVertexBufferFormat(UINT index)
 	{
 		auto& positionInfo = m_modelIaSemantics[m_modelPositionVbIndex];
-
 		assert(positionInfo.name == "POSITION");
-
 		return positionInfo.format;
+	}
+
+	inline VOID SetFrameInfo(ID3D12Resource* frameResource = nullptr, UINT rtvIndex = UINT_MAX, D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_RENDER_TARGET)
+	{
+		m_appFrameInfo.pResState = resState;
+		m_appFrameInfo.pFrameResource = frameResource;
+		m_appFrameInfo.rtvIndex = rtvIndex;
+		m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
 	}
 
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
@@ -172,9 +177,9 @@ protected:
 	virtual inline UINT NumUAVsNeededForApp()         { return 0; }
 	virtual inline UINT NumRootConstantsForApp()      { return 0; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
+	virtual ID3D12RootSignature* GetRootSignature() { return nullptr; }
 
 	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
-	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIndex) { assert(NumRootConstantsForApp() == 0); };
 
 	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
@@ -212,13 +217,12 @@ private:
 
 	///@todo refactor this, maybe use single function
 	HRESULT CreateRenderTargetDescriptorHeap(UINT numDescriptors);
-	HRESULT CreateShaderResourceViewDescriptorHeap(UINT numDescriptors);
+	HRESULT CreateSrvUavCbvDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
 	VOID Imgui_CreateDescriptorHeap();
 	HRESULT CreateSceneMVPMatrix();
 	UINT    GetBackBufferCount();
 	VOID CreateMeshState();
-	VOID CreateRootSignature();
 
 	UINT                       m_width;
 	UINT                       m_height;
@@ -270,5 +274,7 @@ private:
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
 
 	ComPtr<ID3D12DescriptorHeap>          m_imguiDescHeap;
+
+	DxAppFrameInfo                        m_appFrameInfo;
 };
 

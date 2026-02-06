@@ -20,12 +20,10 @@ protected:
 	virtual HRESULT CreatePipelineStateFromModel() override;
 
 	virtual inline UINT NumRootConstantsForApp() override { return 1; }
-	virtual inline VOID AppSetRootConstantForModel(ID3D12GraphicsCommandList* pCmdList, UINT rootParamIdx) override {
-		UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
-		pCmdList->SetGraphicsRoot32BitConstant(rootParamIdx, bits, 0);
-	}
+	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
 
 private:
+	ComPtr<ID3D12RootSignature> m_pRootSignature;
 	FLOAT m_tesstriTessLevel;
 
 };
