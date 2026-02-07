@@ -25,6 +25,7 @@ Dx12Raytracing::Dx12Raytracing(UINT width, UINT height) :
 HRESULT Dx12Raytracing::OnInit()
 {
 	Dx12SampleBase::OnInit();
+
 	ID3D12Device* pDevice = GetDevice();
 	assert(pDevice != nullptr);
 
@@ -37,8 +38,8 @@ HRESULT Dx12Raytracing::OnInit()
 	pCmdList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList));
 	assert(m_dxrCommandList != nullptr);
 
-	BuildBlasAndTlas();
 	CreateRtPSO();
+	BuildBlasAndTlas();
 	BuildShaderTables();
 	CreateUAVOutput();
 
@@ -126,6 +127,18 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 VOID Dx12Raytracing::CreateRtPSO()
 {
+
+	dxhelper::DxCreateRootSignature
+	(
+		m_dxrDevice.Get(),
+		&m_rootSignature,
+		{
+			0_rcbv,
+			"srv_1_0,uav_1_0,cbv_0_0"_dt,
+			1_rsrv
+		},
+		{}
+	);
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
 
@@ -166,7 +179,7 @@ VOID Dx12Raytracing::CreateRtPSO()
 	shaderConfigSubObject.pDesc = &shaderConfig;
 
 	D3D12_GLOBAL_ROOT_SIGNATURE globalRootSigDesc = {};
-	globalRootSigDesc.pGlobalRootSignature = m_globalRootSignature.Get();
+	globalRootSigDesc.pGlobalRootSignature = m_rootSignature.Get();
 
 	D3D12_STATE_SUBOBJECT globalRootSigSubObject = {};
 	globalRootSigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
@@ -262,6 +275,11 @@ VOID Dx12Raytracing::CreateUAVOutput()
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
+HRESULT Dx12Raytracing::CreatePipelineStateFromModel()
+{
+	return E_NOTIMPL;
+}
+
 HRESULT Dx12Raytracing::RenderFrame()
 {
 	SetFrameInfo(m_uavOutputResource.Get(), UINT_MAX, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -277,7 +295,7 @@ HRESULT Dx12Raytracing::RenderFrame()
 	ID3D12DescriptorHeap* descriptorHeaps[] = { GetSrvDescriptorHeap() };
 	m_dxrCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 	m_dxrCommandList->SetPipelineState1(m_rtpso.Get());
-	m_dxrCommandList->SetComputeRootSignature(m_globalRootSignature.Get());
+	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
 	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppSrvGpuHandle(0));

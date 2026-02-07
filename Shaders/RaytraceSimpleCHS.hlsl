@@ -42,5 +42,5 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(0.8f, 0.5f, 0.2f, 1.0f);
+    payload.color = float4(0.8f, 0.1f, 0.1f, 1.0f);
 }

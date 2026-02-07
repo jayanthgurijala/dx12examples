@@ -26,6 +26,7 @@ private:
 	VOID CreateRtPSO();
 	VOID BuildShaderTables();
 	VOID CreateUAVOutput();
+	virtual HRESULT CreatePipelineStateFromModel() override;
 
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
@@ -46,5 +47,7 @@ private:
 	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_missTableBaseAddress;
 
 	ComPtr<ID3D12Resource> m_uavOutputResource;
+
+	ComPtr<ID3D12RootSignature> m_rootSignature;
 };
 

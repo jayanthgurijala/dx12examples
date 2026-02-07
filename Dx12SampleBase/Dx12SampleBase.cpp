@@ -828,15 +828,17 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 
 	const UINT      currentFrameIndex = m_swapChain4->GetCurrentBackBufferIndex();
 	ID3D12Resource* pCurrentBackBuffer = m_swapChainBuffers[currentFrameIndex].Get();
-	ID3D12Resource* pRtvResource = (m_appFrameInfo.type == DxAppFrameType::DxFrameResource) ? m_appFrameInfo.pFrameResource : 
+	ID3D12Resource* pFrameResource = (m_appFrameInfo.type == DxAppFrameType::DxFrameResource) ? m_appFrameInfo.pFrameResource : 
 																	m_rtvResources[m_appFrameInfo.rtvIndex].Get();
+
+	m_pDevice->CreateShaderResourceView(pFrameResource, nullptr, GetSrvUavCBvCpuHeapHandle(0));
 
 	D3D12_RESOURCE_BARRIER preResourceBarriers[2];
 
 	preResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pCurrentBackBuffer,
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
-	preResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pRtvResource,
+	preResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
 		m_appFrameInfo.pResState,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
@@ -866,7 +868,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 	postResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pCurrentBackBuffer,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
-	postResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pRtvResource,
+	postResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 		m_appFrameInfo.pResState);
 	m_pCmdList->ResourceBarrier(2, postResourceBarriers);
@@ -928,8 +930,8 @@ HRESULT Dx12SampleBase::OnInit()
 	}
 
 	{
-		result = LoadGltfFile();
-		result = CreatePipelineStateFromModel();
+		LoadGltfFile();
+		CreatePipelineStateFromModel();
 	}
 
 	///@todo seperate it out
