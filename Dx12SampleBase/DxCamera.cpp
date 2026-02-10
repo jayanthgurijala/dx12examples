@@ -33,7 +33,7 @@ VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 
 VOID DxCamera::Update(FLOAT frameDeltaTIme)
 {
-	m_frameDeltaTime = 0;// frameDeltaTIme;
+	m_frameDeltaTime = frameDeltaTIme;
 	CreateViewMatrix();
 }
 
@@ -43,25 +43,23 @@ VOID DxCamera::Update(FLOAT frameDeltaTIme)
 */
 VOID DxCamera::CreateViewMatrix()
 {
-	//static const FLOAT cameraSpeedInDegPerSecond = 10.0f;
-	//
-    //XMVECTOR up            = XMVectorSet(0, 1, 0, 0);  // Y-up
-    //static XMVECTOR focus  = XMVectorSet(0.0, 0.0, 0.0, 1.0); // m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
-    //m_cameraPosition       = XMVectorSet(0.0f, 2.0f, -5.0f, 1.0f); // m_eye = { 0.0f, 2.0f, -5.0f, 1.0f };
-	//XMVECTOR right = { 1.0f, 0.0f, 0.0f, 0.0f };
-	//XMVECTOR direction = XMVector4Normalize(focus - m_cameraPosition);
-	//up = XMVector3Normalize(XMVector3Cross(direction, right));
+	static const FLOAT cameraSpeedInDegPerSecond = 10.0f;
+	static XMVECTOR    lookAt                    = XMVectorSet(0.0, 0.0, 0.0, 1.0);
+	
+    XMVECTOR up            = XMVectorSet(0, 1, 0, 1.0f);  
+    m_cameraPosition       = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
+
 
 	///@todo use std::chrono properly
-	//m_rotatedAngle += cameraSpeedInDegPerSecond * m_frameDeltaTime;
+	m_rotatedAngle += cameraSpeedInDegPerSecond * m_frameDeltaTime;
 
 	///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".
-	//const XMVECTOR cameraVector = m_cameraPosition - focus;
-	//const XMMATRIX rotationMatrix = XMMatrixRotationY(XMConvertToRadians(m_rotatedAngle));
-	//const XMVECTOR newCameraVector = XMVector3Transform(cameraVector, rotationMatrix);
-	//const XMVECTOR newCameraPos = newCameraVector + focus;
-	//
-	//m_cameraPosition = newCameraPos;
+	const XMVECTOR cameraVector = m_cameraPosition - lookAt;
+	const XMMATRIX rotationMatrix = XMMatrixRotationY(XMConvertToRadians(m_rotatedAngle));
+	const XMVECTOR newCameraVector = XMVector3Transform(cameraVector, rotationMatrix);
+	const XMVECTOR newCameraPos = newCameraVector + lookAt;
+	
+	m_cameraPosition = newCameraPos;
 
 	//m_eye = (-3.5, 2.0, -3.5, 1.0)
 	//m_at = (0.0, 0.0, 0.0, 1.0)
@@ -69,13 +67,11 @@ VOID DxCamera::CreateViewMatrix()
 
 	//ratio = 1.77, 1, 125
     
-	XMVECTOR eyePosition = XMVectorSet(0, -0.2, -5, 1.0);
-	XMVECTOR lookAt      = XMVectorSet(0.0, 0.0, 0.0, 1.0);
-	XMVECTOR up          = XMVectorSet(0, 1, 0, 1.0);
+	//XMVECTOR eyePosition = XMVectorSet(0, -0.2, -5, 1.0);
+	//XMVECTOR lookAt      = XMVectorSet(0.0, 0.0, 0.0, 1.0);
+	//XMVECTOR up          = XMVectorSet(0, 1, 0, 1.0);
 
-	m_cameraPosition = eyePosition;
-
-    m_viewMatrix = XMMatrixLookAtLH(eyePosition,
+    m_viewMatrix = XMMatrixLookAtLH(m_cameraPosition,
 		                            lookAt,
                                     up);
 }
