@@ -12,7 +12,7 @@ using namespace DirectX;
 
 struct DxModelMatrix
 {
-	DxMeshNodeTransformInfo transformInfo;
+	DxNodeTransformInfo transformInfo;
 	XMMATRIX modelMatrix;
 	XMMATRIX normalMatrix;
 };
@@ -20,19 +20,21 @@ struct DxModelMatrix
 class DxCamera
 {
 public:
-	VOID AddTransformInfo(DxMeshNodeTransformInfo transformInfo);
+	VOID AddTransformInfo(DxNodeTransformInfo transformInfo);
 	XMFLOAT4X4 GetViewProjectionMatrixTranspose();
 	XMFLOAT4X4 GetWorldMatrixTranspose(UINT index);
 	XMFLOAT4X4 GetModelViewProjectionMatrixTranspose(UINT index);
 	XMFLOAT4X4 GetNormalMatrixData(UINT index);
 	XMFLOAT4   GetCameraPosition();
+	XMFLOAT4X4 GetViewProjectionInverse();
 	VOID Update(FLOAT frameDeltaTime);
 	DxCamera(UINT width, UINT height);
+	XMFLOAT4X4 GetDxrModelTransposeMatrix(UINT index);
 
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();
-	XMMATRIX CreateModelMatrix(const DxMeshNodeTransformInfo& transformInfo);
+	XMMATRIX CreateModelMatrix(const DxNodeTransformInfo& transformInfo);
 
 	inline XMMATRIX GetModelMatrix(UINT index) { return m_transformInfoList[index].modelMatrix; }
 	inline XMMATRIX GetNormalMatrix(UINT index) { return m_transformInfoList[index].normalMatrix; }

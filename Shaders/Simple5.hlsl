@@ -16,6 +16,8 @@ VSOutput_5 VSMain(VSInput_5 input)
     output.texcoord1 = input.texcoord1;
     output.texcoord2 = input.texcoord2;
     
+    output.position /= output.position.w;
+    
     return output;
 }
 

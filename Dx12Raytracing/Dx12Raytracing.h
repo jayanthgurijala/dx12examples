@@ -47,7 +47,6 @@ private:
 	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_missTableBaseAddress;
 
 	ComPtr<ID3D12Resource> m_uavOutputResource;
-
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 };
 

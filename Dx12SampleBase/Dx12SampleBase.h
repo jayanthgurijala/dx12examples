@@ -7,6 +7,7 @@
 #include <DirectXMath.h>
 #include <d3dx12.h>
 #include "DxCamera.h"
+#include "DxGltfLoader.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -145,7 +146,7 @@ protected:
 
 	inline D3D12_VERTEX_BUFFER_VIEW& GetModelVertexBufferView(UINT index)
 	{
-		return m_modelVbvs[m_modelPositionVbIndex];
+		return m_modelVbvs[0];
 	}
 
 	inline DxDrawPrimitive& GetDrawInfo(UINT index)
@@ -155,7 +156,7 @@ protected:
 
 	inline DXGI_FORMAT GetVertexBufferFormat(UINT index)
 	{
-		auto& positionInfo = m_modelIaSemantics[m_modelPositionVbIndex];
+		auto& positionInfo = m_modelIaSemantics[0];
 		assert(positionInfo.name == "POSITION");
 		return positionInfo.format;
 	}
@@ -168,6 +169,7 @@ protected:
 		m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
 	}
 
+	virtual inline DxCamera* GetCamera() { return m_camera.get(); }
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 
@@ -178,13 +180,13 @@ protected:
 	virtual inline UINT NumRootConstantsForApp()      { return 0; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
 	virtual ID3D12RootSignature* GetRootSignature() { return nullptr; }
-
 	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
+	//virtual inline const Dx 
 
 	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
 
-	VOID AddTransformInfo(const DxMeshNodeTransformInfo& transformInfo);
+	VOID AddTransformInfo(const DxNodeTransformInfo& transformInfo);
 
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -268,7 +270,6 @@ private:
 	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
 	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
 	std::vector<DxIASemantic>             m_modelIaSemantics;
-	UINT                                  m_modelPositionVbIndex;
 
 	DxDrawPrimitive                       m_modelDrawPrimitive;
 	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
@@ -276,5 +277,6 @@ private:
 	ComPtr<ID3D12DescriptorHeap>          m_imguiDescHeap;
 
 	DxAppFrameInfo                        m_appFrameInfo;
+	std::unique_ptr<DxGltfLoader>         m_gltfLoader;
 };
 

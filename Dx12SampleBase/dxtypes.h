@@ -19,7 +19,7 @@ struct DxExtents
 	BOOL hasValidExtents;
 };
 
-struct DxMeshNodeTransformInfo
+struct DxNodeTransformInfo
 {
 	BOOL hasTranslation;
 	BOOL hasRotation;
@@ -44,6 +44,8 @@ struct DxDrawPrimitive
 {
 	UINT numVertices;
 	UINT numIndices;
+
+	//@remove
 	BOOL isIndexedDraw;
 };
 
@@ -67,4 +69,21 @@ struct DxAppFrameInfo
 	ID3D12Resource* pFrameResource;
 	D3D12_RESOURCE_STATES pResState;
 	DxAppFrameType type;
+};
+
+struct DxGltfBuffer
+{
+	DxIASemantic iaLayoutInfo;
+	UINT         bufferIndex;
+	UINT64       byteOffsetInBytes;
+	UINT	     bufferStrideInBytes;
+	UINT64       bufferSizeInBytes;
+};
+
+struct DxGltfMeshPrimInfo
+{
+	std::string               name;
+	std::vector<DxGltfBuffer> vbInfo;
+	std::vector<DxGltfBuffer> ibInfo;
+	DxDrawPrimitive           drawInfo;
 };

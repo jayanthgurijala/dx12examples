@@ -93,6 +93,9 @@
     <ClInclude Include="dxhelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DxGltfLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dx12SampleBase.cpp">
@@ -141,6 +144,9 @@
       <Filter>imgui\backends\win32</Filter>
     </ClCompile>
     <ClCompile Include="dxhelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DxGltfLoader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

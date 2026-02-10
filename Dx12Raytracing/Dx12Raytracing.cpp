@@ -9,7 +9,10 @@
 #include "dxhelper.h"
 #include "DxPrintUtils.h"
 
+using namespace DirectX;
+
 static std::wstring s_hitgroup_1 = L"Hitgroup_1";
+
 
 //@note size must match Ray payload
 struct RayPayload
@@ -97,8 +100,13 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	bottomLevelBuildDesc.ScratchAccelerationStructureData = m_blasScratchBuffer->GetGPUVirtualAddress();
 	m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
+	ExecuteBuildAccelerationStructures();
+
+	DxCamera* pCamera = GetCamera();
+	const XMFLOAT4X4 pData = pCamera->GetDxrModelTransposeMatrix(0);
 	D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
-	instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
+	memcpy(instanceDesc.Transform, &pData, sizeof(instanceDesc.Transform));
+	//instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
 	instanceDesc.InstanceMask = 1;
 	instanceDesc.AccelerationStructure = m_blasResultBuffer->GetGPUVirtualAddress();
 
@@ -162,7 +170,7 @@ VOID Dx12Raytracing::CreateRtPSO()
 	D3D12_HIT_GROUP_DESC hitGroupDesc = {};
 	hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
 	hitGroupDesc.HitGroupExport = s_hitgroup_1.c_str();
-	hitGroupDesc.ClosestHitShaderImport = exports[2].ExportToRename;
+	hitGroupDesc.ClosestHitShaderImport = exports[2].Name;
 
 	
 	D3D12_STATE_SUBOBJECT hitGroup_1SubObject = {};
@@ -284,6 +292,15 @@ HRESULT Dx12Raytracing::RenderFrame()
 {
 	SetFrameInfo(m_uavOutputResource.Get(), UINT_MAX, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+	{
+		// REQUIRED
+		D3D12_RESOURCE_BARRIER uavBarrier = {};
+		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		uavBarrier.UAV.pResource = m_uavOutputResource.Get();
+		m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+	}
+
+
 	D3D12_DISPATCH_RAYS_DESC dispatchRaysDesc = {};
 	dispatchRaysDesc.Width = GetWidth();
 	dispatchRaysDesc.Height = GetHeight();
@@ -298,10 +315,21 @@ HRESULT Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
+	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetCameraBuffer());
 	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppSrvGpuHandle(0));
 	m_dxrCommandList->SetComputeRootShaderResourceView(2, m_tlasResultBuffer->GetGPUVirtualAddress());
 
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);
+
+	{
+		// REQUIRED
+		D3D12_RESOURCE_BARRIER uavBarrier = {};
+		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+		uavBarrier.UAV.pResource = m_uavOutputResource.Get();
+
+		m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+	}
+
 	return S_OK;
 }
 
