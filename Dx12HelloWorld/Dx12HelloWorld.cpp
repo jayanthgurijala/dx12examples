@@ -6,6 +6,7 @@
 #include "framework.h"
 #include <d3dx12.h>
 #include "dxhelper.h"
+#include <imgui.h>
 
 Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 	Dx12SampleBase(width, height)
@@ -29,6 +30,8 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 
 HRESULT Dx12HelloWorld::RenderFrame()
 {
+	ImGui::Text("Hello World");
+
 	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);

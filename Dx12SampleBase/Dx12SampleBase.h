@@ -139,14 +139,31 @@ protected:
 		return 2;
 	}
 
+	inline ID3D12Resource* GetModelIndexBufferResource()
+	{
+		return m_modelIbBuffer.Get();
+	}
+
+	inline ID3D12Resource* GetModelMainTextureUVBufferResource()
+	{
+		return m_modelVbBuffers[2].Get();
+	}
+
 	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT index)
 	{
 		return m_modelIbv;
 	}
 
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelVertexBufferView(UINT index)
+
+	///@todo Assumptions, POSITION, NORMAL, TEXCOORD0, TEXCOORD1 etc as per semantic order in gltfloader
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView()
 	{
 		return m_modelVbvs[0];
+	}
+
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelMainTextureUVBufferView()
+	{
+		return m_modelVbvs[2];
 	}
 
 	inline DxDrawPrimitive& GetDrawInfo(UINT index)
@@ -185,6 +202,7 @@ protected:
 
 	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
+	VOID CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize);
 
 	VOID AddTransformInfo(const DxNodeTransformInfo& transformInfo);
 

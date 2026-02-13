@@ -1,10 +1,14 @@
 #include "Raytracing.hlsli"
 #include "CameraBuffer.hlsli"
 
-RaytracingAccelerationStructure Scene : register(t1, space0);
+Texture2D gTexture    : register(t0);
+SamplerState gSampler : register(s0);
+RaytracingAccelerationStructure Scene : register(t3, space0);
 RWTexture2D<float4> UAVOutput : register(u0, space0);
 
-typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+StructuredBuffer<uint> indexBuffer : register(t1, space0);
+StructuredBuffer<float2> uvVbBuffer  : register(t2, space0);
+
 
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
@@ -44,16 +48,52 @@ void MyRaygenShader()
     ray.TMin      = 0.001;
     ray.TMax      = 100;
     
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 0, 0, ray, payload);
+    TraceRay(Scene, 0, 0xFF, 0, 0, 0, ray, payload);
     
      // Write the raytraced color to the output texture.
     UAVOutput[DispatchRaysIndex().xy] = payload.color;
 }
 
 [shader("closesthit")]
-void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
+void MyClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    payload.color = float4(0.8f, 0.8f, 0.8f, 1.0f);
+    uint primitiveIndexInGeom = PrimitiveIndex();
+    uint numIndicesPacked = 2;
+    uint numIndicesPerTri = 3;
+    uint numBytesPerIndexStrctBuffer = 4;
+    uint byteOffset = primitiveIndexInGeom * numIndicesPerTri * numIndicesPacked;
+    
+    //index buffer is structuredbuffer<uint> but each index is only 16 bits
+    //prim 0(0) needs to access [0] and [1]
+    //prim 1(6) needs to access [1] and [2]
+    //prim 2(12) needs to access [3] and [4]
+    
+    uint firstIndexToRead = byteOffset / numBytesPerIndexStrctBuffer;
+    uint triIndexStart = primitiveIndexInGeom * numIndicesPerTri;
+    
+    uint3 indices;
+    if (triIndexStart % 2 == 0)
+    {
+        indices.x = indexBuffer[firstIndexToRead] & 0x0000FFFF;
+        indices.y = ((indexBuffer[firstIndexToRead] & 0xFFFF0000) >> 16);
+        indices.z = indexBuffer[firstIndexToRead + 1] & 0x0000FFFF;
+    }
+    else
+    {
+        indices.x = ((indexBuffer[firstIndexToRead] & 0xFFFF000) >> 16);
+        indices.y = indexBuffer[firstIndexToRead + 1] & 0x0000FFFF;
+        indices.z = ((indexBuffer[firstIndexToRead + 1] & 0xFFFF0000) >> 16);
+    }
+    float2 uv0 = uvVbBuffer[indices.x];
+    float2 uv1 = uvVbBuffer[indices.y];
+    float2 uv2 = uvVbBuffer[indices.z];
+    
+    float b0 = (1 - attr.barycentrics.x - attr.barycentrics.y);
+    float b1 = attr.barycentrics.x;
+    float b2 = attr.barycentrics.y;
+    
+    float2 uvInterpolated =b1 * uv1 + b2 * uv2 + b0 * uv0;
+    payload.color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
 }
 
 [shader("miss")]

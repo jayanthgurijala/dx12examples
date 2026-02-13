@@ -15,7 +15,7 @@ public:
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp()         override { return 1; }
-	virtual inline UINT NumSRVsNeededForApp()         override { return 1; }
+	virtual inline UINT NumSRVsNeededForApp()         override { return 3; } //srv tex + vbsrv + ibsrv
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }

@@ -488,6 +488,32 @@ VOID Dx12SampleBase::CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resou
 	m_pDevice->CreateUnorderedAccessView(uavResource, nullptr, nullptr, uavHandle);
 }
 
+VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize)
+{
+	const UINT appSrvStartIndex = NumRTVsNeededForApp();
+	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	if (elementSize == 0)
+	{
+		srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+		srvDesc.Buffer.StructureByteStride = 0;
+	}
+	else
+	{
+		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+		srvDesc.Buffer.StructureByteStride = elementSize;
+	}
+	
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Buffer.NumElements = numElements;
+	
+	m_pDevice->CreateShaderResourceView(srvResource, &srvDesc, srvHandle);
+}
+
 //VOID Dx12SampleBase::Create
 
 ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
@@ -793,7 +819,16 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-	ImGui::Begin("Dx12Sample");
+	ImGui::Begin("fps");
+
+	static float values[1000] = {};
+	static int values_offset = 0;
+
+	values[values_offset] = ImGui::GetIO().Framerate;
+	values_offset = (values_offset + 1) % IM_ARRAYSIZE(values);
+
+	ImGui::PlotLines("FPS", values, IM_ARRAYSIZE(values));
+	ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
 
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
 	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
@@ -805,9 +840,9 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	result = RenderFrame();
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
-	ImGui::End();
-
 	assert(m_appFrameInfo.type != DxFrameInvalid);
+
+	ImGui::End();
 	RenderRtvContentsOnScreen();
 
 	return result;
@@ -984,14 +1019,33 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 	assert(vbv.BufferLocation != 0);
 	pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
 
+	static INT numTrianglesToDraw = m_modelDrawPrimitive.numIndices / 3;
+	const INT maxTriangles = numTrianglesToDraw;
+
+	ImGui::Text("Num Triangles");
+	ImGui::SameLine();
+
+	if (ImGui::Button("-"))
+		numTrianglesToDraw -= 1;
+
+	ImGui::SameLine();
+
+	ImGui::SetNextItemWidth(80);
+	ImGui::InputInt("##tess", &numTrianglesToDraw, 0, maxTriangles);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("+"))
+		numTrianglesToDraw += 1;
+
 	if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
 	{
 		pCmdList->IASetIndexBuffer(&m_modelIbv);
-		pCmdList->DrawIndexedInstanced(m_modelDrawPrimitive.numIndices, 1, 0, 0, 0);
+		pCmdList->DrawIndexedInstanced(numTrianglesToDraw * 3, 1, 0, 0, 0);
 	}
 	else
 	{
-		pCmdList->DrawInstanced(m_modelDrawPrimitive.numVertices, 1, 0, 0);
+		pCmdList->DrawInstanced(numTrianglesToDraw * 3, 1, 0, 0);
 	}
 }
 

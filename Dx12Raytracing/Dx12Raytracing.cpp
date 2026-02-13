@@ -8,6 +8,7 @@
 #include <d3dx12.h>
 #include "dxhelper.h"
 #include "DxPrintUtils.h"
+#include <imgui.h>
 
 using namespace DirectX;
 
@@ -60,13 +61,13 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	const D3D12_RESOURCE_STATES scratchState = D3D12_RESOURCE_STATE_COMMON;
 
 	const D3D12_INDEX_BUFFER_VIEW indexBufferView   = GetModelIndexBufferView(0);
-	const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelVertexBufferView(0);
+	const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView();
 	const DxDrawPrimitive         drawInfo          = GetDrawInfo(0);
 
 	D3D12_RAYTRACING_GEOMETRY_DESC geomDesc = {};
 	geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 	geomDesc.Triangles.IndexBuffer = drawInfo.isIndexedDraw ? indexBufferView.BufferLocation : 0;
-	geomDesc.Triangles.IndexCount  = drawInfo.isIndexedDraw ? drawInfo.numIndices : 0;
+	geomDesc.Triangles.IndexCount = drawInfo.isIndexedDraw ? drawInfo.numIndices : 0;
 	geomDesc.Triangles.IndexFormat = drawInfo.isIndexedDraw ? indexBufferView.Format : DXGI_FORMAT_UNKNOWN;
 
 	geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
@@ -135,17 +136,20 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 VOID Dx12Raytracing::CreateRtPSO()
 {
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
 	dxhelper::DxCreateRootSignature
 	(
 		m_dxrDevice.Get(),
+
+		//camera buffer, texture stv, output uav, AS, vertex buffer, index buffer
 		&m_rootSignature,
 		{
 			0_rcbv,
-			"srv_1_0,uav_1_0,cbv_0_0"_dt,
-			1_rsrv
+			"srv_3_0,uav_1_0,cbv_0_0"_dt,
+			3_rsrv
 		},
-		{}
+		{staticSampler}
 	);
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
@@ -290,14 +294,33 @@ HRESULT Dx12Raytracing::CreatePipelineStateFromModel()
 
 HRESULT Dx12Raytracing::RenderFrame()
 {
+	static BOOL vbIbTransitioned = FALSE;
+	auto indexBufferRes = GetModelIndexBufferResource();
+	auto indexBufferView = GetModelIndexBufferView(0);
+
+	auto uvVbBufferRes  = GetModelMainTextureUVBufferResource();
+	auto uvVbView       = GetModelMainTextureUVBufferView();
+
+	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
+	CreateAppBufferSrvDescriptorAtIndex(2, uvVbBufferRes, uvVbView.SizeInBytes / 4, 4);
+
+	ImGui::Text("Ray Tracing");
+
 	SetFrameInfo(m_uavOutputResource.Get(), UINT_MAX, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
+	//if (vbIbTransitioned == FALSE)
 	{
-		// REQUIRED
-		D3D12_RESOURCE_BARRIER uavBarrier = {};
-		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		uavBarrier.UAV.pResource = m_uavOutputResource.Get();
-		m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+		CD3DX12_RESOURCE_BARRIER resourceBarrier[3];
+		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(indexBufferRes,
+			                                                        D3D12_RESOURCE_STATE_INDEX_BUFFER,
+			                                                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		resourceBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(uvVbBufferRes,
+																	D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+																	D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		resourceBarrier[2] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
+
+		vbIbTransitioned = TRUE;
+		m_dxrCommandList->ResourceBarrier(3, resourceBarrier);
 	}
 
 
@@ -322,44 +345,22 @@ HRESULT Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);
 
 	{
-		// REQUIRED
-		D3D12_RESOURCE_BARRIER uavBarrier = {};
-		uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-		uavBarrier.UAV.pResource = m_uavOutputResource.Get();
+		CD3DX12_RESOURCE_BARRIER resourceBarrier[3];
+		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(indexBufferRes,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+			D3D12_RESOURCE_STATE_INDEX_BUFFER
+			);
+		resourceBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(uvVbBufferRes,
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+			);
+		resourceBarrier[2] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
 
-		m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
+		vbIbTransitioned = TRUE;
+		m_dxrCommandList->ResourceBarrier(3, resourceBarrier);
 	}
 
 	return S_OK;
 }
-
-/*HRESULT Dx12Raytracing::RenderFrame()
-{
-	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
-
-	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f };
-
-	pCmdList->OMSetRenderTargets(1,
-		&rtvHandle,
-		FALSE,                   //RTsSingleHandleToDescriptorRange
-		&dsvHandle);
-
-	pCmdList->ClearRenderTargetView(rtvHandle,
-		clearColor,
-		0,
-		nullptr);
-
-	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	RenderModel(pCmdList);
-
-	RenderRtvContentsOnScreen(0);
-
-	return S_OK;
-}*/
-
 
 DX_ENTRY_POINT(Dx12Raytracing);
