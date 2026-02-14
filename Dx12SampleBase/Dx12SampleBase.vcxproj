@@ -295,11 +295,21 @@
   <CompiledShaders Include="$(ProjectDir)..\Shaders\*.pdb" />
   <CompiledShaders Include="$(ProjectDir)..\Shaders\*.hlsl" />
 </ItemGroup>
+<ItemGroup>
+  <GltfFiles Include="$(ProjectDir)..\Models\*.gltf" />
+</ItemGroup>
 <Target Name="CopyCompiledShaders" AfterTargets="Build">
 <MakeDir Directories="$(OutDir)CompiledShaders" />
   <Copy 
     SourceFiles="@(CompiledShaders)" 
     DestinationFolder="$(OutDir)CompiledShaders\" 
+    SkipUnchangedFiles="true" />
+</Target>
+<Target Name="Copy Gltf Models" AfterTargets="Build">
+<MakeDir Directories="$(OutDir)Models" />
+  <Copy 
+    SourceFiles="@(GltfFiles)" 
+    DestinationFolder="$(OutDir)Models\" 
     SkipUnchangedFiles="true" />
 </Target>
 
