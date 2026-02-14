@@ -17,13 +17,14 @@ public:
 	FileReader();
 	static void GetExecutablePath(_Out_writes_(pathSize) CHAR* path, UINT pathSize);
 
-	std::string GetFullAssetFilePath(const std::string& assetName);
+	std::string GetFullModelFilePath(const std::string& assetName);
+	std::string GetFullCompiledShaderFilePath(const std::string& assetName);
 	ComPtr<ID3DBlob> LoadShaderBlobFromAssets(std::string compiledShaderName);
 
 protected:
 
 private:
-	std::string m_assetsPath;
+	std::string m_exePath;
 
 };
 

@@ -141,7 +141,7 @@ protected:
 	inline ComPtr<ID3DBlob> GetCompiledShaderBlob(const std::string& shaderName)
 	{
 		ComPtr<ID3DBlob> shaderBlob;
-		std::string compiledVertexShaderPath = m_assetReader->GetFullAssetFilePath(shaderName);
+		std::string compiledVertexShaderPath = m_assetReader->GetFullCompiledShaderFilePath(shaderName);
 		shaderBlob = m_assetReader->LoadShaderBlobFromAssets(compiledVertexShaderPath);
 		return shaderBlob;
 	}

@@ -36,12 +36,17 @@ FileReader::FileReader()
 {
 	CHAR executableFilePath[MaxPathSize];
 	FileReader::GetExecutablePath(executableFilePath, MaxPathSize);
-	m_assetsPath = executableFilePath;
+	m_exePath = executableFilePath;
 }
 
-std::string FileReader::GetFullAssetFilePath(const std::string& assetName)
+std::string FileReader::GetFullModelFilePath(const std::string& assetName)
 {
-	return m_assetsPath + assetName;
+	return m_exePath + "Models\\" + assetName;
+}
+
+std::string FileReader::GetFullCompiledShaderFilePath(const std::string& assetName)
+{
+	return m_exePath + "CompiledShaders\\" + assetName;
 }
 
 /*

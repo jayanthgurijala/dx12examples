@@ -1152,7 +1152,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 {
 	HRESULT result = S_OK;
 	const std::string gltfFileName = GltfFileName();
-	std::string modelPath = m_assetReader->GetFullAssetFilePath(gltfFileName);
+	std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileName);
 	m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 	m_gltfLoader->LoadModel();
 
