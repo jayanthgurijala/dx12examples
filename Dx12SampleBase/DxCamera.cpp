@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #include "pch.h"
 #include "DxCamera.h"
 #include "DxPrintUtils.h"
@@ -181,6 +185,7 @@ XMFLOAT4X4 DxCamera::GetViewProjectionInverse()
 	//PrintUtils::PrintXMMatrix("Check", chackMatrix);
 	return GetDataFromMatrix(XMMatrixTranspose(vpInverse));
 }
+
 
 
 

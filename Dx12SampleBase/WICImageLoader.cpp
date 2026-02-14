@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #include "pch.h"
 #include "WICImageLoader.h"
 #include <wincodec.h>
@@ -58,3 +62,4 @@ namespace WICImageLoader
 		return outputResource;
 	}
 }
+

@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #pragma once
 
 #include <string.h>
@@ -13,5 +17,6 @@ namespace PrintUtils
 	void PrintString(LPCSTR stringMessage);
 	void PrintBufferAddressRange(ID3D12Resource* pResource);
 }
+
 
 

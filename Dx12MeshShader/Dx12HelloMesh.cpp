@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 // Dx12HelloWorld.cpp : Defines the entry point for the application.
 //
 
@@ -129,6 +133,7 @@ HRESULT Dx12HelloMesh::RenderFrame()
 }
 
 DX_ENTRY_POINT(Dx12HelloMesh);
+
 
 
 

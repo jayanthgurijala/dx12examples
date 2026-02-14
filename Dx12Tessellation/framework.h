@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 // header.h : include file for standard system include files,
 // or project specific include files
 //
@@ -13,3 +17,4 @@
 #include <malloc.h>
 #include <memory.h>
 #include <tchar.h>
+

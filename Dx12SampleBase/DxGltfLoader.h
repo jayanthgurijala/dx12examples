@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #pragma once
 
 #include <string>
@@ -65,4 +69,5 @@ private:
 
 	DxGltfStatus              m_loadStatus;
 };
+
 

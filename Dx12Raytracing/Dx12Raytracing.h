@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #pragma once
 
 #include "resource.h"
@@ -49,4 +53,5 @@ private:
 	ComPtr<ID3D12Resource> m_uavOutputResource;
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 };
+
 

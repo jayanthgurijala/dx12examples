@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #pragma once
 
 #include "dxtypes.h"
@@ -50,4 +54,5 @@ private:
 	XMMATRIX m_projectionMatrix;
 	XMVECTOR m_cameraPosition;
 };
+
 

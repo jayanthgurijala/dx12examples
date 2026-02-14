@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #include "pch.h"
 #include "FileReader.h"
 #include <stdexcept>
@@ -71,5 +75,6 @@ ComPtr<ID3DBlob> FileReader::LoadShaderBlobFromAssets(std::string compiledShader
 	return shaderBlob;
 
 }
+
 
 

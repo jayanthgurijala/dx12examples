@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #include "pch.h"   // MUST be first
 #include "gltfutils.h"
 #include "tiny_gltf.h"
@@ -80,3 +84,4 @@ namespace GltfUtils
 	}
 
 }
+

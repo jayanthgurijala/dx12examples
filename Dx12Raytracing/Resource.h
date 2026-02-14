@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
 // Used by Dx12HelloWorld.rc
@@ -28,3 +32,4 @@
 #define _APS_NEXT_SYMED_VALUE		110
 #endif
 #endif
+

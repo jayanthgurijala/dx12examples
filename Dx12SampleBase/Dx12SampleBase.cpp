@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #include "pch.h"
 #include "Dx12SampleBase.h"
 #include "tiny_gltf.h"
@@ -1289,4 +1293,5 @@ VOID Dx12SampleBase::StartBuildingAccelerationStructures()
 {
 	//m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 }
+
 

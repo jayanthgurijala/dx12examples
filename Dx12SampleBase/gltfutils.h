@@ -1,3 +1,7 @@
+﻿/*
+* Copyright (C) 2026 by Jayanth Gurijala
+* This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
+*/
 #pragma once
 
 #include <d3d12.h>
@@ -14,3 +18,4 @@ namespace GltfUtils
 	//e.g "VEC3" has 3 components
 	UINT GetNumComponentsInType(UINT type);
 }
+
