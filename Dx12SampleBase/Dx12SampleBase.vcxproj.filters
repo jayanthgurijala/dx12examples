@@ -46,6 +46,9 @@
     <Filter Include="Shaders\RayTracing\hlsli">
       <UniqueIdentifier>{597118c7-8e3e-411d-8d08-ea2d47dc8b3b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\MeshShaders">
+      <UniqueIdentifier>{4a742d89-e37a-40b1-8bdf-c6d00fef25f0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -178,6 +181,9 @@
     </None>
     <None Include="..\Shaders\RaytraceSimpleCHS.hlsl">
       <Filter>Shaders\RayTracing</Filter>
+    </None>
+    <None Include="..\Shaders\HelloMesh.hlsl">
+      <Filter>Shaders\MeshShaders</Filter>
     </None>
   </ItemGroup>
 </Project>

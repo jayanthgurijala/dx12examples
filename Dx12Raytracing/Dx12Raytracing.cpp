@@ -289,7 +289,7 @@ VOID Dx12Raytracing::CreateUAVOutput()
 
 HRESULT Dx12Raytracing::CreatePipelineStateFromModel()
 {
-	return E_NOTIMPL;
+	return S_OK;
 }
 
 HRESULT Dx12Raytracing::RenderFrame()
@@ -297,11 +297,12 @@ HRESULT Dx12Raytracing::RenderFrame()
 	static BOOL vbIbTransitioned = FALSE;
 	auto indexBufferRes = GetModelIndexBufferResource();
 	auto indexBufferView = GetModelIndexBufferView(0);
+	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
 
 	auto uvVbBufferRes  = GetModelMainTextureUVBufferResource();
 	auto uvVbView       = GetModelMainTextureUVBufferView();
 
-	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
+
 	CreateAppBufferSrvDescriptorAtIndex(2, uvVbBufferRes, uvVbView.SizeInBytes / 4, 4);
 
 	ImGui::Text("Ray Tracing");

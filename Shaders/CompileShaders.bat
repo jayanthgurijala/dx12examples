@@ -23,6 +23,9 @@ dxc -T ps_6_0 -E PSMain -Fo TessFactor_PS.cso TessFactor.hlsl
 
 dxc /T lib_6_6 /Fo RaytraceSimpleCHS.cso -Zi -Od -Qembed_debug -Fd RaytraceSimpleCHS.pdb RaytraceSimpleCHS.hlsl
 
+dxc /T ms_6_6 -E MSMain -Fo HelloMesh_MS.cso -Zi -Od -Qembed_debug -Fd HelloMesh_MS.pdb HelloMesh.hlsl
+dxc /T ps_6_6 -E PSMain -Fo HelloMesh_PS.cso -Zi -Od -Qembed_debug -Fd HelloMesh_PS.pdb HelloMesh.hlsl
+
 copy *.cso ..\x64\Debug\
 copy *.hlsl ..\x64\Debug\
 copy *.cso ..\x64\Debug\

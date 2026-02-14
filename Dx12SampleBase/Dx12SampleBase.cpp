@@ -1022,22 +1022,6 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 	static INT numTrianglesToDraw = m_modelDrawPrimitive.numIndices / 3;
 	const INT maxTriangles = numTrianglesToDraw;
 
-	ImGui::Text("Num Triangles");
-	ImGui::SameLine();
-
-	if (ImGui::Button("-"))
-		numTrianglesToDraw -= 1;
-
-	ImGui::SameLine();
-
-	ImGui::SetNextItemWidth(80);
-	ImGui::InputInt("##tess", &numTrianglesToDraw, 0, maxTriangles);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("+"))
-		numTrianglesToDraw += 1;
-
 	if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
 	{
 		pCmdList->IASetIndexBuffer(&m_modelIbv);

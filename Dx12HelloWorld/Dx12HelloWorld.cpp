@@ -3,7 +3,6 @@
 
 #include "Dx12HelloWorld.h"
 #include "ExampleEntryPoint.h"
-#include "framework.h"
 #include <d3dx12.h>
 #include "dxhelper.h"
 #include <imgui.h>

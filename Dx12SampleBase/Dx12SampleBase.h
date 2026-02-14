@@ -161,6 +161,11 @@ protected:
 		return m_modelVbvs[0];
 	}
 
+	inline ID3D12Resource* GetModelPositionVertexBufferResource()
+	{
+		return m_modelVbBuffers[0].Get();
+	}
+
 	inline D3D12_VERTEX_BUFFER_VIEW& GetModelMainTextureUVBufferView()
 	{
 		return m_modelVbvs[2];
