@@ -91,6 +91,9 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
+	assert(rtvHandle.ptr != 0);
+	assert(dsvHandle.ptr != 0);
+
 	auto indexBufferRes = GetModelIndexBufferResource();
 	auto indexBufferView = GetModelIndexBufferView(0);
 	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);

@@ -77,6 +77,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow)
 {
 	SetupWindow(hInstance, nCmdShow);
+	Initialize();
 	OnInit();
 	int retval = RenderLoop();
 	PostRun();
@@ -423,12 +424,8 @@ HRESULT Dx12SampleBase::CreateDsvResources(UINT numResources, BOOL createViews)
 	return result;
 }
 
-/*
-* Creates render target resources and their shader resource views.
-* Using this function, the app can create offscreen render targets to render into.
-* SRVs is needed to compose the final image on the swapchain backbuffer.
-*/
-HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
+
+HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
 {
 	HRESULT result = S_OK;
 
@@ -447,7 +444,7 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 
 	for (UINT i = 0; i < numResources; i++)
 	{
-		auto srvHandle = GetSrvUavCBvCpuHeapHandle(i);
+		
 		dxhelper::AllocateTexture2DResource(m_pDevice.Get(),
 			                                &m_rtvResources[i],
 			                                m_width,
@@ -457,13 +454,20 @@ HRESULT Dx12SampleBase::CreateRenderTargetResourceAndSRVs(UINT numResources)
 			                                D3D12_RESOURCE_STATE_RENDER_TARGET,
 			                                &clearValue,
 			                                D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-
-		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
-						                    nullptr,
-						                    srvHandle);
 	}
 
 	return result;
+}
+
+VOID Dx12SampleBase::CreateRenderTargetSRVs(UINT numSrvs)
+{
+	for (UINT i = 0; i < numSrvs; i++)
+	{
+		auto srvHandle = GetSrvUavCBvCpuHeapHandle(i);
+		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
+			nullptr,
+			srvHandle);
+	}
 }
 
 /*
@@ -928,50 +932,18 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 }
 
 
-/*
-* Ordering is important. Most samples put all the code in one function.
-*
-* Concepts:
-* DxgiFactory represents OS interface to all graphics functionality
-* Using factory, enumerate all adapters and choose a DxgiAdapter e.g. WARP, Intel, Nvidia.
-* From dxgiAdapter, create a D3D12Device for a specific feature level.
-* Use the Device and Create CommandQueue.
-* Use Command Queue and Create swapchain and make the window association
-*/
-HRESULT Dx12SampleBase::OnInit()
+HRESULT Dx12SampleBase::Initialize()
 {
 	HRESULT result = S_OK;
 
-	result = CreateDevice();
-	result = CreateCommandQueues();
-	result = CreateCommandList();
-	result = CreateSwapChain();
-	result = CreateFence();
-	result = InitializeFrameComposition();
+	InitlializeDeviceCmdQueueAndCmdList();
+	InitializeRtvDsvDescHeaps();
+	InitializeSrvCbvUavDescHeaps();
+	LoadGltfFile();
 
-	///@todo refactor into a function
-	{
-		const UINT numRTVsForComposition = GetBackBufferCount();
-		const UINT numRTVsForApp = NumRTVsNeededForApp();
-		const UINT numSRVsForApp = NumSRVsNeededForApp();
-		const UINT numDSVsForApp = NumDSVsNeededForApp();
-		const UINT numUAVsForApp = NumUAVsNeededForApp();
-
-		///@todo sample base should setup descriptor heaps, RTVs and DSVs. App can override and return FALSE - yet to create this
-		CreateRenderTargetDescriptorHeap(numRTVsForComposition + numRTVsForApp);
-		CreateDepthStencilViewDescriptorHeap(numDSVsForApp);
-
-		//@note numRTVsForApp is for creating SRVs for the RTVs.
-		CreateSrvUavCbvDescriptorHeap(numRTVsForApp + numSRVsForApp + numUAVsForApp);
-		CreateRenderTargetViews(numRTVsForComposition, TRUE);
-
-		result = CreateRenderTargetResourceAndSRVs(numRTVsForApp);
-		result = CreateRenderTargetViews(numRTVsForApp, FALSE);
-		result = CreateDsvResources(numDSVsForApp);
-	}
 
 	{
-		LoadGltfFile();
+
 		CreatePipelineStateFromModel();
 	}
 
@@ -1009,6 +981,43 @@ HRESULT Dx12SampleBase::OnInit()
 	}
 
 	return result;
+}
+
+VOID Dx12SampleBase::InitlializeDeviceCmdQueueAndCmdList()
+{
+	CreateDevice();
+	CreateCommandQueues();
+	CreateCommandList();
+	CreateSwapChain();
+	CreateFence();
+	InitializeFrameComposition();
+}
+
+VOID Dx12SampleBase::InitializeRtvDsvDescHeaps()
+{
+	const UINT numRTVsForComposition = GetBackBufferCount();
+	const UINT numRTVsForApp         = NumRTVsNeededForApp();
+
+	CreateRenderTargetResources(numRTVsForApp);
+	CreateRenderTargetDescriptorHeap(numRTVsForComposition + numRTVsForApp);
+
+	const UINT numDSVsForApp = NumDSVsNeededForApp();
+	CreateDepthStencilViewDescriptorHeap(numDSVsForApp);
+	CreateDsvResources(numDSVsForApp);
+
+
+	CreateRenderTargetViews(numRTVsForComposition, TRUE);
+	CreateRenderTargetViews(numRTVsForApp, FALSE);
+}
+
+VOID Dx12SampleBase::InitializeSrvCbvUavDescHeaps()
+{
+	const UINT numSRVsForApp = NumSRVsNeededForApp();
+	const UINT numUAVsForApp = NumUAVsNeededForApp();
+	const UINT numRTVsForApp = NumRTVsNeededForApp();
+	//@note numRTVsForApp is for creating SRVs for the RTVs.
+	CreateSrvUavCbvDescriptorHeap(numRTVsForApp + numSRVsForApp + numUAVsForApp);
+	CreateRenderTargetSRVs(numRTVsForApp);
 }
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)

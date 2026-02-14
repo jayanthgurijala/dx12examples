@@ -21,7 +21,13 @@ class Dx12SampleBase
 public:
 	Dx12SampleBase(UINT width, UINT height);
 	~Dx12SampleBase();
-	virtual HRESULT OnInit();
+	HRESULT Initialize();
+	VOID InitlializeDeviceCmdQueueAndCmdList();
+	VOID InitializeRtvDsvDescHeaps();
+	VOID InitializeSrvCbvUavDescHeaps();
+
+	virtual HRESULT OnInit() { return S_OK; };
+
 	HRESULT NextFrame(FLOAT frameDeltaTime);
 	virtual HRESULT RenderFrame() { return S_OK; };
 	virtual HRESULT PostRun() { return S_OK; };
@@ -41,7 +47,8 @@ protected:
 	DxMeshState m_meshState;
 	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
-	HRESULT CreateRenderTargetResourceAndSRVs(UINT numResources);
+	HRESULT CreateRenderTargetResources(UINT numResources);
+	VOID CreateRenderTargetSRVs(UINT numSrvs);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
 	HRESULT CreateDsvResources(UINT numResources, BOOL createViews = TRUE);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
