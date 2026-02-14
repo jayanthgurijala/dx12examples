@@ -21,7 +21,7 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
 	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
 
-	virtual HRESULT CreatePipelineStateFromModel() override;
+	virtual HRESULT OnInit() override;
 
 	virtual inline UINT NumRootConstantsForApp() override { return 1; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }

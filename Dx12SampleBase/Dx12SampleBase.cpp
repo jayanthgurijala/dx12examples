@@ -939,46 +939,8 @@ HRESULT Dx12SampleBase::Initialize()
 	InitlializeDeviceCmdQueueAndCmdList();
 	InitializeRtvDsvDescHeaps();
 	InitializeSrvCbvUavDescHeaps();
+	InitializeImgui();
 	LoadGltfFile();
-
-
-	{
-
-		CreatePipelineStateFromModel();
-	}
-
-	///@todo seperate it out
-	{
-		Imgui_CreateDescriptorHeap();
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-
-		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   // optional
-		//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;       // optional
-		ImGui::StyleColorsDark();
-		ImGui_ImplWin32_Init(m_hwnd);
-
-		ImGui_ImplDX12_InitInfo init_info = {};
-		init_info.Device = m_pDevice.Get();
-		init_info.NumFramesInFlight = GetBackBufferCount(); // usually 2 or 3
-		init_info.RTVFormat = GetBackBufferFormat();  // your swapchain format
-
-		///@todo avoid legacy path
-		init_info.SrvDescriptorHeap = m_imguiDescHeap.Get();
-		init_info.LegacySingleSrvCpuDescriptor = m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart();
-		init_info.LegacySingleSrvGpuDescriptor = m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart();
-
-
-		init_info.CommandQueue = m_pCmdQueue.Get();
-
-		// Optional: provide allocation callbacks
-		init_info.SrvDescriptorAllocFn = nullptr; // simple sample
-		init_info.SrvDescriptorFreeFn = nullptr;
-
-		ImGui_ImplDX12_Init(&init_info);
-
-	}
 
 	return result;
 }
@@ -1020,6 +982,38 @@ VOID Dx12SampleBase::InitializeSrvCbvUavDescHeaps()
 	CreateRenderTargetSRVs(numRTVsForApp);
 }
 
+VOID Dx12SampleBase::InitializeImgui()
+{
+	Imgui_CreateDescriptorHeap();
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO();
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   // optional
+	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;       // optional
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(m_hwnd);
+
+	ImGui_ImplDX12_InitInfo init_info = {};
+	init_info.Device = m_pDevice.Get();
+	init_info.NumFramesInFlight = GetBackBufferCount(); // usually 2 or 3
+	init_info.RTVFormat = GetBackBufferFormat();  // your swapchain format
+
+	///@todo avoid legacy path
+	init_info.SrvDescriptorHeap = m_imguiDescHeap.Get();
+	init_info.LegacySingleSrvCpuDescriptor = m_imguiDescHeap->GetCPUDescriptorHandleForHeapStart();
+	init_info.LegacySingleSrvGpuDescriptor = m_imguiDescHeap->GetGPUDescriptorHandleForHeapStart();
+
+
+	init_info.CommandQueue = m_pCmdQueue.Get();
+
+	// Optional: provide allocation callbacks
+	init_info.SrvDescriptorAllocFn = nullptr; // simple sample
+	init_info.SrvDescriptorFreeFn = nullptr;
+
+	ImGui_ImplDX12_Init(&init_info);
+}
+
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 {
 	const SIZE_T numVertexBufferViews = m_modelVbvs.size();
@@ -1049,7 +1043,7 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 
 
 
-HRESULT Dx12SampleBase::CreatePipelineStateFromModel()
+HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 {
 	HRESULT result = S_OK;
 

@@ -291,11 +291,6 @@ VOID Dx12Raytracing::CreateUAVOutput()
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
-HRESULT Dx12Raytracing::CreatePipelineStateFromModel()
-{
-	return S_OK;
-}
-
 HRESULT Dx12Raytracing::RenderFrame()
 {
 	static BOOL vbIbTransitioned = FALSE;

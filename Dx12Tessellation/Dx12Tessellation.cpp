@@ -19,7 +19,7 @@ Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
 }
 
 
-HRESULT Dx12Tessellation::CreatePipelineStateFromModel()
+HRESULT Dx12Tessellation::OnInit()
 {
 	auto pDevice = GetDevice();
 

@@ -30,7 +30,6 @@ private:
 	VOID CreateRtPSO();
 	VOID BuildShaderTables();
 	VOID CreateUAVOutput();
-	virtual HRESULT CreatePipelineStateFromModel() override;
 
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;

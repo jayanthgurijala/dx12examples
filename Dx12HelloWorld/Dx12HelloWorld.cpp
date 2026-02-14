@@ -16,7 +16,7 @@ Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 {
 }
 
-HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
+HRESULT Dx12HelloWorld::OnInit()
 {
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 	dxhelper::DxCreateRootSignature(
@@ -27,7 +27,9 @@ HRESULT Dx12HelloWorld::CreatePipelineStateFromModel()
 			"srv_1_0,uav_0_0,cbv_0_0"_dt,
 		},
 		{ staticSampler });
-	Dx12SampleBase::CreatePipelineStateFromModel();
+
+	CreateVSPSPipelineStateFromModel();
+
 	return S_OK;
 }
 

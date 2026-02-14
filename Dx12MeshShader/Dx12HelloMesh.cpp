@@ -16,11 +16,6 @@ Dx12HelloMesh::Dx12HelloMesh(UINT width, UINT height) :
 {
 }
 
-HRESULT Dx12HelloMesh::CreatePipelineStateFromModel()
-{
-	return S_OK;
-}
-
 HRESULT Dx12HelloMesh::OnInit()
 {
 	Dx12SampleBase::OnInit();

@@ -25,6 +25,7 @@ public:
 	VOID InitlializeDeviceCmdQueueAndCmdList();
 	VOID InitializeRtvDsvDescHeaps();
 	VOID InitializeSrvCbvUavDescHeaps();
+	VOID InitializeImgui();
 
 	virtual HRESULT OnInit() { return S_OK; };
 
@@ -225,7 +226,7 @@ protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	HRESULT LoadGltfFile();
-	virtual HRESULT CreatePipelineStateFromModel();
+	HRESULT CreateVSPSPipelineStateFromModel();
 
 	VOID StartBuildingAccelerationStructures();
 	VOID ExecuteBuildAccelerationStructures();
