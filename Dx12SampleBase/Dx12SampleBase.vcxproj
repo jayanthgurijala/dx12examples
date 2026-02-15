@@ -19,6 +19,10 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+    <!-- Disable VS fast up-to-date check so MSBuild runs every build -->
+  <PropertyGroup>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -309,22 +313,26 @@
     <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.717.1-preview\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.717.1-preview\build\native\Microsoft.Direct3D.D3D12.props'))" />
     <Error Condition="!Exists('..\packages\Microsoft.Direct3D.D3D12.1.717.1-preview\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Direct3D.D3D12.1.717.1-preview\build\native\Microsoft.Direct3D.D3D12.targets'))" />
   </Target>
-  <Target Name="CompileShaders" BeforeTargets="ClCompile">
+  <Target Name="CompileShaders" BeforeTargets="Build">
+    <Exec Command="echo Compiling Shaders..." />
     <MakeDir Directories="$(OutDir)CompiledShaders;$(OutDir)Models" />
     <Exec Command="&quot;$(ProjectDir)..\Shaders\CompileShaders.bat&quot;" />
+	<Exec Command="echo Compiled Shaders" />
   </Target>
-  <Target Name="CopyCompiledShaders" AfterTargets="Build">
+  <Target Name="CopyCompiledShaders" BeforeTargets="Build" DependsOnTargets="CompileShaders">
     <ItemGroup>
       <CompiledShaders Include="$(ProjectDir)..\Shaders\*.cso" />
       <CompiledShaders Include="$(ProjectDir)..\Shaders\*.pdb" />
       <CompiledShaders Include="$(ProjectDir)..\Shaders\*.hlsl" />
     </ItemGroup>
+	<Exec Command="echo Copying Shaders..." />
     <Copy SourceFiles="@(CompiledShaders)" DestinationFolder="$(OutDir)CompiledShaders\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
   <ItemGroup>
     <GltfFiles Include="$(ProjectDir)..\Models\*.gltf" />
   </ItemGroup>
-  <Target Name="Copy Gltf Files" BeforeTargets="ClCompile">
+  <Target Name="Copy Gltf Files" BeforeTargets="Build">
+    <Exec Command="echo Copying gltf files..." />
     <Copy SourceFiles="@(GltfFiles)" DestinationFolder="$(OutDir)Models\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
 </Project>
