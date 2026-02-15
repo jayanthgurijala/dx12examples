@@ -1,6 +1,6 @@
 cd /d "%~dp0"
 
-del *.cso
+del *.cso *.pdb 2> nul
 
 dxc -T vs_6_0 -E VSMain -Fo FrameSimple_VS.cso -Zi -Od -Qembed_debug -Fd FrameSimple_VS.pdb FrameSimple.hlsl
 dxc -T ps_6_0 -E PSMain -Fo FrameSimple_PS.cso -Zi -Od -Qembed_debug -Fd FrameSimple_PS.pdb FrameSimple.hlsl
