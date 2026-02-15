@@ -296,13 +296,18 @@ HRESULT Dx12Raytracing::RenderFrame()
 	static BOOL vbIbTransitioned = FALSE;
 	auto indexBufferRes = GetModelIndexBufferResource();
 	auto indexBufferView = GetModelIndexBufferView(0);
-	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
+
+	const UINT ibElementSizeInBytes = 4;
+	const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
+	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, ibNumElements, ibElementSizeInBytes);
 
 	auto uvVbBufferRes  = GetModelMainTextureUVBufferResource();
 	auto uvVbView       = GetModelMainTextureUVBufferView();
 
 
-	CreateAppBufferSrvDescriptorAtIndex(2, uvVbBufferRes, uvVbView.SizeInBytes / 4, 4);
+	const UINT uvVbElementSizeInBytes = 4;
+	const UINT uvVbNumElements        = uvVbView.SizeInBytes / 4;
+	CreateAppBufferSrvDescriptorAtIndex(2, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
 
 	ImGui::Text("Ray Tracing");
 
