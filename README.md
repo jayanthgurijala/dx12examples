@@ -29,6 +29,11 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 ### 📺 Videos
 [Introduction](https://www.youtube.com/watch?v=xazLPw_QeAg)
 
+
+
+
+[RayTracing Deer Texturing Debugging](https://www.youtube.com/watch?v=E4kxmSjIjUs)
+
 ## 🛠 Requirements
 
 - Windows 10
