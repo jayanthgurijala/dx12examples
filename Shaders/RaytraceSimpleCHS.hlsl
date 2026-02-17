@@ -57,33 +57,37 @@ void MyRaygenShader()
 [shader("closesthit")]
 void MyClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
+    
+    
+    ///index buffer [1 0]
+    //              [3 2]
     uint primitiveIndexInGeom = PrimitiveIndex();
-    uint numIndicesPacked = 2;
-    uint numIndicesPerTri = 3;
-    uint numBytesPerIndexStrctBuffer = 4;
-    uint byteOffset = primitiveIndexInGeom * numIndicesPerTri * numIndicesPacked;
+    uint numIndicesPerPrim = 3;
+    uint numBytesPerIndex = 2;
+    uint byteOffsetIntoIndexBuffer = primitiveIndexInGeom * numIndicesPerPrim * numBytesPerIndex;
     
-    //index buffer is structuredbuffer<uint> but each index is only 16 bits
-    //prim 0(0) needs to access [0] and [1]
-    //prim 1(6) needs to access [1] and [2]
-    //prim 2(12) needs to access [3] and [4]
+    //16-bit buffer Index?
+    uint indexAccessedAs2Byte = byteOffsetIntoIndexBuffer / 2;
     
-    uint firstIndexToRead = byteOffset / numBytesPerIndexStrctBuffer;
-    uint triIndexStart = primitiveIndexInGeom * numIndicesPerTri;
+    //32-bit buffer?
+    uint indexAccessedAs4Byte = byteOffsetIntoIndexBuffer / 4;
+
     
     uint3 indices;
-    if (triIndexStart % 2 == 0)
+    if (indexAccessedAs2Byte % 2 == 0)
     {
-        indices.x = indexBuffer[firstIndexToRead] & 0x0000FFFF;
-        indices.y = ((indexBuffer[firstIndexToRead] & 0xFFFF0000) >> 16);
-        indices.z = indexBuffer[firstIndexToRead + 1] & 0x0000FFFF;
+        indices.x = indexBuffer[indexAccessedAs4Byte] & 0x0000FFFF;
+        indices.y = (indexBuffer[indexAccessedAs4Byte] >> 16) & 0x0000FFFF;
+        indices.z = indexBuffer[indexAccessedAs4Byte + 1] & 0x0000FFFF;
     }
     else
     {
-        indices.x = ((indexBuffer[firstIndexToRead] & 0xFFFF000) >> 16);
-        indices.y = indexBuffer[firstIndexToRead + 1] & 0x0000FFFF;
-        indices.z = ((indexBuffer[firstIndexToRead + 1] & 0xFFFF0000) >> 16);
+        indices.x = (indexBuffer[indexAccessedAs4Byte] >> 16) & 0x0000FFFF;
+        indices.y = indexBuffer[indexAccessedAs4Byte + 1] & 0x0000FFFF;
+        indices.z = (indexBuffer[indexAccessedAs4Byte + 1] >> 16) & 0x0000FFFF;
     }
+    
+   
     float2 uv0 = uvVbBuffer[indices.x];
     float2 uv1 = uvVbBuffer[indices.y];
     float2 uv2 = uvVbBuffer[indices.z];
