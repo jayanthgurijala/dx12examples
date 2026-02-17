@@ -26,6 +26,14 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 
 ---
 
+### 📺 Videos
+[Introduction](https://www.youtube.com/watch?v=xazLPw_QeAg)
+
+
+
+
+[RayTracing Deer Texturing Debugging](https://www.youtube.com/watch?v=E4kxmSjIjUs)
+
 ## 🛠 Requirements
 
 - Windows 10
@@ -51,7 +59,22 @@ git submodule update
 
 - **Dx12SampleBase** is a shared library and does not run on its own.  
 - To execute a sample, select **any of the other projects** as the **Startup Project** in Visual Studio.  
-- Choose your build configuration (`Debug` or `Release`) and press **F5** to run.  
+- Choose your build configuration (`Debug` or `Release`) and press **F5** to run.
+
+
+### Third-Party Libraries
+
+This project uses the following third-party libraries:
+
+- **Dear ImGui** – Immediate Mode GUI library  
+  https://github.com/ocornut/imgui  
+  License: MIT
+
+- **tinygltf** – glTF loader and parser  
+  https://github.com/syoyo/tinygltf  
+  License: MIT
+
+
 
 
 
