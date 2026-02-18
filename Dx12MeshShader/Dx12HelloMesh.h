@@ -17,7 +17,7 @@ public:
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
-	virtual inline UINT NumSRVsNeededForApp() override { return 3; }
+	virtual inline UINT NumSRVsNeededForApp() override { return 4; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
 	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }

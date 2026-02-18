@@ -1026,17 +1026,47 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 	assert(vbv.BufferLocation != 0);
 	pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
 
-	static INT numTrianglesToDraw = m_modelDrawPrimitive.numIndices / 3;
-	const INT maxTriangles = numTrianglesToDraw;
+	static UINT s_numTrianglesToDraw = m_modelDrawPrimitive.numIndices / 3;
+	static const UINT s_maxTriangles = s_numTrianglesToDraw;
+	static INT s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
+
+	ImGui::Text("Triangle Count");
+	ImGui::SameLine();
+
+	if (ImGui::Button("-##tricountminus"))
+		s_numTrianglesToDrawFromUser -= 1;
+
+	ImGui::SameLine();
+
+
+	ImGui::SetNextItemWidth(80);
+	ImGui::InputInt("##trianglecount", &s_numTrianglesToDrawFromUser, 0, 0);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("+##tricountplus"))
+		s_numTrianglesToDrawFromUser += 1;
+
+	ImGui::SameLine();
+
+
+	if (ImGui::Button("Max"))
+		s_numTrianglesToDrawFromUser = s_maxTriangles;
+
+	if (ImGui::Button("Zero"))
+		s_numTrianglesToDrawFromUser = 0;
+
+
+	s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;
 
 	if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
 	{
 		pCmdList->IASetIndexBuffer(&m_modelIbv);
-		pCmdList->DrawIndexedInstanced(numTrianglesToDraw * 3, 1, 0, 0, 0);
+		pCmdList->DrawIndexedInstanced(s_numTrianglesToDraw * 3, 1, 0, 0, 0);
 	}
 	else
 	{
-		pCmdList->DrawInstanced(numTrianglesToDraw * 3, 1, 0, 0);
+		pCmdList->DrawInstanced(s_numTrianglesToDraw * 3, 1, 0, 0);
 	}
 }
 

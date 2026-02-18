@@ -79,7 +79,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 	ImGui::Text("Tessellation");
 	ImGui::SameLine();
 
-	if (ImGui::Button("-"))
+	if (ImGui::Button("-##tessminus"))
 		m_tesstriTessLevel -= 0.1f;
 
 	ImGui::SameLine();
@@ -89,7 +89,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("+"))
+	if (ImGui::Button("+##tessplus"))
 		m_tesstriTessLevel += 0.1f;
 
 	// Clamp value

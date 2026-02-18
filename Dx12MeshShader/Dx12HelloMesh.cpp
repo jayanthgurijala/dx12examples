@@ -47,7 +47,7 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 		&m_pRootSignature,
 		{
 			0_rcbv,
-			"srv_3_0,uav_0_0,cbv_0_0"_dt,
+			"srv_4_0,uav_0_0,cbv_0_0"_dt,
 		},
 		{ staticSampler });
 
@@ -57,12 +57,11 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	psoDesc.pRootSignature = GetRootSignature();
 	psoDesc.AS = { nullptr, 0 }; // optional
 	psoDesc.MS = CD3DX12_SHADER_BYTECODE(meshShader.Get());
-	psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
 
+	psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	psoDesc.SampleMask = UINT_MAX;
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
 	psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -97,6 +96,13 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	auto vertexBufferView = GetModelPositionVertexBufferView();
 	CreateAppBufferSrvDescriptorAtIndex(2, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
 
+	auto uvVbBufferRes = GetModelMainTextureUVBufferResource();
+	auto uvVbView = GetModelMainTextureUVBufferView();
+
+	const UINT uvVbElementSizeInBytes = 4;
+	const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;
+	CreateAppBufferSrvDescriptorAtIndex(3, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+
 
 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f };
 
@@ -121,7 +127,7 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
 	m_meshCommandList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
 
-	m_meshCommandList->DispatchMesh(128, 1, 1);
+	m_meshCommandList->DispatchMesh(64, 1, 1);
 
 	//RenderModel(pCmdList);
 
