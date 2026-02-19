@@ -1185,21 +1185,10 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 	std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileName);
 	m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 	m_gltfLoader->LoadModel();
-
-	tinygltf::Model    model;
-	std::string        err;
-	std::string        warn;
-	tinygltf::TinyGLTF loader;
-	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, modelPath);
 	
 
 	if (result == S_OK)
 	{
-		const tinygltf::Scene& firstScene = model.scenes[0];
-		const UINT firstNode = firstScene.nodes[0];
-		const tinygltf::Node& firstNodeDesc = model.nodes[0];
-		const UINT firstMesh = firstNodeDesc.mesh;
-
 		DxNodeTransformInfo meshTransformInfo;
 		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, 0);
 		AddTransformInfo(meshTransformInfo);
@@ -1214,7 +1203,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 		for (int i = 0; i < numAttributes; i++)
 		{
-			const UINT64 offsetInBytesInBuffer = gltfMeshPrimInfo.vbInfo[i].byteOffsetInBytes;
+			const UINT64 offsetInBytesInBuffer = gltfMeshPrimInfo.vbInfo[i].bufferOffsetInBytes;
 			const UINT64 bufferSizeInBytes     = gltfMeshPrimInfo.vbInfo[i].bufferSizeInBytes;
 			const UINT   bufferIndex           = gltfMeshPrimInfo.vbInfo[i].bufferIndex;
 			const UINT   bufferStrideInBytes   = gltfMeshPrimInfo.vbInfo[i].bufferStrideInBytes;
@@ -1231,66 +1220,32 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 			m_modelIaSemantics[i] = gltfMeshPrimInfo.vbInfo[i].iaLayoutInfo;
 		}
 
-		m_modelDrawPrimitive = gltfMeshPrimInfo.drawInfo;
-
-		//load index buffers
+		
 		{
-			const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
-			const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
-			const int bufViewIdx = firstPrimitive.indices;
-			if (bufViewIdx != -1)
-			{
-				const tinygltf::Accessor& accessorDesc = model.accessors[bufViewIdx];
-				const int bufferViewIdx = accessorDesc.bufferView;
-				const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufferViewIdx];
-				const int bufferIdx = bufViewDesc.buffer;
-				const tinygltf::Buffer bufferDesc = model.buffers[bufferIdx];
+			const UINT64 bufferSizeInBytes = gltfMeshPrimInfo.ibInfo.bufferSizeInBytes;
+			BYTE* bufferData               = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.ibInfo.bufferIndex);
+			m_modelIbBuffer                = CreateBufferWithData(&bufferData[gltfMeshPrimInfo.ibInfo.bufferOffsetInBytes],
+										           bufferSizeInBytes,
+				                                   L"ModelIndexBuffer");
 
-				const size_t accessorByteOffset = accessorDesc.byteOffset;
-				const UINT bufferSizeInBytes = (UINT)bufViewDesc.byteLength;
-				const size_t bufferViewOffset = bufViewDesc.byteOffset;
-
-				const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
-
-
-				m_modelIbBuffer = CreateBufferWithData((void*)(bufferDesc.data.data() + byteOffsetIntoBuffer), bufferSizeInBytes, L"ModelIndexBuffer");
-				m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
-				m_modelIbv.Format = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
-				m_modelIbv.SizeInBytes = bufferSizeInBytes;
-				m_modelDrawPrimitive.isIndexedDraw = TRUE;
-				m_modelDrawPrimitive.numIndices = (UINT)accessorDesc.count;
-			}
-			else
-			{
-				m_modelDrawPrimitive.isIndexedDraw = FALSE;
-			}
+			m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
+			m_modelIbv.Format         = gltfMeshPrimInfo.ibInfo.indexFormat;
+			m_modelIbv.SizeInBytes    = bufferSizeInBytes;
 		}
 
-		//load materials
+		m_modelDrawPrimitive = gltfMeshPrimInfo.drawInfo;
+
+
+		if (gltfMeshPrimInfo.materialInfo.isMaterialDefined == TRUE)
 		{
-			const tinygltf::Mesh& firstMeshDesc = model.meshes[firstMesh];
-			const tinygltf::Primitive& firstPrimitive = firstMeshDesc.primitives[0];
-			const int materialIdx = firstPrimitive.material;
-			if (materialIdx != -1)
-			{
-				const tinygltf::Material& materialDesc = model.materials[materialIdx];
-				const tinygltf::PbrMetallicRoughness& pbrMaterialRoughness = materialDesc.pbrMetallicRoughness;
-				const tinygltf::TextureInfo& baseColorTex = pbrMaterialRoughness.baseColorTexture;
-				const int                             textureIdx = baseColorTex.index;
-				const tinygltf::Texture& baseTexInfo = model.textures[textureIdx];
-				const int                             baseTexSource = baseTexInfo.source;
-				const tinygltf::Image& baseTexImage = model.images[baseTexSource];
-				const int                             bufViewIdx = baseTexImage.bufferView;
-				const tinygltf::BufferView& bufViewDesc = model.bufferViews[bufViewIdx];
-				const tinygltf::Buffer& bufferDesc = model.buffers[bufViewDesc.buffer];
+			auto& gltfTextureInfo    = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
+			BYTE* bufferData         = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
+			UINT64 bufferSizeInBytes = gltfTextureInfo.bufferSizeInBytes;
+			UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;
 
-				assert(bufViewDesc.byteStride == 0);
-
-				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferDesc.data[bufViewDesc.byteOffset], bufViewDesc.byteLength);
-				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
-				CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
-			}
-
+			ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferData[bufferOffsetInBytes], bufferSizeInBytes);
+			m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
+			CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
 		}
 	}
 

@@ -61,6 +61,21 @@ private:
 		return m_model.bufferViews[index];
 	}
 
+	inline tinygltf::Material& GetMaterial(UINT index)
+	{
+		return m_model.materials[index];
+	}
+
+	inline tinygltf::Texture& GetTexture(UINT index)
+	{
+		return m_model.textures[index];
+	}
+
+	inline tinygltf::Image& GetImage(UINT index)
+	{
+		return m_model.images[index];
+	}
+
 	std::vector<std::string> m_supportedAttributes;
 	std::string m_modelPath;
 

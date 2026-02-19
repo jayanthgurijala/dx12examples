@@ -77,18 +77,77 @@ struct DxAppFrameInfo
 
 struct DxGltfBuffer
 {
-	DxIASemantic iaLayoutInfo;
 	UINT         bufferIndex;
-	UINT64       byteOffsetInBytes;
+	UINT64       bufferOffsetInBytes;
 	UINT	     bufferStrideInBytes;
 	UINT64       bufferSizeInBytes;
 };
 
+
+struct DxGltfVertexBuffer : public DxGltfBuffer
+{
+	DxIASemantic iaLayoutInfo;
+};
+
+struct DxGltfIndexBuffer : public DxGltfBuffer
+{
+	DXGI_FORMAT indexFormat;
+};
+
+struct DxGltfTextureBuffer : public DxGltfBuffer
+{
+	std::string mimeType;
+	std::string name;
+};
+
+struct DxGltfSampler
+{
+	UINT minFilter;
+	UINT magFilter;
+	UINT wrapS;
+	UINT wrapT;
+};
+
+
+struct DxGltfTexture
+{
+	DxGltfSampler samplerInfo;
+	DxGltfTextureBuffer imageBufferInfo;
+};
+
+struct DxGltfTextureInfo
+{
+	DxGltfTexture texture;
+	UINT texCoordIndex;
+};
+
+struct DxPbrMetallicRoughness
+{
+	DxGltfTextureInfo baseColorTexture;
+	FLOAT metallicFactor;
+	FLOAT roughnessFactor;
+};
+
+
+
+
+struct DxGltfMaterial
+{
+	BOOL isMaterialDefined;
+	std::string name;
+	BOOL doubleSided;
+	DxPbrMetallicRoughness pbrMetallicRoughness;
+};
+
 struct DxGltfMeshPrimInfo
 {
-	std::string               name;
-	std::vector<DxGltfBuffer> vbInfo;
-	std::vector<DxGltfBuffer> ibInfo;
-	DxDrawPrimitive           drawInfo;
+	std::string                     name;
+	std::vector<DxGltfVertexBuffer> vbInfo;
+	DxGltfIndexBuffer               ibInfo;
+	DxGltfMaterial					materialInfo;
+	DxDrawPrimitive                 drawInfo;
 };
+
+
+
 
