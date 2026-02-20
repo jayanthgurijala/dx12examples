@@ -70,7 +70,7 @@ protected:
 	HRESULT WaitForFenceCompletion(ID3D12CommandQueue* pCmdQueue);
 	ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData,
 											    UINT sizeInBytes,
-											    const wchar_t* resourceName,
+											    const char* resourceName,
 											    D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
 											    D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON,
 											    BOOL isUploadHeap = FALSE);

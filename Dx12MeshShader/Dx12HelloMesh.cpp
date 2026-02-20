@@ -47,7 +47,7 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 		&m_pRootSignature,
 		{
 			0_rcbv,
-			"srv_4_0,uav_0_0,cbv_0_0"_dt,
+			"srv_4_0,uav_0_0,cbv_0_0"_dt, //texture, vb, ib, uv
 		},
 		{ staticSampler });
 

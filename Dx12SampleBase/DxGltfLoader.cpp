@@ -93,7 +93,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 
 				meshInfo.vbInfo[attrIndx].iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
 				meshInfo.vbInfo[attrIndx].bufferIndex         = bufferIdx;
-				meshInfo.vbInfo[attrIndx].bufferOffsetInBytes   = accessorByteOffset + bufOffset;
+				meshInfo.vbInfo[attrIndx].bufferOffsetInBytes = accessorByteOffset + bufOffset;
 				meshInfo.vbInfo[attrIndx].bufferSizeInBytes   = buflength;
 				meshInfo.vbInfo[attrIndx].bufferStrideInBytes = componentSizeInBytes * numComponents;
 
@@ -140,6 +140,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 			const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
 
 			meshInfo.ibInfo.indexFormat       = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+			meshInfo.ibInfo.name =            "indices";
 			meshInfo.ibInfo.bufferIndex       = bufViewDesc.buffer;
 			meshInfo.ibInfo.bufferOffsetInBytes = byteOffsetIntoBuffer;
 			meshInfo.ibInfo.bufferSizeInBytes = bufferSizeInBytes;

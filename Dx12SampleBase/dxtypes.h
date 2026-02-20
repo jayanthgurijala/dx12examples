@@ -91,6 +91,7 @@ struct DxGltfVertexBuffer : public DxGltfBuffer
 
 struct DxGltfIndexBuffer : public DxGltfBuffer
 {
+	std::string name;
 	DXGI_FORMAT indexFormat;
 };
 

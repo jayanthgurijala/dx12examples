@@ -599,7 +599,7 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	};
 	UINT dataSizeInBytes = sizeof(fullScreenTri);
 
-	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes, L"FrameVB");
+	m_simpleComposition.vertexBuffer = CreateBufferWithData(fullScreenTri, dataSizeInBytes, "FrameVB");
 
 	m_simpleComposition.vertexBufferView.BufferLocation = m_simpleComposition.vertexBuffer->GetGPUVirtualAddress();
 	m_simpleComposition.vertexBufferView.SizeInBytes = dataSizeInBytes;
@@ -612,7 +612,7 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 
 ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData,
 															UINT sizeInBytes,
-														    const wchar_t* resourceName,
+														    const char* resourceName,
 													        D3D12_RESOURCE_FLAGS flags,
 	                                                        D3D12_RESOURCE_STATES initialResourceState,
 	                                                        BOOL isUploadHeap)
@@ -1133,7 +1133,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	/// MVP matrix (16 floats)
 	if (pMappedPtr == nullptr)
 	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, L"MVP", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, "Camera", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
@@ -1211,7 +1211,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 			BYTE* bufferData    = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.vbInfo[i].bufferIndex);
 			m_modelVbBuffers[i] = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
 				                                       (UINT)bufferSizeInBytes,
-				                                       L"VertexBufferN");
+				                                       gltfMeshPrimInfo.vbInfo[i].iaLayoutInfo.name.c_str());
 
 			m_modelVbvs[i].BufferLocation = m_modelVbBuffers[i]->GetGPUVirtualAddress();
 			m_modelVbvs[i].SizeInBytes    = bufferSizeInBytes;
@@ -1226,7 +1226,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 			BYTE* bufferData               = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.ibInfo.bufferIndex);
 			m_modelIbBuffer                = CreateBufferWithData(&bufferData[gltfMeshPrimInfo.ibInfo.bufferOffsetInBytes],
 										           bufferSizeInBytes,
-				                                   L"ModelIndexBuffer");
+				                                   gltfMeshPrimInfo.ibInfo.name.c_str());
 
 			m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
 			m_modelIbv.Format         = gltfMeshPrimInfo.ibInfo.indexFormat;

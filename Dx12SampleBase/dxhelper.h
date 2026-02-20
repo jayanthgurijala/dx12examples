@@ -145,7 +145,7 @@ namespace dxhelper
 	inline void AllocateBufferResource(ID3D12Device* pDevice,
 		                               UINT64 bufferSizeInBytes,
 		                               ID3D12Resource** ppResource,
-		                               const wchar_t* resourceName = nullptr,
+		                               const char* resourceName = nullptr,
 									   D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
 		                               D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON,
 									   BOOL isUploadHeap = FALSE)
@@ -162,7 +162,9 @@ namespace dxhelper
 			IID_PPV_ARGS(ppResource));
 		if (resourceName)
 		{
-			(*ppResource)->SetName(resourceName);
+			std::string name(resourceName);
+			std::wstring wname(name.begin(), name.end());
+			(*ppResource)->SetName(wname.c_str());
 		}
 	}
 
