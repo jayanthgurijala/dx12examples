@@ -35,6 +35,8 @@ public:
 	DxCamera(UINT width, UINT height);
 	XMFLOAT4X4 GetDxrModelTransposeMatrix(UINT index);
 
+	VOID UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up);
+
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();

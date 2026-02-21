@@ -19,7 +19,7 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-    <!-- Disable VS fast up-to-date check so MSBuild runs every build -->
+  <!-- Disable VS fast up-to-date check so MSBuild runs every build -->
   <PropertyGroup>
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
@@ -166,6 +166,7 @@
     <ClInclude Include="dxhelper.h" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="dxtypes.h" />
+    <ClInclude Include="DxUserInput.h" />
     <ClInclude Include="ExampleEntryPoint.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="framework.h" />
@@ -221,6 +222,7 @@
     <ClCompile Include="DxGltfLoader.cpp" />
     <ClCompile Include="dxhelper.cpp" />
     <ClCompile Include="DxPrintUtils.cpp" />
+    <ClCompile Include="DxUserInput.cpp" />
     <ClCompile Include="FileReader.cpp" />
     <ClCompile Include="gltfutils.cpp" />
     <ClCompile Include="pch.cpp">
@@ -317,7 +319,7 @@
     <Exec Command="echo Compiling Shaders..." />
     <MakeDir Directories="$(OutDir)CompiledShaders;$(OutDir)Models" />
     <Exec Command="&quot;$(ProjectDir)..\Shaders\CompileShaders.bat&quot;" />
-	<Exec Command="echo Compiled Shaders" />
+    <Exec Command="echo Compiled Shaders" />
   </Target>
   <Target Name="CopyCompiledShaders" BeforeTargets="Build" DependsOnTargets="CompileShaders">
     <ItemGroup>
@@ -325,7 +327,7 @@
       <CompiledShaders Include="$(ProjectDir)..\Shaders\*.pdb" />
       <CompiledShaders Include="$(ProjectDir)..\Shaders\*.hlsl" />
     </ItemGroup>
-	<Exec Command="echo Copying Shaders..." />
+    <Exec Command="echo Copying Shaders..." />
     <Copy SourceFiles="@(CompiledShaders)" DestinationFolder="$(OutDir)CompiledShaders\%(RecursiveDir)" SkipUnchangedFiles="true" />
   </Target>
   <ItemGroup>

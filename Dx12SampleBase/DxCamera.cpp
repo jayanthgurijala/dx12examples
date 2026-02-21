@@ -28,6 +28,14 @@ XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
 	return xmFloat4x4;
 }
 
+VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up )
+{
+	m_cameraPosition = cameraPosition;
+	m_viewMatrix = XMMatrixLookAtLH(m_cameraPosition,
+		lookAt,
+		up);
+}
+
 VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
@@ -38,8 +46,10 @@ VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 VOID DxCamera::Update(FLOAT frameDeltaTIme)
 {
 	m_frameDeltaTime = frameDeltaTIme;
-	CreateViewMatrix();
+	//CreateViewMatrix();
 }
+
+
 
 /*
 * Look at the origin and move away arbitrary 5 units away
@@ -53,7 +63,6 @@ VOID DxCamera::CreateViewMatrix()
     XMVECTOR up            = XMVectorSet(0, 1, 0, 1.0f);  
     m_cameraPosition       = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
 
-
 	///@todo use std::chrono properly
 	m_rotatedAngle += cameraSpeedInDegPerSecond * m_frameDeltaTime;
 
@@ -64,16 +73,6 @@ VOID DxCamera::CreateViewMatrix()
 	const XMVECTOR newCameraPos = newCameraVector + lookAt;
 	
 	m_cameraPosition = newCameraPos;
-
-	//m_eye = (-3.5, 2.0, -3.5, 1.0)
-	//m_at = (0.0, 0.0, 0.0, 1.0)
-	//up = (0.26, 0.93, 0.26, 1.0)
-
-	//ratio = 1.77, 1, 125
-    
-	//XMVECTOR eyePosition = XMVectorSet(0, -0.2, -5, 1.0);
-	//XMVECTOR lookAt      = XMVectorSet(0.0, 0.0, 0.0, 1.0);
-	//XMVECTOR up          = XMVectorSet(0, 1, 0, 1.0);
 
     m_viewMatrix = XMMatrixLookAtLH(m_cameraPosition,
 		                            lookAt,

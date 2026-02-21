@@ -40,4 +40,17 @@ namespace PrintUtils
 		swprintf_s(buf, L"Buffer GpuVA Start: 0x%llx End: 0x%llx Size: 0x%llu\n", startGpuVA, startGpuVA + resourceDesc.Width, resourceDesc.Width);
 		OutputDebugString(buf);
 	}
+
+	void DebugPrintf(const char* format, ...)
+	{
+		char buffer[1024];
+
+		va_list args;
+		va_start(args, format);
+		vsnprintf(buffer, sizeof(buffer), format, args);
+		va_end(args);
+
+		OutputDebugStringA(buffer);
+	}
+
 }

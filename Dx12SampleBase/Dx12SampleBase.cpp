@@ -19,6 +19,9 @@
 using namespace WICImageLoader;
 using namespace GltfUtils;
 
+Dx12SampleBase* Dx12SampleBase::m_sampleBase = nullptr;
+FLOAT Dx12SampleBase::s_frameDeltaTime = 0;
+
 
 Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_width(width),
@@ -36,6 +39,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_samplerDescriptorSize(0),
 	m_camera(std::make_unique<DxCamera>(width, height)),
 	m_assetReader(std::make_unique<FileReader>()),
+	m_userInput(std::make_unique<DxUserInput>(m_camera.get())),
 	m_modelDrawPrimitive{},
 	m_modelBaseColorTex2D(nullptr),
 	m_modelIbv({}),
@@ -43,7 +47,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr)
 {
-
+	m_sampleBase = this;
 }
 
 Dx12SampleBase::~Dx12SampleBase()
@@ -59,8 +63,53 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
 		return true;
 
+	bool isimGuiMoving = FALSE;
+
+	if (ImGui::GetCurrentContext() != nullptr)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		if (io.WantCaptureMouse)
+		{
+			isimGuiMoving = TRUE;
+		}
+		else
+		{
+			isimGuiMoving = FALSE;
+		}
+	}
+	
+
 	switch (message)
 	{
+	case WM_MOUSEMOVE:
+	{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		if (isimGuiMoving == FALSE)
+		{
+			m_sampleBase->m_userInput->OnMouseMove(x, y);
+		}
+		break;
+	}
+
+	case WM_LBUTTONDOWN:
+	{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		if (isimGuiMoving == FALSE)
+		{
+			m_sampleBase->m_userInput->OnMouseDown(x, y, TRUE);
+		}
+		break;
+	}
+
+	case WM_LBUTTONUP:
+		if (isimGuiMoving == FALSE)
+		{
+			m_sampleBase->m_userInput->OnMouseUp(0, 0, TRUE);
+		}
+		break;
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
 			PostQuitMessage(0);
@@ -820,6 +869,7 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	m_appFrameInfo.type = DxFrameInvalid;
 
 	m_frameDeltaTime = frameDeltaTime;
+	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
 	CreateSceneMVPMatrix();
 

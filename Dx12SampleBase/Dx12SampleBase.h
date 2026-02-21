@@ -12,6 +12,7 @@
 #include <d3dx12.h>
 #include "DxCamera.h"
 #include "DxGltfLoader.h"
+#include "DxUserInput.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -42,6 +43,9 @@ public:
 	int RunApp(HINSTANCE hInstance, int nCmdShow);
 
 	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList);
+
+
+	static FLOAT s_frameDeltaTime;
 
 
 protected:
@@ -280,8 +284,9 @@ private:
 	std::vector<ComPtr<ID3D12Resource>> m_rtvResources;
 	std::vector<ComPtr<ID3D12Resource>> m_dsvResources;
 
-	std::unique_ptr<DxCamera>	m_camera;
-	std::unique_ptr<FileReader>	m_assetReader;
+	std::unique_ptr<DxCamera>	  m_camera;
+	std::unique_ptr<FileReader>	  m_assetReader;
+	std::unique_ptr<DxUserInput>  m_userInput;
 
 	FrameComposition			m_simpleComposition;
 	ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
@@ -313,6 +318,8 @@ private:
 
 	DxAppFrameInfo                        m_appFrameInfo;
 	std::unique_ptr<DxGltfLoader>         m_gltfLoader;
+
+	static 	Dx12SampleBase* m_sampleBase;
 };
 
 

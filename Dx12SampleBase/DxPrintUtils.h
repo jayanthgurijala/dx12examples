@@ -16,6 +16,7 @@ namespace PrintUtils
 	void PrintXMMatrix(LPCSTR matrixName, const XMMATRIX& matrix);
 	void PrintString(LPCSTR stringMessage);
 	void PrintBufferAddressRange(ID3D12Resource* pResource);
+	void DebugPrintf(const char* format, ...);
 }
 
 
