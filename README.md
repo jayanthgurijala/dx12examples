@@ -29,9 +29,12 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 ### 📺 Videos
 [Introduction](https://www.youtube.com/watch?v=xazLPw_QeAg)
 
+[GLTF and Dx12](https://youtu.be/CsiclEWrChM)
+
 [RayTracing Deer Texturing Debugging](https://www.youtube.com/watch?v=E4kxmSjIjUs)
 
 [Mesh Shader Deer Geometry Debugging](https://www.youtube.com/watch?v=P3Ig0_-qH4Q)
+
 
 ## 🛠 Requirements
 
