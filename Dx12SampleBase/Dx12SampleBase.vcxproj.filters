@@ -191,5 +191,8 @@
     <None Include="..\Shaders\HelloMesh.hlsl">
       <Filter>Shaders\MeshShaders</Filter>
     </None>
+    <None Include="..\Shaders\Simple2.hlsl">
+      <Filter>Shaders\VSPS</Filter>
+    </None>
   </ItemGroup>
 </Project>

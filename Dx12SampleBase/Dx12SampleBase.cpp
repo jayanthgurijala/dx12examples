@@ -1288,14 +1288,17 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 		if (gltfMeshPrimInfo.materialInfo.isMaterialDefined == TRUE)
 		{
-			auto& gltfTextureInfo    = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
-			BYTE* bufferData         = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
-			UINT64 bufferSizeInBytes = gltfTextureInfo.bufferSizeInBytes;
-			UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;
+			auto& gltfTextureInfo = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
+			if (gltfTextureInfo.bufferSizeInBytes > 0)
+			{
+				BYTE* bufferData = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
+				UINT64 bufferSizeInBytes = gltfTextureInfo.bufferSizeInBytes;
+				UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;
 
-			ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferData[bufferOffsetInBytes], bufferSizeInBytes);
-			m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
-			CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
+				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferData[bufferOffsetInBytes], bufferSizeInBytes);
+				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
+				CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
+			}
 		}
 	}
 

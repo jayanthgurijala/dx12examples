@@ -8,6 +8,9 @@ dxc -T ps_6_0 -E PSMain -Fo FrameSimple_PS.cso -Zi -Od -Qembed_debug -Fd FrameSi
 dxc -T vs_6_0 -E VSMain -Fo Simple1_VS.cso -Zi -Od -Qembed_debug -Fd Simple1_VS.pdb Simple1.hlsl
 dxc -T ps_6_0 -E PSMain -Fo Simple1_PS.cso -Zi -Od -Qembed_debug -Fd Simple1_PS.pdb Simple1.hlsl
 
+dxc -T vs_6_0 -E VSMain -Fo Simple2_VS.cso -Zi -Od -Qembed_debug -Fd Simple1_VS.pdb Simple2.hlsl
+dxc -T ps_6_0 -E PSMain -Fo Simple2_PS.cso -Zi -Od -Qembed_debug -Fd Simple1_PS.pdb Simple2.hlsl
+
 dxc -T vs_6_0 -E VSMain -Fo Simple5_VS.cso  -Zi -Od -Qembed_debug -Fd Simple5_VS.pdb Simple5.hlsl
 dxc -T ps_6_0 -E PSMain -Fo Simple5_PS.cso  -Zi -Od -Qembed_debug -Fd Simple5_PS.pdb Simple5.hlsl
 

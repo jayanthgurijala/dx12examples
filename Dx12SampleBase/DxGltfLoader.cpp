@@ -168,24 +168,31 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 			pbrRoughness.baseColorTexture.texCoordIndex = materialDesc.pbrMetallicRoughness.baseColorTexture.texCoord;
 			const int textureIndex                      = materialDesc.pbrMetallicRoughness.baseColorTexture.index;
 
-			auto& textureInfo = GetTexture(textureIndex);
-			int sampler       = textureInfo.sampler; //indexes into samplers
-			int source        = textureInfo.source; //indexes into images
+			if (textureIndex != -1)
+			{
+				auto& textureInfo = GetTexture(textureIndex);
+				int sampler = textureInfo.sampler; //indexes into samplers
+				int source = textureInfo.source; //indexes into images
 
-			assert(sampler == -1); //sampler info is not supported yet
+				assert(sampler == -1); //sampler info is not supported yet
 
-			const tinygltf::Image& imageInfo = GetImage(source);
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.mimeType = imageInfo.name;
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.name = imageInfo.mimeType;
+				const tinygltf::Image& imageInfo = GetImage(source);
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.mimeType = imageInfo.name;
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.name = imageInfo.mimeType;
 
-			const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
-			assert(bufViewDesc.byteStride == 0);
+				const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
+				assert(bufViewDesc.byteStride == 0);
 
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferIndex = bufViewDesc.buffer;
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = bufViewDesc.byteLength;
-			pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferStrideInBytes = 0; //not supported yet
-			meshInfo.materialInfo.isMaterialDefined = TRUE;
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferIndex = bufViewDesc.buffer;
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = bufViewDesc.byteLength;
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferStrideInBytes = 0; //not supported yet
+				meshInfo.materialInfo.isMaterialDefined = TRUE;
+			}
+			else
+			{
+				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = 0;
+			}
 		}
 		else
 		{
