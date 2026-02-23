@@ -238,6 +238,7 @@
     <None Include="..\Shaders\CameraBuffer.hlsli">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </None>
+    <None Include="..\Shaders\MaterialsBuffer.hlsli" />
     <None Include="..\Shaders\Raytracing.hlsli" />
     <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>

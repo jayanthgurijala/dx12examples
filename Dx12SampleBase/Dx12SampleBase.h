@@ -289,6 +289,7 @@ private:
 	std::unique_ptr<DxUserInput>  m_userInput;
 
 	FrameComposition			m_simpleComposition;
+
 	ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
 
 	///@todo associate fences with command queues?

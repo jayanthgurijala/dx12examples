@@ -18,6 +18,6 @@ VSOutput_2 VSMain(VSInput_2 input)
 
 float4 PSMain(PSInput_2 input) : SV_TARGET
 {   
-    return float4(0.85, 0.85, 0.85, 1.0f);
+    return float4(input.normal, 1.0f);
 
 }

@@ -194,5 +194,8 @@
     <None Include="..\Shaders\Simple2.hlsl">
       <Filter>Shaders\VSPS</Filter>
     </None>
+    <None Include="..\Shaders\MaterialsBuffer.hlsli">
+      <Filter>Shaders\hlsi</Filter>
+    </None>
   </ItemGroup>
 </Project>

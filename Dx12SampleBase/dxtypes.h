@@ -46,11 +46,11 @@ struct DxIASemantic
 
 struct DxDrawPrimitive
 {
-	UINT numVertices;
-	UINT numIndices;
+	UINT numVertices = 0;
+	UINT numIndices = 0;
 
 	//@remove
-	BOOL isIndexedDraw;
+	BOOL isIndexedDraw = FALSE;
 };
 
 struct DxMeshState
@@ -148,7 +148,4 @@ struct DxGltfMeshPrimInfo
 	DxGltfMaterial					materialInfo;
 	DxDrawPrimitive                 drawInfo;
 };
-
-
-
 
