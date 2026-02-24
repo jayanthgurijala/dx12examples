@@ -61,10 +61,14 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+	
 	pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
 
-	RenderModel(pCmdList);
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0).gpuCameraData);
+	RenderModel(pCmdList, 0, 0);
+
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(1).gpuCameraData);
+	RenderModel(pCmdList, 1, 0);
 
 	SetFrameInfo(nullptr, 0);
 

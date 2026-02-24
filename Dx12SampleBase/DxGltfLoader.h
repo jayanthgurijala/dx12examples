@@ -24,16 +24,21 @@ public:
 	UINT NumNodesInScene(UINT index);
 
 	VOID GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT sceneIndex, UINT nodeIndex);
-	VOID LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex);
+	VOID LoadMeshPrimitiveInfo(DxGltfPrimInfo& meshInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex);
 
 	inline unsigned char* GetBufferData(UINT index)
 	{
 		return m_model.buffers[index].data.data();
 	}
 
-	inline UINT NumPrimitivesInMesh(UINT sceneIndex, UINT nodeIndex)
+	inline UINT NumPrimitives(UINT sceneIndex, UINT nodeIndex)
 	{
 		return GetMesh(sceneIndex, nodeIndex).primitives.size();
+	}
+
+	inline std::string GetNodeName(UINT sceneIndex, UINT nodeIndex)
+	{
+		return GetNode(sceneIndex, nodeIndex).name;
 	}
 
 private:

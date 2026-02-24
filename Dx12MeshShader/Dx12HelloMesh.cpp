@@ -129,8 +129,6 @@ HRESULT Dx12HelloMesh::RenderFrame()
 
 	m_meshCommandList->DispatchMesh(64, 1, 1);
 
-	//RenderModel(pCmdList);
-
 	SetFrameInfo(nullptr, 0);
 
 	return S_OK;

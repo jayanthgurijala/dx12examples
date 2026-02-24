@@ -39,7 +39,7 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
-	XMMATRIX normalMatrix = XMMatrixTranspose(XMMatrixInverse(nullptr, worldMatrix));
+	XMMATRIX normalMatrix = XMMatrixInverse(nullptr, worldMatrix);
     m_transformInfoList.push_back({transformInfo, worldMatrix, normalMatrix});
 }
 
@@ -99,20 +99,20 @@ XMMATRIX DxCamera::CreateModelMatrix(const DxNodeTransformInfo& transformInfo)
 	if (transformInfo.hasMatrix == FALSE)
 	{
 		XMVECTOR translation = (transformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
-			(FLOAT)meshTranslation[1],
-			(FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
-
-		//XMVECTOR rotation =  XMMatrixIdentity();
+																		            (FLOAT)meshTranslation[1],
+																		            (FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
 
 		XMVECTOR scale = (transformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
-			(FLOAT)meshScale[1],
-			(FLOAT)meshScale[2],
-			1.0f) : XMVectorSplatOne();
+																		(FLOAT)meshScale[1],
+																		(FLOAT)meshScale[2],
+																		1.0f) : XMVectorSplatOne();
 
+		XMVECTOR quaternionRotation = (transformInfo.hasRotation == TRUE) ? XMVectorSet(meshRotation[0],
+			                                                                            meshRotation[1],
+			                                                                            meshRotation[2],
+			                                                                            meshRotation[3]) : XMVectorSet(0, 0, 0, 1);
 		XMMATRIX T = XMMatrixTranslationFromVector(translation);
-
-		///@todo find good way for this rotate by 180 degree gltf to dx RH vs LH conversion
-		XMMATRIX R = XMMatrixRotationY(XM_PI);
+		XMMATRIX R = XMMatrixRotationQuaternion(quaternionRotation);
 		XMMATRIX S = XMMatrixScalingFromVector(scale);
 
 		modelMatrix = S * R * T;

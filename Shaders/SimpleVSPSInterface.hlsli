@@ -115,42 +115,57 @@ struct PSInputSimpleFrameComposition
 
 //<---------------------------- Simple Tess -------------------------->
 
-struct VSOutput_5_Tess
-{
-    float4 position  : SV_POSITION;
-    float3 normal    : NORMAL;
-    float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
-    float2 texcoord2 : TEXCOORD2;
-};
-
-struct HSOutput_5
-{
-    float4 position : SV_POSITION;
-    float3 normal : NORMAL;
-    float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
-    float2 texcoord2 : TEXCOORD2;
-};
-
 struct HSConstantsTriOutput
 {
     float TessLevelOuter[3] : SV_TessFactor;
     float TessLevelInner : SV_InsideTessFactor;
 };
 
+struct VSOutput_3_Tess
+{
+    float4 position  : SV_POSITION;
+    float3 normal    : NORMAL;
+    float2 texcoord0 : TEXCOORD0;
+};
+
+struct HSOutput_3
+{
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 texcoord0 : TEXCOORD0;
+};
 
 //@note same as VSOUTPUT for non tess
-struct DSOutput_5
+struct DSOutput_3
 {
     float4 position : SV_POSITION;
     float4 worldPosition : WORLDPOSITION;
     float3 normal : NORMAL;
     float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
-    float2 texcoord2 : TEXCOORD2;
 };
 
+//<---------------------------- Simple Tess 2 attrs ---------------------->
+
+struct VSOutput_2_Tess
+{
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+};
+
+struct HSOutput_2
+{
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+};
+
+
+//@note same as VSOUTPUT for non tess
+struct DSOutput_2
+{
+    float4 position : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
+    float3 normal : NORMAL;
+};
 
 
 

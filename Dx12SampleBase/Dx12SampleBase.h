@@ -42,7 +42,7 @@ public:
 
 	int RunApp(HINSTANCE hInstance, int nCmdShow);
 
-	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList);
+	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList, UINT nodeIndex = 0, UINT primitiveIndex = 0);
 
 
 	static FLOAT s_frameDeltaTime;
@@ -283,6 +283,8 @@ protected:
 	VOID StartBuildingAccelerationStructures();
 	VOID ExecuteBuildAccelerationStructures();
 
+	HRESULT CreateSceneMVPMatrix();
+
 private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
@@ -309,7 +311,6 @@ private:
 	HRESULT CreateSrvUavCbvDescriptorHeap(UINT numDescriptors);
 	HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
 	VOID Imgui_CreateDescriptorHeap();
-	HRESULT CreateSceneMVPMatrix();
 	UINT    GetBackBufferCount();
 
 	UINT                       m_width;

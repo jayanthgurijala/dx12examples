@@ -135,7 +135,7 @@ struct DxGltfMaterial
 	DxPbrMetallicRoughness pbrMetallicRoughness;
 };
 
-struct DxGltfMeshPrimInfo
+struct DxGltfPrimInfo
 {
 	std::string                     name;
 	std::vector<DxGltfVertexBuffer> vbInfo;
@@ -177,14 +177,15 @@ struct DxPrimitiveInfo
 
 struct DxMeshInfo
 {
-	std::string name;
 	std::vector<DxPrimitiveInfo> primitives;
 };
 
 struct DxNodeInfo
 {
-	DxNodeTransformInfo	transformInfo;
-	DxMeshInfo		    meshInfo;
+	std::string name;
+	DxNodeTransformInfo	      transformInfo;
+	DxMeshInfo		          meshInfo;
+	D3D12_GPU_VIRTUAL_ADDRESS gpuCameraData;
 };
 
 struct DxSceneInfo

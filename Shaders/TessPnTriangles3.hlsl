@@ -6,26 +6,17 @@ cbuffer RootConstant : register(b1)
     float tessLevel;
 };
 
-VSOutput_5_Tess VSMain(VSInput_5 input)
+VSOutput_3_Tess VSMain(VSInput_3 input)
 {
-    VSOutput_5_Tess output = (VSOutput_5_Tess) 0;
+    VSOutput_3_Tess output = (VSOutput_3_Tess) 0;
     output.position = float4(input.position, 1.0);
     output.normal = input.normal;
-    output.texcoord0 = input.texcoord0;
-    output.texcoord1 = input.texcoord1;
-    output.texcoord2 = input.texcoord2;
+    output.texcoord0 = input.texcoord;
     return output;
 }
 
-struct HSOutput_TessFactor
-{
-    float4 Pos        : SV_POSITION;
-    float3 Normal     : NORMAL0;
-    float2 UV         : TEXCOORD0;
-    float pnPatch[10] : TEXCOORD6;
-};
 
-HSConstantsTriOutput ConstantsHS(InputPatch<VSOutput_5_Tess, 3> patch, uint InvocationID : SV_PrimitiveID)
+HSConstantsTriOutput ConstantsHS(InputPatch<VSOutput_3_Tess, 3> patch, uint InvocationID : SV_PrimitiveID)
 {
     HSConstantsTriOutput output = (HSConstantsTriOutput) 0;
     output.TessLevelOuter[0] = tessLevel;
@@ -41,9 +32,9 @@ HSConstantsTriOutput ConstantsHS(InputPatch<VSOutput_5_Tess, 3> patch, uint Invo
 [outputcontrolpoints(3)]
 [patchconstantfunc("ConstantsHS")]
 [maxtessfactor(20.0f)]
-HSOutput_5 HSMain(InputPatch<VSOutput_5_Tess, 3> patch, uint i : SV_OutputControlPointID)
+HSOutput_3 HSMain(InputPatch<VSOutput_3_Tess, 3> patch, uint i : SV_OutputControlPointID)
 {
-    HSOutput_5 output = (HSOutput_5) 0;
+    HSOutput_3 output = (HSOutput_3) 0;
 
     output.position  = patch[i].position;
     output.normal    = patch[i].normal;
@@ -58,11 +49,11 @@ float3 ProjectToPlane(float3 vec, float3 normal)
 }
 
 [domain("tri")]
-DSOutput_5 DSMain(HSConstantsTriOutput input, const OutputPatch<HSOutput_5, 3> patch,
+DSOutput_3 DSMain(HSConstantsTriOutput input, const OutputPatch<HSOutput_3, 3> patch,
     float3 bary : SV_DomainLocation
 )
 {
-    DSOutput_5 output = (DSOutput_5) 0;
+    DSOutput_3 output = (DSOutput_3) 0;
     
     float u = bary.x;
     float v = bary.y;
@@ -147,7 +138,7 @@ DSOutput_5 DSMain(HSConstantsTriOutput input, const OutputPatch<HSOutput_5, 3> p
 Texture2D gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
-float4 PSMain(DSOutput_5 input) : SV_TARGET
+float4 PSMain(DSOutput_3 input) : SV_TARGET
 {
     float3 sampledColor = gTexture.Sample(gSampler, input.texcoord0).xyz;
     return float4(sampledColor, 1.0f);

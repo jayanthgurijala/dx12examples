@@ -179,7 +179,7 @@
     <None Include="..\Shaders\FrameSimple.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\Shaders\TessFactor.hlsl">
+    <None Include="..\Shaders\TessPnTriangles3.hlsl">
       <Filter>Shaders\Tess</Filter>
     </None>
     <None Include="..\Shaders\Raytracing.hlsli">
@@ -199,6 +199,9 @@
     </None>
     <None Include="..\Shaders\Simple3.hlsl">
       <Filter>Shaders\VSPS</Filter>
+    </None>
+    <None Include="..\Shaders\TessPnTriangles2.hlsl">
+      <Filter>Shaders\Tess</Filter>
     </None>
   </ItemGroup>
 </Project>

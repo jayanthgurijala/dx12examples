@@ -1062,17 +1062,18 @@ VOID Dx12SampleBase::InitializeImgui()
 	ImGui_ImplDX12_Init(&init_info);
 }
 
-VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
+VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT nodeIndex, UINT primitiveIndex)
 {
-	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(0, 0);
-	for (UINT i = 0; i < numVertexBufferViews; i++)
+	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(nodeIndex, primitiveIndex);
+
+	for (UINT vbvIndex = 0; vbvIndex < numVertexBufferViews; vbvIndex++)
 	{
-		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(0, 0, i);
-		pCmdList->IASetVertexBuffers(i, 1, &vbv);
+		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(nodeIndex, primitiveIndex, vbvIndex);
+		pCmdList->IASetVertexBuffers(vbvIndex, 1, &vbv);
 	}
-	
-	auto&             primitiveDrawInfo            = GetModelDrawInfo(0, 0);
-	static UINT       s_numTrianglesToDraw         = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
+
+	///@todo this will no longer work for multiple primitives in the scene.
+	/*static UINT       s_numTrianglesToDraw = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
 	static const UINT s_maxTriangles               = s_numTrianglesToDraw;
 	static INT        s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
 
@@ -1103,17 +1104,19 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 		s_numTrianglesToDrawFromUser = 0;
 
 
-	s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;
+	s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;*/
+
+	auto& primitiveDrawInfo = GetModelDrawInfo(nodeIndex, primitiveIndex);
 
 	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
-		auto& indexBufferView = GetModelIndexBufferView(0, 0);
+		auto& indexBufferView = GetModelIndexBufferView(nodeIndex, primitiveIndex);
 		pCmdList->IASetIndexBuffer(&indexBufferView);
-		pCmdList->DrawIndexedInstanced(s_numTrianglesToDraw * 3, 1, 0, 0, 0);
+		pCmdList->DrawIndexedInstanced(primitiveDrawInfo.numIndices, 1, 0, 0, 0);
 	}
 	else
 	{
-		pCmdList->DrawInstanced(s_numTrianglesToDraw * 3, 1, 0, 0);
+		pCmdList->DrawInstanced(primitiveDrawInfo.numVertices, 1, 0, 0);
 	}
 }
 
@@ -1126,14 +1129,13 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel(UINT nodeIndex, UINT pr
 
 	auto& curPrimitive = GetPrimitiveInfo(nodeIndex, primitiveIndex);
 
-	char vertexShaderName[64];
-	char pixelShaderName[64];
-
 	ID3D12RootSignature* pRootSignature = GetRootSignature();
 
 	assert(GetRootSignature() != nullptr);
 
 	const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
+	char vertexShaderName[64];
+	char pixelShaderName[64];
 	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
 	snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
 
@@ -1159,48 +1161,78 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
 
-	XMFLOAT4X4 mmData    = m_camera->GetWorldMatrixTranspose(0);
-	XMFLOAT4X4 mvpData   = m_camera->GetModelViewProjectionMatrixTranspose(0);
-	XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
+	const UINT numNodeTransforms = m_camera->NumModelTransforms();
+	const UINT numNodesInScene = m_sceneInfo.nodes.size();
 
-	//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
-	XMFLOAT4X4 normalData  = m_camera->GetNormalMatrixData(0);
-	XMFLOAT4   camPosition = m_camera->GetCameraPosition();
+	///@note each node should have TRS information else we create identitty matrix
+	assert(numNodesInScene == numNodeTransforms);
 
-	const UINT numMatrix         = 4; //model matrix, MPV matrix, Inverse_viewProj(RayTracing) and normal matrix
-	const UINT numFloat4         = 1;
+	assert(numNodeTransforms > 0);
+
+	const UINT numMatrix = 4; //model matrix, MPV matrix, Inverse_viewProj(RayTracing) and normal matrix
+	const UINT numFloat4 = 1; //camera position
 	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
 	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
-	const UINT constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
-										   (float4SizeInBytes * numFloat4);
+	const UINT64 constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
+		                                   (float4SizeInBytes * numFloat4);
+
+	const UINT64 cbAlignedSizeInBytes = dxhelper::DxAlign(constantBufferSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+
+	//@todo seperate mvp matrix into model and vp matrix
+	const UINT totalConstantBufferSize = cbAlignedSizeInBytes * numNodeTransforms;
 
 	///@todo avoid using static
-	static VOID* pMappedPtr = nullptr;
+	static VOID* pMappedPtr     = nullptr;
 	static BYTE* pMappedBytePtr = nullptr;
-
-	///@note constant buffer data layout
-	/// MVP matrix (16 floats)
 	if (pMappedPtr == nullptr)
 	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, constantBufferSizeInBytes, "Camera", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, totalConstantBufferSize, "Camera", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
 		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
+
+		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
+		for (int nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+		{
+			auto& nodeInfo         = GetNodeInfo(nodeIdx);
+			nodeInfo.gpuCameraData = baseGpuVa + cbAlignedSizeInBytes * nodeIdx;
+		}
+		assert(baseGpuVa + totalConstantBufferSize == GetNodeInfo(numNodesInScene - 1).gpuCameraData + cbAlignedSizeInBytes);
 	}
+
 	assert(pMappedPtr != nullptr);
 	assert(pMappedBytePtr == pMappedPtr);
 
-	BYTE* pWritePtr = pMappedBytePtr;
-	memcpy(pWritePtr, &mmData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &normalData, matrixSizeInBytes);
-	pWritePtr += matrixSizeInBytes;
-	memcpy(pWritePtr, &camPosition, float4SizeInBytes);
+	for (int nodeIdx = 0; nodeIdx < numNodeTransforms; nodeIdx++)
+	{
+		BYTE*      pWritePtr = pMappedBytePtr + nodeIdx * cbAlignedSizeInBytes;
+		XMFLOAT4X4 mmData    = m_camera->GetWorldMatrixTranspose(nodeIdx);
+		XMFLOAT4X4 mvpData   = m_camera->GetModelViewProjectionMatrixTranspose(nodeIdx);
+		XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
+
+		//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
+		XMFLOAT4X4 normalData = m_camera->GetNormalMatrixData(nodeIdx);
+		XMFLOAT4   camPosition = m_camera->GetCameraPosition();
+
+		memcpy(pWritePtr, &mmData, matrixSizeInBytes);
+		pWritePtr += matrixSizeInBytes;
+		memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
+		pWritePtr += matrixSizeInBytes;
+		memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
+		pWritePtr += matrixSizeInBytes;
+		memcpy(pWritePtr, &normalData, matrixSizeInBytes);
+		pWritePtr += matrixSizeInBytes;
+		memcpy(pWritePtr, &camPosition, float4SizeInBytes);
+		pWritePtr += float4SizeInBytes;
+
+		assert(pMappedPtr != nullptr);
+		assert(pMappedBytePtr == pMappedPtr);
+	}
+
+	///@note it is critical that we do not want to change this else debugging will be so very difficult
+	assert(pMappedPtr    != nullptr);
+	assert(pMappedBytePtr == pMappedPtr);
 
 	return result;
 }
@@ -1216,35 +1248,38 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 	
 	const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
 	m_sceneInfo.nodes.resize(numNodesInScene);
-
-	for (UINT i = 0; i < numNodesInScene; i++)
+	for (UINT node = 0; node < numNodesInScene; node++)
 	{
-		DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(i).transformInfo;
-		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, i);
+		auto& currentNode = GetNodeInfo(node);
+		currentNode.name = m_gltfLoader->GetNodeName(0, node);
+		DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(node).transformInfo;
+		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, node);
 		AddTransformInfo(meshTransformInfo);
 
-		const UINT numMeshPrimitive = m_gltfLoader->NumPrimitivesInMesh(0, i);
-		m_sceneInfo.nodes[i].meshInfo.primitives.resize(numMeshPrimitive);
+		const UINT numPrimitives = m_gltfLoader->NumPrimitives(0, node);
+		currentNode.meshInfo.primitives.resize(numPrimitives);
 
-		for (UINT j = 0; j < numMeshPrimitive; j++)
+		assert(numPrimitives == 1);
+
+		for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 		{
 			///@note Load VB, IB and textures for each primitive.
-			DxGltfMeshPrimInfo gltfMeshPrimInfo;
-			m_gltfLoader->LoadMeshPrimitiveInfo(gltfMeshPrimInfo, 0, i, j);
+			DxGltfPrimInfo gltfPrimInfo;
+			m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, 0, node, primitive);
 
-			const UINT numVertexAttributes = gltfMeshPrimInfo.vbInfo.size();
-			auto& currentPrim = GetPrimitiveInfo(0, j);
+			const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
+			auto& currentPrim = GetPrimitiveInfo(node, primitive);
 			currentPrim.vertexBufferInfo.resize(numVertexAttributes);
 			currentPrim.modelIaSemantics.resize(numVertexAttributes);
 
-			currentPrim.modelDrawPrimitive = gltfMeshPrimInfo.drawInfo;
+			currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
 
 			///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 			{
 				for (UINT k = 0; k < numVertexAttributes; k++)
 				{
 					auto& vbInfo                       = currentPrim.vertexBufferInfo[k];
-					const auto& gltfVbInfo             = gltfMeshPrimInfo.vbInfo[k];
+					const auto& gltfVbInfo             = gltfPrimInfo.vbInfo[k];
 
 					const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
 					const UINT64 bufferSizeInBytes     = gltfVbInfo.bufferSizeInBytes;
@@ -1275,26 +1310,26 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 
 			///@Fill in index buffer info if indexed draw
 			{
-				if (gltfMeshPrimInfo.drawInfo.isIndexedDraw == TRUE)
+				if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
 				{
 					auto& ibInfo                       = currentPrim.indexBufferInfo;
-					const UINT64 offsetInBytesInBuffer = gltfMeshPrimInfo.ibInfo.bufferOffsetInBytes;
-					const UINT64 bufferSizeInBytes     = gltfMeshPrimInfo.ibInfo.bufferSizeInBytes;
-					const UINT   bufferIndex           = gltfMeshPrimInfo.ibInfo.bufferIndex;
-					BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.ibInfo.bufferIndex);
+					const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
+					const UINT64 bufferSizeInBytes     = gltfPrimInfo.ibInfo.bufferSizeInBytes;
+					const UINT   bufferIndex           = gltfPrimInfo.ibInfo.bufferIndex;
+					BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
 					ibInfo.indexBuffer                 = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
 																			  (UINT)bufferSizeInBytes,
-						                                                      gltfMeshPrimInfo.ibInfo.name.c_str());
+						                                                      gltfPrimInfo.ibInfo.name.c_str());
 					ibInfo.modelIbv.BufferLocation     = ibInfo.indexBuffer->GetGPUVirtualAddress();
 					ibInfo.modelIbv.SizeInBytes        = bufferSizeInBytes;
-					ibInfo.modelIbv.Format             = gltfMeshPrimInfo.ibInfo.indexFormat;
+					ibInfo.modelIbv.Format             = gltfPrimInfo.ibInfo.indexFormat;
 				}
 			}
 
 			///@Fill in material and texture info if material is defined for the primitive
-			if (gltfMeshPrimInfo.materialInfo.isMaterialDefined == TRUE)
+			if (gltfPrimInfo.materialInfo.isMaterialDefined == TRUE)
 			{
-				auto& gltfTextureInfo      = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
+				auto& gltfTextureInfo      = gltfPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
 				BYTE* bufferData           = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
 				UINT64 bufferSizeInBytes   = gltfTextureInfo.bufferSizeInBytes;
 				UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;

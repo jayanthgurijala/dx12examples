@@ -34,15 +34,22 @@ public:
 	VOID Update(FLOAT frameDeltaTime);
 	DxCamera(UINT width, UINT height);
 	XMFLOAT4X4 GetDxrModelTransposeMatrix(UINT index);
-
 	VOID UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up);
+	
+	inline UINT NumModelTransforms()
+	{
+		return m_transformInfoList.size();
+	}
 
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();
 	XMMATRIX CreateModelMatrix(const DxNodeTransformInfo& transformInfo);
 
-	inline XMMATRIX GetModelMatrix(UINT index) { return m_transformInfoList[index].modelMatrix; }
+	inline XMMATRIX GetModelMatrix(UINT index) 
+	{
+		return m_transformInfoList[index].modelMatrix;
+	}
 	inline XMMATRIX GetNormalMatrix(UINT index) { return m_transformInfoList[index].normalMatrix; }
 
 	std::vector<DxModelMatrix> m_transformInfoList;

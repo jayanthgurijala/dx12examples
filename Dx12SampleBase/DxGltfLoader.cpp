@@ -10,7 +10,7 @@ using namespace GltfUtils;
 
 DxGltfLoader::DxGltfLoader(std::string modelPath) :
 	m_modelPath(modelPath),
-	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0", "TEXCOORD_1", "TEXCOORD_2"})
+	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0"})
 {
 }
 
@@ -51,12 +51,13 @@ VOID DxGltfLoader::GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, 
 * 2. Vertex Buffers - (size, stride) (bufferIndex, Offset)
 * 3. Index Buffers
 */
-VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex)
+VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex)
 {
+	const tinygltf::Mesh& mesh = GetMesh(sceneIndex, nodeIndex);
 	const tinygltf::Primitive& primitive = GetPrimitive(sceneIndex, nodeIndex, primitiveIndex);
 	const UINT totalAttributesInPrimitive = min(m_supportedAttributes.size(), primitive.attributes.size());
-	meshInfo.vbInfo.resize(totalAttributesInPrimitive);
-
+	primInfo.vbInfo.resize(totalAttributesInPrimitive);
+	primInfo.name = mesh.name;
 	//@note load vertex buffers
 	{
 		UINT attrIndx = 0;
@@ -91,13 +92,13 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 				const size_t bufOffset          = bufViewDesc.byteOffset;
 				const size_t accessorByteOffset = accessorDesc.byteOffset;
 
-				meshInfo.vbInfo[attrIndx].iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
-				meshInfo.vbInfo[attrIndx].bufferIndex         = bufferIdx;
-				meshInfo.vbInfo[attrIndx].bufferOffsetInBytes = accessorByteOffset + bufOffset;
-				meshInfo.vbInfo[attrIndx].bufferSizeInBytes   = buflength;
-				meshInfo.vbInfo[attrIndx].bufferStrideInBytes = componentSizeInBytes * numComponents;
+				primInfo.vbInfo[attrIndx].iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
+				primInfo.vbInfo[attrIndx].bufferIndex         = bufferIdx;
+				primInfo.vbInfo[attrIndx].bufferOffsetInBytes = accessorByteOffset + bufOffset;
+				primInfo.vbInfo[attrIndx].bufferSizeInBytes   = buflength;
+				primInfo.vbInfo[attrIndx].bufferStrideInBytes = componentSizeInBytes * numComponents;
 
-				auto& currentSemantic = meshInfo.vbInfo[attrIndx].iaLayoutInfo;
+				auto& currentSemantic = primInfo.vbInfo[attrIndx].iaLayoutInfo;
 				///@todo make a string utils class to check for stuff
 				auto pos = attributeName.find("_");
 
@@ -119,7 +120,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 			}
 			attributeIt++;
 		}
-		meshInfo.drawInfo.numVertices = (UINT)(numTotalVertices);
+		primInfo.drawInfo.numVertices = (UINT)(numTotalVertices);
 	}
 
 
@@ -139,17 +140,17 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 			const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
 			const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
 
-			meshInfo.ibInfo.indexFormat       = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
-			meshInfo.ibInfo.name =            "indices";
-			meshInfo.ibInfo.bufferIndex       = bufViewDesc.buffer;
-			meshInfo.ibInfo.bufferOffsetInBytes = byteOffsetIntoBuffer;
-			meshInfo.ibInfo.bufferSizeInBytes = bufferSizeInBytes;
-			meshInfo.drawInfo.numIndices      = (UINT)accessorDesc.count;
-			meshInfo.drawInfo.isIndexedDraw = TRUE;
+			primInfo.ibInfo.indexFormat       = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+			primInfo.ibInfo.name =            "indices";
+			primInfo.ibInfo.bufferIndex       = bufViewDesc.buffer;
+			primInfo.ibInfo.bufferOffsetInBytes = byteOffsetIntoBuffer;
+			primInfo.ibInfo.bufferSizeInBytes = bufferSizeInBytes;
+			primInfo.drawInfo.numIndices      = (UINT)accessorDesc.count;
+			primInfo.drawInfo.isIndexedDraw = TRUE;
 		}
 		else
 		{
-			meshInfo.drawInfo.isIndexedDraw = FALSE;
+			primInfo.drawInfo.isIndexedDraw = FALSE;
 		}
 	}
 
@@ -159,10 +160,10 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 		if (materialIdx != -1)
 		{
 			const tinygltf::Material& materialDesc = GetMaterial(materialIdx);
-			meshInfo.materialInfo.name             = materialDesc.name;
-			meshInfo.materialInfo.doubleSided      = materialDesc.doubleSided;
+			primInfo.materialInfo.name             = materialDesc.name;
+			primInfo.materialInfo.doubleSided      = materialDesc.doubleSided;
 
-			auto& pbrRoughness = meshInfo.materialInfo.pbrMetallicRoughness;
+			auto& pbrRoughness = primInfo.materialInfo.pbrMetallicRoughness;
 			pbrRoughness.metallicFactor                 = (FLOAT)materialDesc.pbrMetallicRoughness.metallicFactor;
 			pbrRoughness.roughnessFactor                = (FLOAT)materialDesc.pbrMetallicRoughness.roughnessFactor;
 			pbrRoughness.baseColorTexture.texCoordIndex = materialDesc.pbrMetallicRoughness.baseColorTexture.texCoord;
@@ -187,7 +188,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
 				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = bufViewDesc.byteLength;
 				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferStrideInBytes = 0; //not supported yet
-				meshInfo.materialInfo.isMaterialDefined = TRUE;
+				primInfo.materialInfo.isMaterialDefined = TRUE;
 			}
 			else
 			{
@@ -196,7 +197,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfMeshPrimInfo& meshInfo, UINT scen
 		}
 		else
 		{
-			meshInfo.materialInfo.isMaterialDefined = FALSE;
+			primInfo.materialInfo.isMaterialDefined = FALSE;
 		}
 	}
 

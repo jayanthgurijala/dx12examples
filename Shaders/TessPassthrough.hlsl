@@ -2,19 +2,17 @@
 #include "CameraBuffer.hlsli"
 
 
-VSOutput_5_Tess VSMain(VSInput_5 input)
+VSOutput_3_Tess VSMain(VSInput_3 input)
 {
-    VSOutput_5_Tess output = (VSOutput_5_Tess) 0;
+    VSOutput_3_Tess output = (VSOutput_3_Tess) 0;
     output.position = float4(input.position, 1.0);
     output.normal = input.normal;
-    output.texcoord0 = input.texcoord0;
-    output.texcoord1 = input.texcoord1;
-    output.texcoord2 = input.texcoord2;
+    output.texcoord0 = input.texcoord;
     return output;
 }
 
 
-HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_5_Tess, 3> patch, uint patchId : SV_PrimitiveID)
+HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_3_Tess, 3> patch, uint patchId : SV_PrimitiveID)
 {
     HSConstantsTriOutput triPatchConstants;
     triPatchConstants.TessLevelInner = 1;
@@ -29,12 +27,12 @@ HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_5_Tess, 3> patch, uint p
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("HSConstantFunc")]
-HSOutput_5 HSMain(
-    InputPatch<VSOutput_5_Tess, 3> patch,
+HSOutput_3 HSMain(
+    InputPatch<VSOutput_3_Tess, 3> patch,
     uint i : SV_OutputControlPointID,
     uint patchId : SV_PrimitiveID)
 {
-    HSOutput_5 output;
+    HSOutput_3 output;
 
     // Pass through control point position
     output.position = patch[i].position;
@@ -44,9 +42,9 @@ HSOutput_5 HSMain(
 }
 
 [domain("tri")]
-DSOutput_5 DSMain(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_DomainLocation, const OutputPatch<HSOutput_5, 3> patch)
+DSOutput_3 DSMain(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_DomainLocation, const OutputPatch<HSOutput_3, 3> patch)
 {
-    DSOutput_5 output = (DSOutput_5) 0;
+    DSOutput_3 output = (DSOutput_3) 0;
     output.position = (TessCoord.x * patch[0].position) +
                       (TessCoord.y * patch[1].position) +
                       (TessCoord.z * patch[2].position);
@@ -65,7 +63,7 @@ DSOutput_5 DSMain(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_Domain
 Texture2D gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
-float4 PSMain(DSOutput_5 input) : SV_TARGET
+float4 PSMain(DSOutput_3 input) : SV_TARGET
 {
     float3 sampledColor = gTexture.Sample(gSampler, input.texcoord0).xyz;
     return float4(sampledColor, 1.0f);

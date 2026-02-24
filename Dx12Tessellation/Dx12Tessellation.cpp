@@ -34,14 +34,23 @@ HRESULT Dx12Tessellation::OnInit()
 		},
 		{ staticSampler });
 
-	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob("TessFactor_VS.cso");
-	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob("TessFactor_HS.cso");
-	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob("TessFactor_DS.cso");
-	ComPtr<ID3DBlob> pixelShader  = GetCompiledShaderBlob("TessFactor_PS.cso");
+	auto& curPrimitive = GetPrimitiveInfo(0, 0);
+	const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
+	char vertexShaderName[64];
+	char hullShaderName[64];
+	char domainShaderName[64];
+	char pixelShaderName[64];
+	snprintf(vertexShaderName, 64, "TessFactor%zu_VS.cso", numAttributes);
+	snprintf(hullShaderName, 64, "TessFactor%zu_HS.cso", numAttributes);
+	snprintf(domainShaderName, 64, "TessFactor%zu_DS.cso", numAttributes);
+	snprintf(pixelShaderName, 64, "TessFactor%zu_PS.cso", numAttributes);
+
+	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
+	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob(hullShaderName);
+	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob(domainShaderName);
+	ComPtr<ID3DBlob> pixelShader  = GetCompiledShaderBlob(pixelShaderName);
 
 	assert(vertexShader != nullptr && hullShader != nullptr && domainShader != nullptr && pixelShader != nullptr);
-
-	auto& curPrimitive = GetPrimitiveInfo(0, 0);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 	pipelineStateDesc.InputLayout = { curPrimitive.modelIaSemantics.data() , static_cast<UINT>(curPrimitive.modelIaSemantics.size()) };
