@@ -31,6 +31,11 @@ public:
 		return m_model.buffers[index].data.data();
 	}
 
+	inline UINT NumPrimitivesInMesh(UINT sceneIndex, UINT nodeIndex)
+	{
+		return GetMesh(sceneIndex, nodeIndex).primitives.size();
+	}
+
 private:
 
 	inline tinygltf::Node& GetNode(UINT sceneIndex, UINT nodeIndex)

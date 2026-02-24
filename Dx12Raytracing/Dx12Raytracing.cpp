@@ -76,7 +76,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 	geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
 	geomDesc.Triangles.VertexCount  = drawInfo.numVertices;
-	geomDesc.Triangles.VertexFormat = GetVertexBufferFormat(0);
+	geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(0);
 
 	//Object space -> new object space
 	geomDesc.Triangles.Transform3x4 = 0;
@@ -301,8 +301,8 @@ HRESULT Dx12Raytracing::RenderFrame()
 	const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
 	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, ibNumElements, ibElementSizeInBytes);
 
-	auto uvVbBufferRes  = GetModelMainTextureUVBufferResource();
-	auto uvVbView       = GetModelMainTextureUVBufferView();
+	auto uvVbBufferRes = GetModelUvVertexBufferResource();
+	auto uvVbView      = GetModelUvBufferView();
 
 
 	const UINT uvVbElementSizeInBytes = 4;

@@ -343,6 +343,15 @@
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Shaders\Simple3.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Target Name="Copy Gltf Files" BeforeTargets="Build">
     <Exec Command="echo Copying gltf files..." />
     <Copy SourceFiles="@(GltfFiles)" DestinationFolder="$(OutDir)Models\%(RecursiveDir)" SkipUnchangedFiles="true" />

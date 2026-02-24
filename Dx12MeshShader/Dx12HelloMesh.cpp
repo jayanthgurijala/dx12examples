@@ -96,8 +96,8 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	auto vertexBufferView = GetModelPositionVertexBufferView();
 	CreateAppBufferSrvDescriptorAtIndex(2, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
 
-	auto uvVbBufferRes = GetModelMainTextureUVBufferResource();
-	auto uvVbView = GetModelMainTextureUVBufferView();
+	auto uvVbBufferRes = GetModelUvVertexBufferResource();
+	auto uvVbView = GetModelUvBufferView();
 
 	const UINT uvVbElementSizeInBytes = 4;
 	const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;

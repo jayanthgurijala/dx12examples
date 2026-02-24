@@ -49,7 +49,7 @@ public:
 
 
 protected:
-	DxMeshState m_meshState;
+
 	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
 	HRESULT CreateRenderTargetResources(UINT numResources);
@@ -155,48 +155,96 @@ protected:
 		return 2;
 	}
 
-	inline ID3D12Resource* GetModelIndexBufferResource()
+	inline DxNodeInfo& GetNodeInfo(UINT nodeIndex = 0)
 	{
-		return m_modelIbBuffer.Get();
+		return m_sceneInfo.nodes[nodeIndex];
 	}
 
-	inline ID3D12Resource* GetModelMainTextureUVBufferResource()
+	inline DxMeshInfo& GetMeshInfo(UINT nodeIndex = 0)
 	{
-		return m_modelVbBuffers[2].Get();
+		return GetNodeInfo(nodeIndex).meshInfo;
 	}
 
-	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT index)
+	inline DxPrimitiveInfo& GetPrimitiveInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
 	{
-		return m_modelIbv;
+		return GetMeshInfo(nodeIndex).primitives[primitiveIndex];
+	}
+
+	inline DxPrimVertexData& GetPrimitiveVertexData(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
+	{
+		return GetPrimitiveInfo(nodeIndex, primitiveIndex).vertexBufferInfo[vbIndex];
+	}
+
+	inline DxPrimIndexData& GetPrimitiveIndexData(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		return GetPrimitiveInfo(nodeIndex, primitiveIndex).indexBufferInfo;
+	}
+
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
+	{
+		auto& vbv = GetPrimitiveVertexData(nodeIndex, primitiveIndex, vbIndex).modelVbv;
+		assert(vbv.BufferLocation != 0);
+		assert(vbv.SizeInBytes != 0);
+		assert(vbv.StrideInBytes != 0);
+		return vbv;
+	}
+
+	inline DxDrawPrimitive& GetModelDrawInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		return GetPrimitiveInfo(nodeIndex, primitiveIndex).modelDrawPrimitive;
+	}
+
+	inline ID3D12Resource* GetModelIndexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		return GetPrimitiveIndexData(nodeIndex, primitiveIndex).indexBuffer.Get();
+	}
+
+	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		return  GetPrimitiveIndexData(nodeIndex, primitiveIndex).modelIbv;
+	}
+
+	inline UINT NumVertexAttributesInPrimitive(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		return static_cast<UINT>(GetPrimitiveInfo(nodeIndex, primitiveIndex).vertexBufferInfo.size());
 	}
 
 
 	///@todo Assumptions, POSITION, NORMAL, TEXCOORD0, TEXCOORD1 etc as per semantic order in gltfloader
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView()
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0)
 	{
-		return m_modelVbvs[0];
+		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, 0).modelVbv;
 	}
 
-	inline ID3D12Resource* GetModelPositionVertexBufferResource()
+	inline ID3D12Resource* GetModelPositionVertexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0)
 	{
-		return m_modelVbBuffers[0].Get();
+		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, 0).modelVbBuffer.Get();
 	}
 
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelMainTextureUVBufferView()
+	inline ID3D12Resource* GetModelUvVertexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT texCoordIndex = 0)
 	{
-		return m_modelVbvs[2];
+		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbBuffer.Get();
 	}
 
-	inline DxDrawPrimitive& GetDrawInfo(UINT index)
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelUvBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT texCoordIndex = 0)
 	{
-		return m_modelDrawPrimitive;
+		//@note POSITION = 0, NORMAL = 1, TEXCOORD0 = 2, TEXCOORD1 = 3 and so on as per gltfloader semantic order
+		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbv;
 	}
 
-	inline DXGI_FORMAT GetVertexBufferFormat(UINT index)
+	inline DxDrawPrimitive& GetDrawInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
 	{
-		auto& positionInfo = m_modelIaSemantics[0];
-		assert(positionInfo.name == "POSITION");
-		return positionInfo.format;
+		return m_sceneInfo.nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
+	}
+
+	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	{
+		///@note POSITION is always the first semantic in the list as per gltfloader, this is an assumption we are making here
+		auto& positionInfo = GetPrimitiveInfo(nodeIndex, primitiveIndex).modelIaSemantics[0];
+
+		assert(std::strcmp(positionInfo.SemanticName, "POSITION") == 0);
+
+		return positionInfo.Format;
 	}
 
 	inline VOID SetFrameInfo(ID3D12Resource* frameResource = nullptr, UINT rtvIndex = UINT_MAX, D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_RENDER_TARGET)
@@ -230,7 +278,7 @@ protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	HRESULT LoadGltfFile();
-	HRESULT CreateVSPSPipelineStateFromModel();
+	HRESULT CreateVSPSPipelineStateFromModel(UINT nodeIndex = 0, UINT primitiveIndex = 0);
 
 	VOID StartBuildingAccelerationStructures();
 	VOID ExecuteBuildAccelerationStructures();
@@ -263,7 +311,6 @@ private:
 	VOID Imgui_CreateDescriptorHeap();
 	HRESULT CreateSceneMVPMatrix();
 	UINT    GetBackBufferCount();
-	VOID CreateMeshState();
 
 	UINT                       m_width;
 	UINT                       m_height;
@@ -305,22 +352,13 @@ private:
 
 	HWND m_hwnd;
 
-	///@todo model resources refactor
-	std::vector<ComPtr<ID3D12Resource>>   m_modelVbBuffers;
-	ComPtr<ID3D12Resource>                m_modelIbBuffer;
-	std::vector<D3D12_VERTEX_BUFFER_VIEW> m_modelVbvs;
-	D3D12_INDEX_BUFFER_VIEW               m_modelIbv;
-	std::vector<DxIASemantic>             m_modelIaSemantics;
-
-	DxDrawPrimitive                       m_modelDrawPrimitive;
-	ComPtr<ID3D12Resource>                m_modelBaseColorTex2D;
-
-	ComPtr<ID3D12DescriptorHeap>          m_imguiDescHeap;
-
-	DxAppFrameInfo                        m_appFrameInfo;
-	std::unique_ptr<DxGltfLoader>         m_gltfLoader;
+	ComPtr<ID3D12DescriptorHeap>   m_imguiDescHeap;
+	DxAppFrameInfo                 m_appFrameInfo;
+	std::unique_ptr<DxGltfLoader>  m_gltfLoader;
 
 	static 	Dx12SampleBase* m_sampleBase;
+
+	DxSceneInfo	m_sceneInfo;
 };
 
 

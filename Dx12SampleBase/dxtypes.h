@@ -7,6 +7,9 @@
 #include <d3d12.h>
 #include <vector>
 #include <string>
+#include <wrl.h>
+
+using namespace Microsoft::WRL;
 
 
 struct SimpleVertex
@@ -39,8 +42,8 @@ struct DxNodeTransformInfo
 struct DxIASemantic
 {
 	std::string name;
-	UINT index;
-	BOOL isIndexValid;
+	UINT        index;
+	BOOL        isIndexValid;
 	DXGI_FORMAT format;
 };
 
@@ -51,13 +54,6 @@ struct DxDrawPrimitive
 
 	//@remove
 	BOOL isIndexedDraw = FALSE;
-};
-
-struct DxMeshState
-{
-	//IALayout needs contiguous data
-	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementDesc;
-	BOOL doubleSided;
 };
 
 enum DxAppFrameType
@@ -74,6 +70,8 @@ struct DxAppFrameInfo
 	D3D12_RESOURCE_STATES pResState;
 	DxAppFrameType type;
 };
+
+
 
 struct DxGltfBuffer
 {
@@ -129,14 +127,11 @@ struct DxPbrMetallicRoughness
 	FLOAT roughnessFactor;
 };
 
-
-
-
 struct DxGltfMaterial
 {
-	BOOL isMaterialDefined;
+	BOOL        isMaterialDefined;
 	std::string name;
-	BOOL doubleSided;
+	BOOL        doubleSided;
 	DxPbrMetallicRoughness pbrMetallicRoughness;
 };
 
@@ -148,4 +143,55 @@ struct DxGltfMeshPrimInfo
 	DxGltfMaterial					materialInfo;
 	DxDrawPrimitive                 drawInfo;
 };
+
+struct DxPrimVertexData
+{
+	ComPtr<ID3D12Resource>   modelVbBuffer;
+	D3D12_VERTEX_BUFFER_VIEW modelVbv;
+	std::string              semanticName;
+};
+
+struct DxPrimIndexData
+{
+	ComPtr<ID3D12Resource>        indexBuffer;
+	D3D12_INDEX_BUFFER_VIEW       modelIbv;
+};
+
+struct DxPrimMaterialInfo
+{
+	DxGltfMaterial         materialInfo;
+	ComPtr<ID3D12Resource> modelBaseColorTex2D;
+};
+
+
+struct DxPrimitiveInfo
+{
+	std::string                           name;
+	std::vector<DxPrimVertexData>         vertexBufferInfo;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
+	DxPrimIndexData			              indexBufferInfo;
+	DxPrimMaterialInfo			          materialInfo;
+	DxDrawPrimitive                       modelDrawPrimitive;
+
+};
+
+struct DxMeshInfo
+{
+	std::string name;
+	std::vector<DxPrimitiveInfo> primitives;
+};
+
+struct DxNodeInfo
+{
+	DxNodeTransformInfo	transformInfo;
+	DxMeshInfo		    meshInfo;
+};
+
+struct DxSceneInfo
+{
+	std::vector<DxNodeInfo> nodes;
+};
+
+
+
 

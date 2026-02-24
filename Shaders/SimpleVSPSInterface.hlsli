@@ -14,6 +14,7 @@ struct PSInput_1
 };
 
 
+
 //<------------------------------ FOR 2 input attributes ----------------->
 
 struct VSInput_2
@@ -33,6 +34,29 @@ struct PSInput_2
 {
     float4 position : SV_POSITION;
     float3 normal : NORMAL;
+};
+
+//<------------------------------ FOR 3 input attributes ----------------->
+
+struct VSInput_3
+{
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 texcoord : TEXCOORD0;
+};
+
+struct VSOutput_3
+{
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 texcoord : TEXCOORD0;
+};
+
+struct PSInput_3
+{
+    float4 position : SV_POSITION;
+    float3 normal : NORMAL;
+    float2 texcoord : TEXCOORD0;
 };
 
 //<------------------------------ FOR 5 input attributes ----------------->

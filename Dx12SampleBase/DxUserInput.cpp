@@ -76,7 +76,6 @@ VOID DxUserInput::OnMouseMove(UINT x, UINT y)
 
 		XMFLOAT3 temp;
 		XMStoreFloat3(&temp, m_up);
-		PrintUtils::DebugPrintf("Up Vector: (%f %f %f)\n", temp.x, temp.y, temp.z);
 		m_camera->UpdateCameraViewMatrix(newCameraPos, m_lookAt, m_up);
 
 		m_prevMouseX = x;

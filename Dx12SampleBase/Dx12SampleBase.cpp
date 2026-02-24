@@ -40,9 +40,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_camera(std::make_unique<DxCamera>(width, height)),
 	m_assetReader(std::make_unique<FileReader>()),
 	m_userInput(std::make_unique<DxUserInput>(m_camera.get())),
-	m_modelDrawPrimitive{},
-	m_modelBaseColorTex2D(nullptr),
-	m_modelIbv({}),
+	m_sceneInfo({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr)
@@ -1066,19 +1064,17 @@ VOID Dx12SampleBase::InitializeImgui()
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 {
-	const SIZE_T numVertexBufferViews = m_modelVbvs.size();
-	D3D12_VERTEX_BUFFER_VIEW vbv = {};
-	vbv.BufferLocation = m_modelVbvs[0].BufferLocation;
-	vbv.SizeInBytes = m_modelVbvs[0].SizeInBytes;
-	vbv.StrideInBytes = m_modelVbvs[0].StrideInBytes;
-	assert(vbv.SizeInBytes > 0);
-	assert(vbv.StrideInBytes > 0);
-	assert(vbv.BufferLocation != 0);
-	pCmdList->IASetVertexBuffers(0, numVertexBufferViews, &m_modelVbvs[0]);
-
-	static UINT s_numTrianglesToDraw = m_modelDrawPrimitive.numIndices / 3;
-	static const UINT s_maxTriangles = s_numTrianglesToDraw;
-	static INT s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
+	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(0, 0);
+	for (UINT i = 0; i < numVertexBufferViews; i++)
+	{
+		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(0, 0, i);
+		pCmdList->IASetVertexBuffers(i, 1, &vbv);
+	}
+	
+	auto&             primitiveDrawInfo            = GetModelDrawInfo(0, 0);
+	static UINT       s_numTrianglesToDraw         = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
+	static const UINT s_maxTriangles               = s_numTrianglesToDraw;
+	static INT        s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
 
 	ImGui::Text("Triangle Count");
 	ImGui::SameLine();
@@ -1109,9 +1105,10 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 
 	s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;
 
-	if (m_modelDrawPrimitive.isIndexedDraw == TRUE)
+	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
-		pCmdList->IASetIndexBuffer(&m_modelIbv);
+		auto& indexBufferView = GetModelIndexBufferView(0, 0);
+		pCmdList->IASetIndexBuffer(&indexBufferView);
 		pCmdList->DrawIndexedInstanced(s_numTrianglesToDraw * 3, 1, 0, 0, 0);
 	}
 	else
@@ -1123,25 +1120,27 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList)
 
 
 
-HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
+HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel(UINT nodeIndex, UINT primitiveIndex)
 {
 	HRESULT result = S_OK;
+
+	auto& curPrimitive = GetPrimitiveInfo(nodeIndex, primitiveIndex);
 
 	char vertexShaderName[64];
 	char pixelShaderName[64];
 
 	ID3D12RootSignature* pRootSignature = GetRootSignature();
 
-	assert(GetRootSignature() != nullptr && m_meshState.inputElementDesc.size() > 0);
+	assert(GetRootSignature() != nullptr);
 
-	const SIZE_T numAttributes = m_meshState.inputElementDesc.size();
+	const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
 	snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
 	snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
 
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
 	inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
-	inputLayoutDesc.pInputElementDescs = m_meshState.inputElementDesc.data();
+	inputLayoutDesc.pInputElementDescs = curPrimitive.modelIaSemantics.data();
 
 
 	///@todo tie up cull mode to double sided from gltf
@@ -1206,103 +1205,109 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	return result;
 }
 
-VOID Dx12SampleBase::CreateMeshState()
-{
-	m_meshState.inputElementDesc.clear();
-	const SIZE_T numAttributes = m_modelIaSemantics.size();
-	m_meshState.inputElementDesc.resize(numAttributes);
-	for (UINT i = 0; i < numAttributes; i++)
-	{
-		auto& inputElementDesc = m_meshState.inputElementDesc[i];
-		const UINT semanticIndex = m_modelIaSemantics[i].isIndexValid ? m_modelIaSemantics[i].index : 0;
-		inputElementDesc.SemanticName = m_modelIaSemantics[i].name.c_str();
-		inputElementDesc.AlignedByteOffset = 0;
-		inputElementDesc.SemanticIndex = semanticIndex;
-		inputElementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-		inputElementDesc.InstanceDataStepRate = 0;
-		inputElementDesc.Format = m_modelIaSemantics[i].format;
-
-		///@note depends on VB allocation. Need gltf to DX converter to give this info
-		inputElementDesc.InputSlot = i;
-	}
-}
-
-
 HRESULT Dx12SampleBase::LoadGltfFile()
 {
-	HRESULT result = S_OK;
+	HRESULT result                 = S_OK;
 	const std::string gltfFileName = GltfFileName();
-	std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileName);
-	m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
+	std::string modelPath          = m_assetReader->GetFullModelFilePath(gltfFileName);
+	m_gltfLoader                   = std::make_unique<DxGltfLoader>(modelPath);
+
 	m_gltfLoader->LoadModel();
 	
+	const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
+	m_sceneInfo.nodes.resize(numNodesInScene);
 
-	if (result == S_OK)
+	for (UINT i = 0; i < numNodesInScene; i++)
 	{
-		DxNodeTransformInfo meshTransformInfo;
-		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, 0);
+		DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(i).transformInfo;
+		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, i);
 		AddTransformInfo(meshTransformInfo);
 
-		DxGltfMeshPrimInfo gltfMeshPrimInfo;
-		m_gltfLoader->LoadMeshPrimitiveInfo(gltfMeshPrimInfo, 0, 0, 0);
+		const UINT numMeshPrimitive = m_gltfLoader->NumPrimitivesInMesh(0, i);
+		m_sceneInfo.nodes[i].meshInfo.primitives.resize(numMeshPrimitive);
 
-		UINT numAttributes = gltfMeshPrimInfo.vbInfo.size();
-		m_modelVbBuffers.resize(numAttributes);
-		m_modelVbvs.resize(numAttributes);
-		m_modelIaSemantics.resize(numAttributes);
-
-		for (int i = 0; i < numAttributes; i++)
+		for (UINT j = 0; j < numMeshPrimitive; j++)
 		{
-			const UINT64 offsetInBytesInBuffer = gltfMeshPrimInfo.vbInfo[i].bufferOffsetInBytes;
-			const UINT64 bufferSizeInBytes     = gltfMeshPrimInfo.vbInfo[i].bufferSizeInBytes;
-			const UINT   bufferIndex           = gltfMeshPrimInfo.vbInfo[i].bufferIndex;
-			const UINT   bufferStrideInBytes   = gltfMeshPrimInfo.vbInfo[i].bufferStrideInBytes;
+			///@note Load VB, IB and textures for each primitive.
+			DxGltfMeshPrimInfo gltfMeshPrimInfo;
+			m_gltfLoader->LoadMeshPrimitiveInfo(gltfMeshPrimInfo, 0, i, j);
 
-			BYTE* bufferData    = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.vbInfo[i].bufferIndex);
-			m_modelVbBuffers[i] = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-				                                       (UINT)bufferSizeInBytes,
-				                                       gltfMeshPrimInfo.vbInfo[i].iaLayoutInfo.name.c_str());
+			const UINT numVertexAttributes = gltfMeshPrimInfo.vbInfo.size();
+			auto& currentPrim = GetPrimitiveInfo(0, j);
+			currentPrim.vertexBufferInfo.resize(numVertexAttributes);
+			currentPrim.modelIaSemantics.resize(numVertexAttributes);
 
-			m_modelVbvs[i].BufferLocation = m_modelVbBuffers[i]->GetGPUVirtualAddress();
-			m_modelVbvs[i].SizeInBytes    = bufferSizeInBytes;
-			m_modelVbvs[i].StrideInBytes  = bufferStrideInBytes;
+			currentPrim.modelDrawPrimitive = gltfMeshPrimInfo.drawInfo;
 
-			m_modelIaSemantics[i] = gltfMeshPrimInfo.vbInfo[i].iaLayoutInfo;
-		}
-
-		
-		{
-			const UINT64 bufferSizeInBytes = gltfMeshPrimInfo.ibInfo.bufferSizeInBytes;
-			BYTE* bufferData               = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.ibInfo.bufferIndex);
-			m_modelIbBuffer                = CreateBufferWithData(&bufferData[gltfMeshPrimInfo.ibInfo.bufferOffsetInBytes],
-										           bufferSizeInBytes,
-				                                   gltfMeshPrimInfo.ibInfo.name.c_str());
-
-			m_modelIbv.BufferLocation = m_modelIbBuffer->GetGPUVirtualAddress();
-			m_modelIbv.Format         = gltfMeshPrimInfo.ibInfo.indexFormat;
-			m_modelIbv.SizeInBytes    = bufferSizeInBytes;
-		}
-
-		m_modelDrawPrimitive = gltfMeshPrimInfo.drawInfo;
-
-
-		if (gltfMeshPrimInfo.materialInfo.isMaterialDefined == TRUE)
-		{
-			auto& gltfTextureInfo = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
-			if (gltfTextureInfo.bufferSizeInBytes > 0)
+			///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 			{
-				BYTE* bufferData = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
-				UINT64 bufferSizeInBytes = gltfTextureInfo.bufferSizeInBytes;
-				UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;
+				for (UINT k = 0; k < numVertexAttributes; k++)
+				{
+					auto& vbInfo                       = currentPrim.vertexBufferInfo[k];
+					const auto& gltfVbInfo             = gltfMeshPrimInfo.vbInfo[k];
 
-				ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(&bufferData[bufferOffsetInBytes], bufferSizeInBytes);
-				m_modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(), imageData.pixels.size(), imageData.width, imageData.height);
-				CreateAppSrvDescriptorAtIndex(0, m_modelBaseColorTex2D.Get());
+					const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
+					const UINT64 bufferSizeInBytes     = gltfVbInfo.bufferSizeInBytes;
+					const UINT   bufferIndex           = gltfVbInfo.bufferIndex;
+					const UINT   bufferStrideInBytes   = gltfVbInfo.bufferStrideInBytes;
+					BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
+					vbInfo.modelVbBuffer               = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+										               						(UINT)bufferSizeInBytes,
+										               						gltfVbInfo.iaLayoutInfo.name.c_str());
+
+					vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
+					vbInfo.modelVbv.SizeInBytes    = bufferSizeInBytes;
+					vbInfo.modelVbv.StrideInBytes  = bufferStrideInBytes;
+					vbInfo.semanticName            = gltfVbInfo.iaLayoutInfo.name;
+
+					auto& inputElementDesc                = currentPrim.modelIaSemantics[k];
+					auto& iaSemanticInfo                  = gltfVbInfo.iaLayoutInfo;
+					const UINT semanticIndex              = iaSemanticInfo.isIndexValid ? iaSemanticInfo.index : 0;
+					inputElementDesc.SemanticName         = vbInfo.semanticName.c_str();
+					inputElementDesc.AlignedByteOffset    = 0;
+					inputElementDesc.SemanticIndex        = semanticIndex;
+					inputElementDesc.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+					inputElementDesc.InstanceDataStepRate = 0;
+					inputElementDesc.Format               = iaSemanticInfo.format;
+					inputElementDesc.InputSlot            = k;
+				}
+			}
+
+			///@Fill in index buffer info if indexed draw
+			{
+				if (gltfMeshPrimInfo.drawInfo.isIndexedDraw == TRUE)
+				{
+					auto& ibInfo                       = currentPrim.indexBufferInfo;
+					const UINT64 offsetInBytesInBuffer = gltfMeshPrimInfo.ibInfo.bufferOffsetInBytes;
+					const UINT64 bufferSizeInBytes     = gltfMeshPrimInfo.ibInfo.bufferSizeInBytes;
+					const UINT   bufferIndex           = gltfMeshPrimInfo.ibInfo.bufferIndex;
+					BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfMeshPrimInfo.ibInfo.bufferIndex);
+					ibInfo.indexBuffer                 = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+																			  (UINT)bufferSizeInBytes,
+						                                                      gltfMeshPrimInfo.ibInfo.name.c_str());
+					ibInfo.modelIbv.BufferLocation     = ibInfo.indexBuffer->GetGPUVirtualAddress();
+					ibInfo.modelIbv.SizeInBytes        = bufferSizeInBytes;
+					ibInfo.modelIbv.Format             = gltfMeshPrimInfo.ibInfo.indexFormat;
+				}
+			}
+
+			///@Fill in material and texture info if material is defined for the primitive
+			if (gltfMeshPrimInfo.materialInfo.isMaterialDefined == TRUE)
+			{
+				auto& gltfTextureInfo      = gltfMeshPrimInfo.materialInfo.pbrMetallicRoughness.baseColorTexture.texture.imageBufferInfo;
+				BYTE* bufferData           = m_gltfLoader->GetBufferData(gltfTextureInfo.bufferIndex);
+				UINT64 bufferSizeInBytes   = gltfTextureInfo.bufferSizeInBytes;
+				UINT64 bufferOffsetInBytes = gltfTextureInfo.bufferOffsetInBytes;
+				ImageData imageData        = WICImageLoader::LoadImageFromMemory_WIC(&bufferData[bufferOffsetInBytes], bufferSizeInBytes);
+
+				currentPrim.materialInfo.modelBaseColorTex2D = CreateTexture2DWithData(imageData.pixels.data(),
+					                                                                   imageData.pixels.size(),
+					                                                                   imageData.width,
+					                                                                   imageData.height);
+				CreateAppSrvDescriptorAtIndex(0, currentPrim.materialInfo.modelBaseColorTex2D.Get());
 			}
 		}
 	}
-
-	CreateMeshState();
 
 	return result;
 }
