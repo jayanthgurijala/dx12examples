@@ -13,14 +13,6 @@ StructuredBuffer<float2> uvVbBuffer  : register(t2, space0);
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 direction)
 {
-    //float4x4 projectionToWorld_T =
-    //{
-    //    { 0.55604, 0.239525, -0.419169, 0 },
-    //    { -1.80351e-08, 0.359638, 0.205507, 0 },
-    //    { 3.472, -1.984, 3.472, -0.992 },
-    //    { -2.84439, 1.62537, -2.84439, 1 }
-    //};
-
     float2 xy = index + 0.5f; // center in the middle of the pixel.
     float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
 
@@ -55,12 +47,8 @@ void MyRaygenShader()
 }
 
 [shader("closesthit")]
-void MyClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    
-    
-    ///index buffer [1 0]
-    //              [3 2]
     uint primitiveIndexInGeom = PrimitiveIndex();
     uint numIndicesPerPrim = 3;
     uint numBytesPerIndex = 2;
@@ -86,8 +74,7 @@ void MyClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersection
         indices.y = indexBuffer[indexAccessedAs4Byte + 1] & 0x0000FFFF;
         indices.z = (indexBuffer[indexAccessedAs4Byte + 1] >> 16) & 0x0000FFFF;
     }
-    
-   
+
     float2 uv0 = uvVbBuffer[indices.x];
     float2 uv1 = uvVbBuffer[indices.y];
     float2 uv2 = uvVbBuffer[indices.z];
@@ -98,6 +85,12 @@ void MyClosestHitShader(inout RayPayload payload, in BuiltInTriangleIntersection
     
     float2 uvInterpolated =b1 * uv1 + b2 * uv2 + b0 * uv0;
     payload.color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
+}
+
+[shader("closesthit")]
+void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    payload.color = float4(1.0, 1.0, 1.0, 1.0);
 }
 
 [shader("miss")]

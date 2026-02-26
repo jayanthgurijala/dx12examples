@@ -163,43 +163,118 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT sceneInd
 			primInfo.materialInfo.name             = materialDesc.name;
 			primInfo.materialInfo.doubleSided      = materialDesc.doubleSided;
 
-			auto& pbrRoughness = primInfo.materialInfo.pbrMetallicRoughness;
-			pbrRoughness.metallicFactor                 = (FLOAT)materialDesc.pbrMetallicRoughness.metallicFactor;
-			pbrRoughness.roughnessFactor                = (FLOAT)materialDesc.pbrMetallicRoughness.roughnessFactor;
-			pbrRoughness.baseColorTexture.texCoordIndex = materialDesc.pbrMetallicRoughness.baseColorTexture.texCoord;
-			const int textureIndex                      = materialDesc.pbrMetallicRoughness.baseColorTexture.index;
-
-			if (textureIndex != -1)
 			{
-				auto& textureInfo = GetTexture(textureIndex);
-				int sampler = textureInfo.sampler; //indexes into samplers
-				int source = textureInfo.source; //indexes into images
+				auto& pbrRoughness              = primInfo.materialInfo.pbrMetallicRoughness;
+				pbrRoughness.metallicFactor     = (FLOAT)materialDesc.pbrMetallicRoughness.metallicFactor;
+				pbrRoughness.roughnessFactor    = (FLOAT)materialDesc.pbrMetallicRoughness.roughnessFactor;
+				pbrRoughness.baseColorFactor[0] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[0];
+				pbrRoughness.baseColorFactor[1] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[1];
+				pbrRoughness.baseColorFactor[2] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[2];
+				pbrRoughness.baseColorFactor[3] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[3];
 
-				assert(sampler == -1); //sampler info is not supported yet
+				LoadGltfTextureInfo(pbrRoughness.baseColorTexture, materialDesc.pbrMetallicRoughness.baseColorTexture);
+				LoadGltfTextureInfo(pbrRoughness.metallicRoughnessTexture, materialDesc.pbrMetallicRoughness.metallicRoughnessTexture);
+			}
 
-				const tinygltf::Image& imageInfo = GetImage(source);
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.mimeType = imageInfo.name;
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.name = imageInfo.mimeType;
+			{
+				auto& dxNormalInfo		   = primInfo.materialInfo.normalInfo;
+				const auto& gltfNormalInfo = materialDesc.normalTexture;
+				dxNormalInfo.scale         = gltfNormalInfo.scale;
+				LoadGltfTextureInfo(dxNormalInfo.normalTexture, { gltfNormalInfo.index, gltfNormalInfo.texCoord });
+			}
 
-				const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
-				assert(bufViewDesc.byteStride == 0);
+			{
+				auto& dxOcclusionInfo         = primInfo.materialInfo.occlusionInfo;
+				const auto& gltfOcclusionInfo = materialDesc.occlusionTexture;
+				dxOcclusionInfo.strength      = gltfOcclusionInfo.strength;
+				LoadGltfTextureInfo(dxOcclusionInfo.occlusionTexture, { gltfOcclusionInfo.index, gltfOcclusionInfo.texCoord });
+			}
 
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferIndex = bufViewDesc.buffer;
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = bufViewDesc.byteLength;
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferStrideInBytes = 0; //not supported yet
-				primInfo.materialInfo.isMaterialDefined = TRUE;
+			{
+				auto& dxEmissiveTextureInfo  = primInfo.materialInfo.emissiveInfo;
+				dxEmissiveTextureInfo.emissiveFactor[0] = (FLOAT)materialDesc.emissiveFactor[0];
+				dxEmissiveTextureInfo.emissiveFactor[1] = (FLOAT)materialDesc.emissiveFactor[1];
+				dxEmissiveTextureInfo.emissiveFactor[2] = (FLOAT)materialDesc.emissiveFactor[2];
+				LoadGltfTextureInfo(dxEmissiveTextureInfo.emissiveTexture, materialDesc.emissiveTexture);
+			}
+
+			if (materialDesc.alphaMode == "MASK")
+			{
+				primInfo.materialInfo.alphaMode = DxMask;
+			}
+			else if (materialDesc.alphaMode == "BLEND")
+			{
+				primInfo.materialInfo.alphaMode = DxBlend;
 			}
 			else
 			{
-				pbrRoughness.baseColorTexture.texture.imageBufferInfo.bufferSizeInBytes = 0;
+				primInfo.materialInfo.alphaMode = DxOpaque;
 			}
+
+			primInfo.materialInfo.alphaCutOff = materialDesc.alphaCutoff;
+		}
+			
+	}
+
+}
+
+VOID DxGltfLoader::LoadGltfTextureInfo(DxGltfTextureInfo& dxTextureInfo, const tinygltf::TextureInfo& gltfTextureInfo)
+{
+	const int textureIndex      = gltfTextureInfo.index;
+	dxTextureInfo.texCoordIndex = gltfTextureInfo.texCoord;
+
+	if (textureIndex != -1)
+	{
+		const tinygltf::Texture& textureInfo = GetTexture(textureIndex);
+		const int samplerIdx                 = textureInfo.sampler;
+		const int imageIdx                   = textureInfo.source;
+
+		// Load sampler info
+		if (samplerIdx != -1)
+		{
+			const tinygltf::Sampler& samplerDesc = GetSampler(samplerIdx);
+			dxTextureInfo.texture.samplerInfo.minFilter = samplerDesc.minFilter;
+			dxTextureInfo.texture.samplerInfo.magFilter = samplerDesc.magFilter;
+			dxTextureInfo.texture.samplerInfo.wrapS = samplerDesc.wrapS;
+			dxTextureInfo.texture.samplerInfo.wrapT = samplerDesc.wrapT;
 		}
 		else
 		{
-			primInfo.materialInfo.isMaterialDefined = FALSE;
+			// Set default sampler values if not specified
+			dxTextureInfo.texture.samplerInfo.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+			dxTextureInfo.texture.samplerInfo.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+			dxTextureInfo.texture.samplerInfo.wrapS     = TINYGLTF_TEXTURE_WRAP_REPEAT;
+			dxTextureInfo.texture.samplerInfo.wrapT     = TINYGLTF_TEXTURE_WRAP_REPEAT;
+		}
+
+		// Load image buffer info
+		if (imageIdx != -1)
+		{
+			const tinygltf::Image& imageInfo               = GetImage(imageIdx);
+			dxTextureInfo.texture.imageBufferInfo.name     = imageInfo.name;
+			dxTextureInfo.texture.imageBufferInfo.mimeType = imageInfo.mimeType;
+
+			assert(imageInfo.bufferView != -1);
+
+			const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
+			assert(bufViewDesc.byteStride == 0);
+
+			dxTextureInfo.texture.imageBufferInfo.bufferIndex         = bufViewDesc.buffer;
+			dxTextureInfo.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
+			dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes   = bufViewDesc.byteLength;
+			dxTextureInfo.texture.imageBufferInfo.bufferStrideInBytes = 0;
+		}
+		else
+		{
+			dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes = 0;
 		}
 	}
+	else
+	{
+		dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes = 0;
+	}
+
+
 
 }
 

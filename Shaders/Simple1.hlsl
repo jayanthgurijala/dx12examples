@@ -7,8 +7,9 @@ VSOutput_1 VSMain( VSInput_1 input )
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    output.position = mul(float4(input.position, 1.0f), g_mvpT);
-    output.position /= output.position.w;
+    output.position     = mul(float4(input.position, 1.0f), g_mvpT);
+    output.position     /= output.position.w;
+    output.worldPosition = mul(float4(input.position, 1.0f), g_modelMatrixT);
 
     return output;
 }

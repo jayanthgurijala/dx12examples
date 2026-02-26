@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <wrl.h>
+#include <d3dx12.h>
 
 using namespace Microsoft::WRL;
 
@@ -110,29 +111,61 @@ struct DxGltfSampler
 
 struct DxGltfTexture
 {
-	DxGltfSampler samplerInfo;
+	DxGltfSampler       samplerInfo;
 	DxGltfTextureBuffer imageBufferInfo;
 };
 
 struct DxGltfTextureInfo
 {
 	DxGltfTexture texture;
-	UINT texCoordIndex;
+	UINT          texCoordIndex;
 };
 
 struct DxPbrMetallicRoughness
 {
 	DxGltfTextureInfo baseColorTexture;
-	FLOAT metallicFactor;
-	FLOAT roughnessFactor;
+	DxGltfTextureInfo metallicRoughnessTexture;
+	FLOAT             baseColorFactor[4];
+	FLOAT             metallicFactor;
+	FLOAT             roughnessFactor;
+
+};
+
+struct DxNormalTextureInfo
+{
+	DxGltfTextureInfo normalTexture;
+	FLOAT scale;
+};
+
+struct DxOcclusionTextureInfo
+{
+	DxGltfTextureInfo occlusionTexture;
+	FLOAT strength;
+};
+
+struct DxEmissiveTextureInfo
+{
+	DxGltfTextureInfo emissiveTexture;
+	FLOAT emissiveFactor[3];
+};
+
+enum DxAlphaMode
+{
+	DxOpaque,
+	DxMask,
+	DxBlend
 };
 
 struct DxGltfMaterial
 {
-	BOOL        isMaterialDefined;
-	std::string name;
-	BOOL        doubleSided;
+	std::string            name;
 	DxPbrMetallicRoughness pbrMetallicRoughness;
+	DxNormalTextureInfo    normalInfo;
+	DxOcclusionTextureInfo occlusionInfo;
+	DxEmissiveTextureInfo  emissiveInfo;
+	DxAlphaMode            alphaMode;
+	FLOAT                  alphaCutOff;
+	BOOL                   doubleSided;
 };
 
 struct DxGltfPrimInfo
@@ -142,6 +175,46 @@ struct DxGltfPrimInfo
 	DxGltfIndexBuffer               ibInfo;
 	DxGltfMaterial					materialInfo;
 	DxDrawPrimitive                 drawInfo;
+};
+
+struct DxMaterialCB
+{
+	FLOAT baseColorFactor[4];
+
+	FLOAT emissiveFactor[3];
+	FLOAT metallicFactor;
+
+	FLOAT roughnessFactor;
+	FLOAT normalScale;
+	FLOAT occlusionStrength;
+	FLOAT alphaCutoff;
+
+	UINT  flags;
+	FLOAT padding[2];
+};
+
+struct DxMaterialResourceInfo
+{
+	ComPtr<ID3D12Resource> pbrBaseColorTexture;
+	ComPtr<ID3D12Resource> pbrMetallicRoughnessTexture;
+	ComPtr<ID3D12Resource> normalTexture;
+	ComPtr<ID3D12Resource> occlusionTexture;
+	ComPtr<ID3D12Resource> emissiveTexture;
+
+	//@note Resource holds data for all the primitives and it is chunked per primitive
+	D3D12_GPU_VIRTUAL_ADDRESS meterialCb;
+};
+
+enum MaterialFlags
+{
+	HasBaseColorTexture = 1 << 0,
+	HasNormalTexture = 1 << 1,
+	HasMetallicRoughnessTex = 1 << 2,
+	HasOcclusionTexture = 1 << 3,
+	HasEmissiveTexture = 1 << 4,
+	AlphaModeMask = 1 << 5,
+	AlphaModeBlend = 1 << 6,
+	DoubleSided = 1 << 7
 };
 
 struct DxPrimVertexData
@@ -157,22 +230,21 @@ struct DxPrimIndexData
 	D3D12_INDEX_BUFFER_VIEW       modelIbv;
 };
 
-struct DxPrimMaterialInfo
-{
-	DxGltfMaterial         materialInfo;
-	ComPtr<ID3D12Resource> modelBaseColorTex2D;
-};
-
-
 struct DxPrimitiveInfo
 {
+	DxDrawPrimitive                       modelDrawPrimitive;
+
 	std::string                           name;
 	std::vector<DxPrimVertexData>         vertexBufferInfo;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
 	DxPrimIndexData			              indexBufferInfo;
-	DxPrimMaterialInfo			          materialInfo;
-	DxDrawPrimitive                       modelDrawPrimitive;
 
+
+	ComPtr<ID3D12PipelineState>           pipelineState;
+	CD3DX12_ROOT_PARAMETER                descriptorTable;
+
+	DxMaterialCB                          materialCbData;
+	DxMaterialResourceInfo                materialTextures;
 };
 
 struct DxMeshInfo
@@ -183,6 +255,7 @@ struct DxMeshInfo
 struct DxNodeInfo
 {
 	std::string name;
+	BOOL                      hasMeshInfo;
 	DxNodeTransformInfo	      transformInfo;
 	DxMeshInfo		          meshInfo;
 	D3D12_GPU_VIRTUAL_ADDRESS gpuCameraData;

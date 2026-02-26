@@ -29,6 +29,7 @@ protected:
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
 	FLOAT m_tesstriTessLevel;
+	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
 };
 

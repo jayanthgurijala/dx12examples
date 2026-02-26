@@ -19,12 +19,14 @@ Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 HRESULT Dx12HelloWorld::OnInit()
 {
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
 			0_rcbv,
-			"srv_1_0,uav_0_0,cbv_0_0"_dt,
+			"srv_5_0,uav_0_0,cbv_0_0"_dt,
+			1_rcbv
 		},
 		{ staticSampler });
 
@@ -55,8 +57,6 @@ HRESULT Dx12HelloWorld::RenderFrame()
 
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	pCmdList->SetPipelineState(m_modelPipelineState.Get());
 	pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
@@ -64,11 +64,19 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	
 	pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0).gpuCameraData);
-	RenderModel(pCmdList, 0, 0);
-
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(1).gpuCameraData);
-	RenderModel(pCmdList, 1, 0);
+	const UINT numNodes = NumNodesInScene();
+	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+	{
+		const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+		{
+			auto& curPrimitive = GetPrimitiveInfo(nodeIdx, primIdx);
+			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(nodeIdx).gpuCameraData);
+			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+			RenderModel(pCmdList, nodeIdx, 0);
+		}
+	}
 
 	SetFrameInfo(nullptr, 0);
 

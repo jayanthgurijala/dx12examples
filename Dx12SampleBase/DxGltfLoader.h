@@ -31,6 +31,11 @@ public:
 		return m_model.buffers[index].data.data();
 	}
 
+	inline BOOL IsNodeMeshInfoValid(UINT sceneIndex, UINT nodeIndex)
+	{
+		return (GetNode(sceneIndex, nodeIndex).mesh != -1);
+	}
+
 	inline UINT NumPrimitives(UINT sceneIndex, UINT nodeIndex)
 	{
 		return GetMesh(sceneIndex, nodeIndex).primitives.size();
@@ -53,7 +58,9 @@ private:
 
 	inline tinygltf::Mesh& GetMesh(UINT sceneIndex, UINT nodeIndex)
 	{
-		return m_model.meshes[GetNode(sceneIndex, nodeIndex).mesh];
+		auto& node = GetNode(sceneIndex, nodeIndex);
+		int meshIdx =node.mesh;
+		return m_model.meshes[meshIdx];
 	}
 
 	inline tinygltf::Primitive& GetPrimitive(UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex)
@@ -85,6 +92,14 @@ private:
 	{
 		return m_model.images[index];
 	}
+
+	inline tinygltf::Sampler& GetSampler(UINT index)
+	{
+		return m_model.samplers[index];
+	}
+
+	VOID LoadGltfTextureInfo(DxGltfTextureInfo& dxTextureInfo,
+		                     const tinygltf::TextureInfo& gltfTextureInfo);
 
 	std::vector<std::string> m_supportedAttributes;
 	std::string m_modelPath;

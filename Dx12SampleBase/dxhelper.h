@@ -226,5 +226,11 @@ namespace dxhelper
 
 		pDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(ppRootSignature));
 	}
+
+	template<typename T, size_t N>
+	void DxMemCpy(T(&dst)[N], const T(&src)[N])
+	{
+		std::memcpy(dst, src, sizeof(T) * N);
+	}
 }
 

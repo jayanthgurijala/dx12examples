@@ -49,9 +49,6 @@ public:
 
 
 protected:
-
-	ComPtr<ID3D12PipelineState> m_modelPipelineState;
-
 	HRESULT CreateRenderTargetResources(UINT numResources);
 	VOID CreateRenderTargetSRVs(UINT numSrvs);
 	HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
@@ -255,6 +252,16 @@ protected:
 		m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
 	}
 
+	inline UINT NumNodesInScene()
+	{
+		return m_sceneInfo.nodes.size();
+	}
+
+	inline UINT NumPrimitivesInNodeMesh(UINT nodeIdx)
+	{
+		return GetMeshInfo(nodeIdx).primitives.size();
+	}
+
 	virtual inline DxCamera* GetCamera() { return m_camera.get(); }
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
@@ -278,12 +285,13 @@ protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	HRESULT LoadGltfFile();
-	HRESULT CreateVSPSPipelineStateFromModel(UINT nodeIndex = 0, UINT primitiveIndex = 0);
+	HRESULT CreateVSPSPipelineStateFromModel();
 
 	VOID StartBuildingAccelerationStructures();
 	VOID ExecuteBuildAccelerationStructures();
 
 	HRESULT CreateSceneMVPMatrix();
+	VOID CreateSceneMaterialCb();
 
 private:
 
@@ -339,6 +347,7 @@ private:
 	FrameComposition			m_simpleComposition;
 
 	ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
+	ComPtr<ID3D12Resource>      m_materialConstantBuffer;
 
 	///@todo associate fences with command queues?
 	ComPtr<ID3D12Fence>         m_fence;

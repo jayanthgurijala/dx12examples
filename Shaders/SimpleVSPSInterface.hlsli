@@ -5,12 +5,14 @@ struct VSInput_1
 
 struct VSOutput_1
 {
-    float4 position : SV_POSITION;
+    float4 position      : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
 };
 
 struct PSInput_1
 {
     float4 position : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
 };
 
 
@@ -25,15 +27,10 @@ struct VSInput_2
 
 struct VSOutput_2
 {
-    float4 position : SV_POSITION;
-    float3 normal : NORMAL;
+    float4 position      : SV_POSITION;
+    float3 normal        : NORMAL;
+    float4 worldPosition : WORLDPOSITION;
     
-};
-
-struct PSInput_2
-{
-    float4 position : SV_POSITION;
-    float3 normal : NORMAL;
 };
 
 //<------------------------------ FOR 3 input attributes ----------------->
@@ -48,16 +45,11 @@ struct VSInput_3
 struct VSOutput_3
 {
     float4 position : SV_POSITION;
+    float4 worldPosition : WORLDPOSITION;
     float3 normal : NORMAL;
     float2 texcoord : TEXCOORD0;
 };
 
-struct PSInput_3
-{
-    float4 position : SV_POSITION;
-    float3 normal : NORMAL;
-    float2 texcoord : TEXCOORD0;
-};
 
 //<------------------------------ FOR 5 input attributes ----------------->
 struct VSInput_5
@@ -71,12 +63,12 @@ struct VSInput_5
 
 struct VSOutput_5
 {
-    float4 position  : SV_POSITION;
+    float4 position      : SV_POSITION;
     float4 worldPosition : WORLDPOSITION;
-    float3 normal    : NORMAL;
-    float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
-    float2 texcoord2 : TEXCOORD2;
+    float3 normal        : NORMAL;
+    float2 texcoord0     : TEXCOORD0;
+    float2 texcoord1     : TEXCOORD1;
+    float2 texcoord2     : TEXCOORD2;
 };
 
 struct PSInput_5

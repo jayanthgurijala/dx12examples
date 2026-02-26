@@ -39,6 +39,9 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
+
+	///@note no need to transpose here as we should be using Transpose of inverse.
+	///      DirectX to Hlsl needs a transpose, so transpose(transpose) cancel.
 	XMMATRIX normalMatrix = XMMatrixInverse(nullptr, worldMatrix);
     m_transformInfoList.push_back({transformInfo, worldMatrix, normalMatrix});
 }

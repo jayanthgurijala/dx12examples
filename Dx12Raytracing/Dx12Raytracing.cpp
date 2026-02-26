@@ -161,7 +161,8 @@ VOID Dx12Raytracing::CreateRtPSO()
 	D3D12_EXPORT_DESC exports[] = {
 		{ L"MyRaygenShader", nullptr, D3D12_EXPORT_FLAG_NONE },
 		{ L"MyMissShader", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"MyClosestHitShader", nullptr, D3D12_EXPORT_FLAG_NONE }
+		{ L"CHSBaseColorTexturing", nullptr, D3D12_EXPORT_FLAG_NONE },
+		{ L"CHSNormalMapping", nullptr, D3D12_EXPORT_FLAG_NONE }
 	};
 
 	D3D12_DXIL_LIBRARY_DESC dxilLibDesc = {};
@@ -303,7 +304,6 @@ HRESULT Dx12Raytracing::RenderFrame()
 
 	auto uvVbBufferRes = GetModelUvVertexBufferResource();
 	auto uvVbView      = GetModelUvBufferView();
-
 
 	const UINT uvVbElementSizeInBytes = 4;
 	const UINT uvVbNumElements        = uvVbView.SizeInBytes / 4;
