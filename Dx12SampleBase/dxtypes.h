@@ -22,8 +22,8 @@ struct SimpleVertex
 
 struct DxExtents
 {
-	double min[3];
-	double max[3];
+	FLOAT min[3];
+	FLOAT max[3];
 	BOOL hasValidExtents;
 };
 
@@ -175,8 +175,7 @@ struct DxGltfPrimInfo
 	DxGltfIndexBuffer               ibInfo;
 	DxGltfMaterial					materialInfo;
 	DxDrawPrimitive                 drawInfo;
-	FLOAT                           minExtents[3];
-	FLOAT                           maxExtents[3];
+	DxExtents                       extents;
 };
 
 struct DxMaterialCB

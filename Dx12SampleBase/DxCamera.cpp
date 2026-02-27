@@ -20,9 +20,11 @@ DxCamera::DxCamera(UINT width, UINT height)
 	m_rotatedAngleX = 0;
 	m_rotatedAngleY = 0;
 
-	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -3.0f, 1.0f);
+	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -12.0f, 1.0f);
 	m_lookAt = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	m_up = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
+
+    m_fovYInRadians = XMConvertToRadians(60);
 }
 
 XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
@@ -49,6 +51,62 @@ VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 	///      DirectX to Hlsl needs a transpose, so transpose(transpose) cancel.
 	XMMATRIX normalMatrix = XMMatrixInverse(nullptr, worldMatrix);
     m_transformInfoList.push_back({transformInfo, worldMatrix, normalMatrix});
+}
+
+VOID DxCamera::AddMinMaxExtents(DxExtents extents)
+{
+    XMFLOAT3 min = { extents.min[0], extents.min[1], extents.min[2] };
+    XMFLOAT3 max = { extents.max[0], extents.max[1], extents.max[2] };
+
+	XMVECTOR corners[8] =
+	{
+		XMVectorSet(min.x, min.y, min.z, 1),
+		XMVectorSet(max.x, min.y, min.z, 1),
+		XMVectorSet(min.x, max.y, min.z, 1),
+		XMVectorSet(max.x, max.y, min.z, 1),
+		XMVectorSet(min.x, min.y, max.z, 1),
+		XMVectorSet(max.x, min.y, max.z, 1),
+		XMVectorSet(min.x, max.y, max.z, 1),
+		XMVectorSet(max.x, max.y, max.z, 1),
+	};
+
+
+	///@note as per gltf loading process, we first add node transform and then min,max extents for each primitive.
+    ///       So the last transform in the list should be the one that we need to apply to the min max extents to get
+	///       the correct camera position.
+    const UINT numTransforms = m_transformInfoList.size();
+    XMMATRIX worldMatrix = m_transformInfoList[numTransforms - 1].modelMatrix;
+
+	for (int i = 0; i < 8; ++i)
+	{
+		corners[i] = XMVector3Transform(corners[i], worldMatrix);
+	}
+
+	XMVECTOR newMin = corners[0];
+	XMVECTOR newMax = corners[0];
+
+	for (int i = 1; i < 8; ++i)
+	{
+		newMin = XMVectorMin(newMin, corners[i]);
+		newMax = XMVectorMax(newMax, corners[i]);
+	}
+
+	XMFLOAT3 minOut;
+	XMFLOAT3 maxOut;
+
+	XMStoreFloat3(&minOut, newMin);
+	XMStoreFloat3(&maxOut, newMax);
+
+
+	XMVECTOR center = 0.5f * (XMLoadFloat3(&minOut) + XMLoadFloat3(&maxOut));
+	XMVECTOR size   = XMLoadFloat3(&maxOut) - XMLoadFloat3(&minOut);
+	float radius    = XMVectorGetX(XMVector3Length(size)) * 0.5f; // half diagonal
+
+    float distance = radius / sinf(m_fovYInRadians * 0.5f);
+
+    m_cameraPosition = center + XMVectorSet(0.0f, 0.0f, -distance, 1.0f);
+    m_lookAt = center;
+    UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
 }
 
 VOID DxCamera::Update(FLOAT frameDeltaTIme)
@@ -78,7 +136,7 @@ VOID DxCamera::CreateViewMatrix()
 
 VOID DxCamera::CreateProjectionMatrix()
 {
-    m_projectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f),
+    m_projectionMatrix = XMMatrixPerspectiveFovLH(m_fovYInRadians,
                                                   m_viewportAspectRatio,
                                                   1.0f,
                                                   125.0f);

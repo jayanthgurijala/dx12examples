@@ -605,36 +605,34 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 
     const D3D12_CULL_MODE cullMode = doubleSided ? D3D12_CULL_MODE_NONE : D3D12_CULL_MODE_BACK;
     const D3D12_FILL_MODE fillMode = enableWireFrame ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
-    auto rast = dxhelper::GetRasterizerState(cullMode, fillMode);
-
-	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil);
-
-
+    
+	auto rast = dxhelper::GetRasterizerState(cullMode, fillMode);
     auto blend = dxhelper::GetBlendState(enableBlend);
+    BOOL enableDepthWrite = (enableBlend == TRUE) ? FALSE : TRUE;
+	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil, FALSE, enableDepthWrite);
 
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-		pipelineStateDesc.InputLayout = iaLayout;
-		pipelineStateDesc.pRootSignature = signature;
-		pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-		pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-		pipelineStateDesc.RasterizerState = rast;
-		pipelineStateDesc.BlendState = blend;
-		pipelineStateDesc.DepthStencilState = dsState;
-
-		///@todo write some test cases for this
-		pipelineStateDesc.SampleMask = UINT_MAX;
-		pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		pipelineStateDesc.NumRenderTargets = 1;
-		pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
-		pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilFormat() : DXGI_FORMAT_UNKNOWN;
-
-		///@todo experiment with flags
-		pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-
-		pipelineStateDesc.SampleDesc.Count = 1;
-
-		m_pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&gfxPipelineState));
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
+	pipelineStateDesc.InputLayout = iaLayout;
+	pipelineStateDesc.pRootSignature = signature;
+	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
+	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+	pipelineStateDesc.RasterizerState = rast;
+	pipelineStateDesc.BlendState = blend;
+	pipelineStateDesc.DepthStencilState = dsState;
+	
+	///@todo write some test cases for this
+	pipelineStateDesc.SampleMask = UINT_MAX;
+	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipelineStateDesc.NumRenderTargets = 1;
+	pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
+	pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilFormat() : DXGI_FORMAT_UNKNOWN;
+	
+	///@todo experiment with flags
+	pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	
+	pipelineStateDesc.SampleDesc.Count = 1;
+	
+	m_pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&gfxPipelineState));
 
 	return gfxPipelineState;
 }
@@ -1426,6 +1424,8 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 				currentPrim.modelIaSemantics.resize(numVertexAttributes);
 
 				currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
+
+				m_camera->AddMinMaxExtents(gltfPrimInfo.extents);
 
 				///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 				{

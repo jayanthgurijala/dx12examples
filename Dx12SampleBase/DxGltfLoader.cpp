@@ -81,13 +81,15 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT sceneInd
 				{
 					numTotalVertices += accessorDesc.count;
 
-					primInfo.minExtents[0] = (FLOAT)accessorDesc.minValues[0];
-					primInfo.minExtents[1] = (FLOAT)accessorDesc.minValues[1];
-					primInfo.minExtents[2] = (FLOAT)accessorDesc.minValues[2];
+					primInfo.extents.min[0] = (FLOAT)accessorDesc.minValues[0];
+					primInfo.extents.min[1] = (FLOAT)accessorDesc.minValues[1];
+					primInfo.extents.min[2] = (FLOAT)accessorDesc.minValues[2];
 
-					primInfo.maxExtents[0] = (FLOAT)accessorDesc.maxValues[0];
-					primInfo.maxExtents[1] = (FLOAT)accessorDesc.maxValues[1];
-					primInfo.maxExtents[2] = (FLOAT)accessorDesc.maxValues[2];
+					primInfo.extents.max[0] = (FLOAT)accessorDesc.maxValues[0];
+					primInfo.extents.max[1] = (FLOAT)accessorDesc.maxValues[1];
+					primInfo.extents.max[2] = (FLOAT)accessorDesc.maxValues[2];
+
+                    primInfo.extents.hasValidExtents = TRUE;
 
 				}
 				const int bufferViewIdx = accessorDesc.bufferView;

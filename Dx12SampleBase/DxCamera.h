@@ -25,6 +25,7 @@ class DxCamera
 {
 public:
 	VOID AddTransformInfo(DxNodeTransformInfo transformInfo);
+	VOID AddMinMaxExtents(DxExtents extents);
 	XMFLOAT4X4 GetViewProjectionMatrixTranspose();
 	XMFLOAT4X4 GetWorldMatrixTranspose(UINT index);
 	XMFLOAT4X4 GetModelViewProjectionMatrixTranspose(UINT index);
@@ -79,6 +80,8 @@ private:
 	XMVECTOR m_cameraPosition;
 	XMVECTOR m_lookAt;
 	XMVECTOR m_up;
+
+	FLOAT m_fovYInRadians;
 };
 
 
