@@ -175,6 +175,8 @@ struct DxGltfPrimInfo
 	DxGltfIndexBuffer               ibInfo;
 	DxGltfMaterial					materialInfo;
 	DxDrawPrimitive                 drawInfo;
+	FLOAT                           minExtents[3];
+	FLOAT                           maxExtents[3];
 };
 
 struct DxMaterialCB

@@ -134,13 +134,31 @@ namespace dxhelper
 		return rast;
 	}
 
-	inline CD3DX12_DEPTH_STENCIL_DESC GetDepthStencilState(BOOL enableDepth = TRUE, BOOL enableStencil = FALSE)
+	inline CD3DX12_DEPTH_STENCIL_DESC GetDepthStencilState(BOOL enableDepth = TRUE, BOOL enableStencil = FALSE, BOOL enableDepthWrite = TRUE)
 	{
 		CD3DX12_DEPTH_STENCIL_DESC depthStencilState(D3D12_DEFAULT);
 		depthStencilState.DepthEnable = enableDepth;
 		depthStencilState.StencilEnable = enableStencil;
+        depthStencilState.DepthWriteMask = enableDepthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 		return depthStencilState;
 	}
+
+	inline CD3DX12_BLEND_DESC GetBlendState(BOOL enableBlend = FALSE)
+	{
+		CD3DX12_BLEND_DESC blendState(D3D12_DEFAULT);
+		if (enableBlend)
+		{
+			blendState.RenderTarget[0].BlendEnable = TRUE;
+			blendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			blendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			blendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			blendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			blendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+			blendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+			blendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		}
+		return blendState;
+    }
 
 	inline void AllocateBufferResource(ID3D12Device* pDevice,
 		                               UINT64 bufferSizeInBytes,

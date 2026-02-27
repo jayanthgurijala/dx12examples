@@ -13,7 +13,7 @@ DxUserInput::DxUserInput(DxCamera* camera)
 	m_rotatedAngleX = 0;
 	m_rotatedAngleY = 0;
 
-	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -15.0f, 1.0f);
+	m_cameraPosition = XMVectorSet(0.0f, -3.0f, -3.0f, 1.0f);
 	m_lookAt         = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	m_up             = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 

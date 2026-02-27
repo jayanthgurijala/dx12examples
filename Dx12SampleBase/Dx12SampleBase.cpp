@@ -595,7 +595,8 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
 																		   BOOL enableWireFrame,
 																		   BOOL doubleSided,
-																		   BOOL useDepthStencil)
+																		   BOOL useDepthStencil,
+																		   BOOL enableBlend)
 {
 	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
 
@@ -604,9 +605,14 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 
 	assert(vertexShader != nullptr && pixelShader != nullptr);
 
+    const D3D12_CULL_MODE cullMode = doubleSided ? D3D12_CULL_MODE_NONE : D3D12_CULL_MODE_BACK;
+    const D3D12_FILL_MODE fillMode = enableWireFrame ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
+    auto rast = dxhelper::GetRasterizerState(cullMode, fillMode);
 
-	auto rast    = dxhelper::GetRasterizerState();
 	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil);
+
+
+    auto blend = dxhelper::GetBlendState(enableBlend);
 
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -615,7 +621,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 		pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
 		pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
 		pipelineStateDesc.RasterizerState = rast;
-		pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		pipelineStateDesc.BlendState = blend;
 		pipelineStateDesc.DepthStencilState = dsState;
 
 		///@todo write some test cases for this
@@ -1166,7 +1172,17 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 			inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
 			inputLayoutDesc.pInputElementDescs = curPrimitive.modelIaSemantics.data();
 
-			curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName, pixelShaderName, pRootSignature, inputLayoutDesc, FALSE, TRUE, TRUE);
+			const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
+            const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+
+			curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
+				                                                        pixelShaderName,
+				                                                        pRootSignature,
+				                                                        inputLayoutDesc,
+																		FALSE,                  //wireframe
+																	    doubleSied,				//doubleSided
+																	    TRUE,				    //depth enable?
+				                                                         blendEnabled);				    
 		}
 	}
 

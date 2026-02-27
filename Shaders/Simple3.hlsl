@@ -46,7 +46,6 @@ float4 PSMain(VSOutput_3 input) : SV_TARGET
         baseColor *= pbrBaseColorTexture.Sample(gSampler, input.texcoord);
     }
     
-    
     return float4(baseColor);
 
 }

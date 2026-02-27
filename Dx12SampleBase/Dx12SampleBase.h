@@ -55,12 +55,13 @@ protected:
 	HRESULT CreateDsvResources(UINT numResources, BOOL createViews = TRUE);
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
 	ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
-		const std::string& pixelShaderName,
-		ID3D12RootSignature* signature,
-		const D3D12_INPUT_LAYOUT_DESC& iaLayout,
-		BOOL wireframe = FALSE,
-		BOOL doubleSided = FALSE,
-		BOOL useDepthStencil = FALSE);
+															   const std::string& pixelShaderName,
+															   ID3D12RootSignature* signature,
+															   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
+															   BOOL wireframe       = FALSE,
+															   BOOL doubleSided     = FALSE,
+															   BOOL useDepthStencil = FALSE,
+															   BOOL enableBlend     = FALSE);
 	HRESULT UploadCpuDataAndWaitForCompletion(void* cpuData,
 		UINT                       dataSizeInBytes,
 		ID3D12GraphicsCommandList* pcmdList,
