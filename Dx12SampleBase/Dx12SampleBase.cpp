@@ -877,7 +877,6 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 
 	m_appFrameInfo.type = DxFrameInvalid;
 
-	m_frameDeltaTime = frameDeltaTime;
 	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
 	CreateSceneMVPMatrix();

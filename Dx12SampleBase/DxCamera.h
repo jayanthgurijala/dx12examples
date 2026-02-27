@@ -53,15 +53,15 @@ private:
 	inline XMMATRIX GetNormalMatrix(UINT index) { return m_transformInfoList[index].normalMatrix; }
 
 	std::vector<DxModelMatrix> m_transformInfoList;
-	FLOAT m_frameDeltaTime;
-	UINT m_viewportWidth;
-	UINT m_viewportHeight;
-	FLOAT m_viewportAspectRatio;
-	FLOAT m_rotatedAngle;
 
 	XMMATRIX m_viewMatrix;
 	XMMATRIX m_projectionMatrix;
 	XMVECTOR m_cameraPosition;
+
+	UINT  m_viewportWidth;
+	UINT m_viewportHeight;
+	FLOAT m_viewportAspectRatio;
+	FLOAT m_rotatedAngle;
 };
 
 

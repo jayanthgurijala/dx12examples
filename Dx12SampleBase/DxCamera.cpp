@@ -7,7 +7,6 @@
 #include "DxPrintUtils.h"
 
 DxCamera::DxCamera(UINT width, UINT height) :
-    m_frameDeltaTime(0),
 	m_cameraPosition({}),
 	m_rotatedAngle(0)
 {
@@ -30,10 +29,10 @@ XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
 
 VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up )
 {
-	m_cameraPosition = cameraPosition;
-	m_viewMatrix = XMMatrixLookAtLH(m_cameraPosition,
+	m_viewMatrix = XMMatrixLookAtLH(cameraPosition,
 		lookAt,
 		up);
+    m_cameraPosition = cameraPosition;
 }
 
 VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
@@ -48,8 +47,7 @@ VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
 
 VOID DxCamera::Update(FLOAT frameDeltaTIme)
 {
-	m_frameDeltaTime = frameDeltaTIme;
-	//CreateViewMatrix();
+
 }
 
 
@@ -60,26 +58,12 @@ VOID DxCamera::Update(FLOAT frameDeltaTIme)
 */
 VOID DxCamera::CreateViewMatrix()
 {
-	static const FLOAT cameraSpeedInDegPerSecond = 10.0f;
-	static XMVECTOR    lookAt                    = XMVectorSet(0.0, 0.0, 0.0, 1.0);
-	
-    XMVECTOR up            = XMVectorSet(0, 1, 0, 1.0f);  
-    m_cameraPosition       = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
+	XMVECTOR lookAt = XMVectorSet(0.0, 0.0, 0.0, 1.0);
+    XMVECTOR up     = XMVectorSet(0, 1, 0, 1.0f);  
+	XMVECTOR camPos = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
 
-	///@todo use std::chrono properly
-	m_rotatedAngle += cameraSpeedInDegPerSecond * m_frameDeltaTime;
+    UpdateCameraViewMatrix(camPos, lookAt, up);
 
-	///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".
-	const XMVECTOR cameraVector = m_cameraPosition - lookAt;
-	const XMMATRIX rotationMatrix = XMMatrixRotationY(XMConvertToRadians(m_rotatedAngle));
-	const XMVECTOR newCameraVector = XMVector3Transform(cameraVector, rotationMatrix);
-	const XMVECTOR newCameraPos = newCameraVector + lookAt;
-	
-	m_cameraPosition = newCameraPos;
-
-    m_viewMatrix = XMMatrixLookAtLH(m_cameraPosition,
-		                            lookAt,
-                                    up);
 }
 
 VOID DxCamera::CreateProjectionMatrix()
