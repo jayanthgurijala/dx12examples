@@ -14,8 +14,6 @@
 
 using namespace DirectX;
 
-class DxUserInput;
-
 struct DxModelMatrix
 {
 	DxNodeTransformInfo transformInfo;
@@ -37,25 +35,30 @@ public:
 	DxCamera(UINT width, UINT height);
 	XMFLOAT4X4 GetDxrModelTransposeMatrix(UINT index);
 	VOID UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up);
-	
+
 	inline UINT NumModelTransforms()
 	{
 		return m_transformInfoList.size();
 	}
 
-    inline VOID SetUserInput(DxUserInput* userInput)
-	{
-		m_userInput = userInput;
-	}
-
 	VOID Initialize();
+
+	VOID OnMouseDown(UINT x, UINT y, BOOL isLeftButton);
+	VOID OnMouseUp(UINT x, UINT y, BOOL isLeftButton);
+	VOID OnMouseMove(UINT x, UINT y);
+	VOID MoveForward();
+
+	//inline XMVECTOR GetCameraPosition()
+	//{
+	//	return m_cameraPosition;
+	//}
 
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();
 	XMMATRIX CreateModelMatrix(const DxNodeTransformInfo& transformInfo);
 
-	inline XMMATRIX GetModelMatrix(UINT index) 
+	inline XMMATRIX GetModelMatrix(UINT index)
 	{
 		return m_transformInfoList[index].modelMatrix;
 	}
@@ -67,7 +70,18 @@ private:
 	XMMATRIX m_projectionMatrix;
 	FLOAT    m_viewportAspectRatio;
 
-    DxUserInput* m_userInput;
+	BOOL m_isMouseLeftButtonDown;
+	FLOAT m_prevMouseX;
+	FLOAT m_prevMouseY;
+
+	FLOAT    m_rotatedAngleX;
+	FLOAT    m_rotatedAngleY;
+	XMVECTOR m_cameraPosition;
+	XMVECTOR m_lookAt;
+	XMVECTOR m_up;
 };
+
+
+
 
 

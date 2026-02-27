@@ -12,7 +12,6 @@
 #include <d3dx12.h>
 #include "DxCamera.h"
 #include "DxGltfLoader.h"
-#include "DxUserInput.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -366,7 +365,6 @@ private:
 
 	std::unique_ptr<DxCamera>	  m_camera;
 	std::unique_ptr<FileReader>	  m_assetReader;
-	std::unique_ptr<DxUserInput>  m_userInput;
 
 	FrameComposition			m_simpleComposition;
 

@@ -166,7 +166,6 @@
     <ClInclude Include="dxhelper.h" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="dxtypes.h" />
-    <ClInclude Include="DxUserInput.h" />
     <ClInclude Include="ExampleEntryPoint.h" />
     <ClInclude Include="FileReader.h" />
     <ClInclude Include="framework.h" />
@@ -222,7 +221,6 @@
     <ClCompile Include="DxGltfLoader.cpp" />
     <ClCompile Include="dxhelper.cpp" />
     <ClCompile Include="DxPrintUtils.cpp" />
-    <ClCompile Include="DxUserInput.cpp" />
     <ClCompile Include="FileReader.cpp" />
     <ClCompile Include="gltfutils.cpp" />
     <ClCompile Include="pch.cpp">

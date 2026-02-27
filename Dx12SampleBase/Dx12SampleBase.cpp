@@ -46,8 +46,6 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_sampleBase = this;
 
 	m_camera    = std::make_unique<DxCamera>(width, height);
-	m_userInput = std::make_unique<DxUserInput>(m_camera.get());
-    m_camera->SetUserInput(m_userInput.get());
     m_camera->Initialize();
 }
 
@@ -89,7 +87,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		int y = GET_Y_LPARAM(lParam);
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_userInput->OnMouseMove(x, y);
+			m_sampleBase->m_camera->OnMouseMove(x, y);
 		}
 		break;
 	}
@@ -100,7 +98,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		int y = GET_Y_LPARAM(lParam);
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_userInput->OnMouseDown(x, y, TRUE);
+			m_sampleBase->m_camera->OnMouseDown(x, y, TRUE);
 		}
 		break;
 	}
@@ -108,7 +106,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	case WM_LBUTTONUP:
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_userInput->OnMouseUp(0, 0, TRUE);
+			m_sampleBase->m_camera->OnMouseUp(0, 0, TRUE);
 		}
 		break;
 	case WM_KEYDOWN:
@@ -116,7 +114,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 			PostQuitMessage(0);
 		if (wParam == 'W')
 		{
-			m_sampleBase->m_userInput->MoveForward();
+			m_sampleBase->m_camera->MoveForward();
         }
 		break;
 

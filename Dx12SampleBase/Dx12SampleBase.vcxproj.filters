@@ -99,9 +99,6 @@
     <ClInclude Include="DxGltfLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DxUserInput.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dx12SampleBase.cpp">
@@ -153,9 +150,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DxGltfLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="DxUserInput.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

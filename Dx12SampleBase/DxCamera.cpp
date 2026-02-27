@@ -5,12 +5,24 @@
 #include "pch.h"
 #include "DxCamera.h"
 #include "DxPrintUtils.h"
-#include "DxUserInput.h"
+#include "Dx12SampleBase.h"
 
 DxCamera::DxCamera(UINT width, UINT height)
 {
     m_transformInfoList.clear();
     m_viewportAspectRatio = (FLOAT)width / height;
+
+
+	m_isMouseLeftButtonDown = FALSE;
+	m_prevMouseX = 0;
+	m_prevMouseY = 0;
+
+	m_rotatedAngleX = 0;
+	m_rotatedAngleY = 0;
+
+	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -3.0f, 1.0f);
+	m_lookAt = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	m_up = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 }
 
 XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
@@ -58,7 +70,7 @@ VOID DxCamera::CreateViewMatrix()
 {
 	XMVECTOR lookAt = XMVectorSet(0.0, 0.0, 0.0, 1.0);
     XMVECTOR up     = XMVectorSet(0, 1, 0, 1.0f);  
-    XMVECTOR camPos = m_userInput->GetCameraPosition();
+	XMVECTOR camPos = m_cameraPosition;
 
     UpdateCameraViewMatrix(camPos, lookAt, up);
 
@@ -155,7 +167,7 @@ XMFLOAT4X4 DxCamera::GetNormalMatrixData(UINT index)
 XMFLOAT4 DxCamera::GetCameraPosition()
 {
 	XMFLOAT4 camPosData;
-	XMStoreFloat4(&camPosData, m_userInput->GetCameraPosition());
+	XMStoreFloat4(&camPosData, m_cameraPosition);
 	return camPosData;
 }
 
@@ -168,6 +180,82 @@ XMFLOAT4X4 DxCamera::GetViewProjectionInverse()
 	XMMATRIX chackMatrix = vpMatrix * vpInverse;
 	//PrintUtils::PrintXMMatrix("Check", chackMatrix);
 	return GetDataFromMatrix(XMMatrixTranspose(vpInverse));
+}
+
+
+VOID DxCamera::OnMouseDown(UINT x, UINT y, BOOL isLeftButton)
+{
+	m_isMouseLeftButtonDown = TRUE;
+	x = static_cast<FLOAT>(x);
+	y = static_cast<FLOAT>(y);
+	m_prevMouseX = x;
+	m_prevMouseY = y;
+}
+
+VOID DxCamera::OnMouseUp(UINT x, UINT y, BOOL isLeftButton)
+{
+	m_isMouseLeftButtonDown = FALSE;
+}
+
+VOID DxCamera::OnMouseMove(UINT x, UINT y)
+{
+	static float speed = 30.0f;
+
+	x = static_cast<FLOAT>(x);
+	y = static_cast<FLOAT>(y);
+
+	if (m_isMouseLeftButtonDown == TRUE)
+	{
+		FLOAT dx = x - m_prevMouseX;
+		FLOAT dy = y - m_prevMouseY;
+		FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
+
+		FLOAT dxInDegrees = dx * speed * frameDeltaTime;
+		FLOAT dyInDegrees = dy * speed * frameDeltaTime;
+
+
+		//@note X mouse movement corresponds to rotation around Y axis and Y mouse movement corresponds to rotation around X axis
+		m_rotatedAngleY = dxInDegrees; //preserves up direction
+		m_rotatedAngleX = dyInDegrees; //messe up up direction and cause forward to be aligned with up
+
+		FLOAT xRotInRadians = XMConvertToRadians(m_rotatedAngleX);
+		FLOAT yRotInRadians = XMConvertToRadians(m_rotatedAngleY);
+
+		///@note rotate camera located at "cameraPosition" "cameraRotateAngleInDeg" around "sceneCenter".
+		const XMVECTOR cameraVector = m_cameraPosition - m_lookAt;
+		const XMMATRIX rotationMatrixX = XMMatrixRotationX(xRotInRadians);
+		const XMMATRIX rotationMatrixY = XMMatrixRotationY(yRotInRadians);
+		XMMATRIX rotation = rotationMatrixX * rotationMatrixY;
+		const XMVECTOR newCameraVector = XMVector3Transform(cameraVector, rotation);
+		const XMVECTOR newCameraPos = newCameraVector + m_lookAt;
+
+		XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
+		XMVECTOR forward = XMVector3Normalize(m_lookAt - newCameraPos);
+		XMVECTOR right = XMVector3Normalize(XMVector3Cross(worldUp, forward));
+
+
+		m_up = XMVector3Normalize(XMVector3Cross(forward, right));
+
+		XMFLOAT3 temp;
+		XMStoreFloat3(&temp, m_up);
+		UpdateCameraViewMatrix(newCameraPos, m_lookAt, m_up);
+		m_cameraPosition = newCameraPos;
+
+		m_prevMouseX = x;
+		m_prevMouseY = y;
+	}
+}
+
+VOID DxCamera::MoveForward()
+{
+	float speed = 5.0f;
+	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
+	FLOAT moveDistance = speed * frameDeltaTime;
+	FLOAT camZ = XMVectorGetZ(m_cameraPosition);
+	camZ += moveDistance;
+	m_cameraPosition = XMVectorSetZ(m_cameraPosition, camZ);
+	UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
+
 }
 
 
