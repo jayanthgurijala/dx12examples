@@ -482,9 +482,9 @@ HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
 	//@todo find a way to match these 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
 	D3D12_CLEAR_VALUE clearValue = {};
 	clearValue.Format = GetBackBufferFormat();
-	clearValue.Color[0] = 0.7f;
-	clearValue.Color[1] = 0.7f;
-	clearValue.Color[2] = 1.0f;
+	clearValue.Color[0] = 0.5f;
+	clearValue.Color[1] = 0.5f;
+	clearValue.Color[2] = 0.5f;
 	clearValue.Color[3] = 1.0f;
 
 	auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -997,10 +997,11 @@ HRESULT Dx12SampleBase::Initialize()
 	HRESULT result = S_OK;
 
 	InitlializeDeviceCmdQueueAndCmdList();
+	LoadGltfFile();
 	InitializeRtvDsvDescHeaps();
 	InitializeSrvCbvUavDescHeaps();
+	LoadSceneMaterialInfo();
 	InitializeImgui();
-	LoadGltfFile();
 
 	return result;
 }
@@ -1297,6 +1298,8 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		totalPrimitivesInScene += numPrims;
 	}
 
+	assert(totalPrimitivesInScene == NumPrimsInScene());
+
 	const UINT alignedTotalMaterialBufferSize = alignedMaterialSize * totalPrimitivesInScene;
 
 
@@ -1337,7 +1340,9 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		assert(baseGpuVa + alignedTotalMaterialBufferSize == lastAddressWritten + alignedMaterialSize);
 		assert(firstPrim != nullptr && firstPrim->materialTextures.meterialCb == baseGpuVa);
 		assert(lastPrim != nullptr && lastPrim->materialTextures.meterialCb == baseGpuVa + alignedTotalMaterialBufferSize - alignedMaterialSize);
+		assert(absolutePrimIndex == NumPrimsInScene());
 	}
+
 
 	assert(pMappedPtr != nullptr);
 	assert(pMappedBytePtr == pMappedPtr);
@@ -1358,6 +1363,7 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 				absolutePrimIndex++;
 			}
 		}
+		assert(absolutePrimIndex == NumPrimsInScene());
 	}
 }
 
@@ -1372,6 +1378,8 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 	
 	const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
 	m_sceneInfo.nodes.resize(numNodesInScene);
+
+	UINT primitiveIndex = 0;
 	for (UINT node = 0; node < numNodesInScene; node++)
 	{
 		auto& currentNode = GetNodeInfo(node);
@@ -1385,8 +1393,6 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 		{
 			const UINT numPrimitives = m_gltfLoader->NumPrimitives(0, node);
 			currentNode.meshInfo.primitives.resize(numPrimitives);
-
-			//assert(numPrimitives == 1);
 
 			for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 			{
@@ -1453,6 +1459,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					}
 				}
 
+
 				///@Fill in material and texture info if material is defined for the primitive
 				{
 					const auto& gltfMaterial   = gltfPrimInfo.materialInfo;
@@ -1478,9 +1485,9 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 							if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
 							{
 								const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-								BYTE* bufferData = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-								UINT64 bufferSizeInBytes = imageBufferInfo.bufferSizeInBytes;
-								UINT64 bufferOffsetInBytes = imageBufferInfo.bufferOffsetInBytes;
+								BYTE* bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
+								UINT64 bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
+								UINT64 bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
 
 								ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
 									&bufferData[bufferOffsetInBytes],
@@ -1505,11 +1512,6 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					primTextureInfo.occlusionTexture            = LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture);
 					primTextureInfo.emissiveTexture             = LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture);
 
-					CreateAppSrvDescriptorAtIndex(0, primTextureInfo.pbrBaseColorTexture.Get());			//t0
-					CreateAppSrvDescriptorAtIndex(1, primTextureInfo.pbrMetallicRoughnessTexture.Get());	//t1
-					CreateAppSrvDescriptorAtIndex(2, primTextureInfo.normalTexture.Get());					//t2
-					CreateAppSrvDescriptorAtIndex(3, primTextureInfo.occlusionTexture.Get());				//t3	
-					CreateAppSrvDescriptorAtIndex(4, primTextureInfo.emissiveTexture.Get());				//t4
 
 					auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
 						flags |= (texture != nullptr) ? bit : 0;
@@ -1552,11 +1554,36 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 						break;
 					}
 				}
+				primitiveIndex++;
 			}
 		}
+		SetNumTotalPrimitivesInScene(primitiveIndex);
 	}
 
 	return result;
+}
+
+VOID Dx12SampleBase::LoadSceneMaterialInfo()
+{
+    UINT primitiveIndex = 0;
+    const UINT numNodesInScene = NumNodesInScene();
+	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+	{
+        const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+		{
+			auto& currentPrim = GetPrimitiveInfo(nodeIdx, primIdx);
+			auto& primTextureInfo = currentPrim.materialTextures;
+			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.Get());			//t0
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 1, primTextureInfo.pbrMetallicRoughnessTexture.Get());	//t1
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 2, primTextureInfo.normalTexture.Get());			    //t2
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 3, primTextureInfo.occlusionTexture.Get());				//t3	
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 4, primTextureInfo.emissiveTexture.Get());				//t4
+			primitiveIndex++;
+		}
+	}
+
 }
 
 

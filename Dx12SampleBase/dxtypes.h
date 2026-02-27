@@ -190,7 +190,7 @@ struct DxMaterialCB
 	FLOAT alphaCutoff;
 
 	UINT  flags;
-	FLOAT padding[2];
+	FLOAT padding[3];
 };
 
 struct DxMaterialResourceInfo
@@ -264,6 +264,7 @@ struct DxNodeInfo
 struct DxSceneInfo
 {
 	std::vector<DxNodeInfo> nodes;
+	UINT numTotalPrimitivesInScene;
 };
 
 

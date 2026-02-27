@@ -43,7 +43,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
-	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f };
+	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,
@@ -61,10 +61,10 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	
-	pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+	UINT primIdxInScene       = 0;
+	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
+	const UINT numNodes       = NumNodesInScene();
 
-	const UINT numNodes = NumNodesInScene();
 	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 	{
 		const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
@@ -73,8 +73,10 @@ HRESULT Dx12HelloWorld::RenderFrame()
 			auto& curPrimitive = GetPrimitiveInfo(nodeIdx, primIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
 			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(nodeIdx).gpuCameraData);
+			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
 			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, nodeIdx, 0);
+			primIdxInScene++;
 		}
 	}
 

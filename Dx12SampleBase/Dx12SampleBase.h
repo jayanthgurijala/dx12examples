@@ -262,6 +262,23 @@ protected:
 		return GetMeshInfo(nodeIdx).primitives.size();
 	}
 
+	inline UINT NumSRVsPerPrimitive()
+	{
+		///@note based on PBR shading
+		return 5;
+	}
+
+	inline UINT NumPrimsInScene()
+	{
+		return m_sceneInfo.numTotalPrimitivesInScene;
+	}
+
+	inline UINT NumSRVsInScene()
+	{
+		assert(UINT_MAX / NumSRVsPerPrimitive() > NumPrimsInScene());
+		return NumPrimsInScene() * NumSRVsPerPrimitive();
+	}
+
 	virtual inline DxCamera* GetCamera() { return m_camera.get(); }
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
@@ -285,6 +302,7 @@ protected:
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	HRESULT LoadGltfFile();
+	VOID LoadSceneMaterialInfo();
 	HRESULT CreateVSPSPipelineStateFromModel();
 
 	VOID StartBuildingAccelerationStructures();
@@ -296,6 +314,11 @@ protected:
 private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
+
+	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims)
+	{
+		m_sceneInfo.numTotalPrimitivesInScene = numPrims;
+	}
 
 	struct FrameComposition
 	{
