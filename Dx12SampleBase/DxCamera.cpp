@@ -5,17 +5,12 @@
 #include "pch.h"
 #include "DxCamera.h"
 #include "DxPrintUtils.h"
+#include "DxUserInput.h"
 
-DxCamera::DxCamera(UINT width, UINT height) :
-	m_cameraPosition({}),
-	m_rotatedAngle(0)
+DxCamera::DxCamera(UINT width, UINT height)
 {
     m_transformInfoList.clear();
-    m_viewportWidth  = width;
-    m_viewportHeight = height;
     m_viewportAspectRatio = (FLOAT)width / height;
-	CreateViewMatrix();
-	CreateProjectionMatrix();
 }
 
 XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
@@ -32,7 +27,6 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 	m_viewMatrix = XMMatrixLookAtLH(cameraPosition,
 		lookAt,
 		up);
-    m_cameraPosition = cameraPosition;
 }
 
 VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
@@ -50,7 +44,11 @@ VOID DxCamera::Update(FLOAT frameDeltaTIme)
 
 }
 
-
+VOID DxCamera::Initialize()
+{
+	CreateViewMatrix();
+	CreateProjectionMatrix();
+}
 
 /*
 * Look at the origin and move away arbitrary 5 units away
@@ -60,7 +58,7 @@ VOID DxCamera::CreateViewMatrix()
 {
 	XMVECTOR lookAt = XMVectorSet(0.0, 0.0, 0.0, 1.0);
     XMVECTOR up     = XMVectorSet(0, 1, 0, 1.0f);  
-	XMVECTOR camPos = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
+    XMVECTOR camPos = m_userInput->GetCameraPosition();
 
     UpdateCameraViewMatrix(camPos, lookAt, up);
 
@@ -157,7 +155,7 @@ XMFLOAT4X4 DxCamera::GetNormalMatrixData(UINT index)
 XMFLOAT4 DxCamera::GetCameraPosition()
 {
 	XMFLOAT4 camPosData;
-	XMStoreFloat4(&camPosData, m_cameraPosition);
+	XMStoreFloat4(&camPosData, m_userInput->GetCameraPosition());
 	return camPosData;
 }
 

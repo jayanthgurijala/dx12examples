@@ -37,15 +37,18 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
-	m_camera(std::make_unique<DxCamera>(width, height)),
 	m_assetReader(std::make_unique<FileReader>()),
-	m_userInput(std::make_unique<DxUserInput>(m_camera.get())),
 	m_sceneInfo({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr)
 {
 	m_sampleBase = this;
+
+	m_camera    = std::make_unique<DxCamera>(width, height);
+	m_userInput = std::make_unique<DxUserInput>(m_camera.get());
+    m_camera->SetUserInput(m_userInput.get());
+    m_camera->Initialize();
 }
 
 Dx12SampleBase::~Dx12SampleBase()
@@ -111,6 +114,10 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
 			PostQuitMessage(0);
+		if (wParam == 'W')
+		{
+			m_sampleBase->m_userInput->MoveForward();
+        }
 		break;
 
 	case WM_DESTROY:

@@ -13,7 +13,7 @@ DxUserInput::DxUserInput(DxCamera* camera)
 	m_rotatedAngleX = 0;
 	m_rotatedAngleY = 0;
 
-	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -5.0f, 1.0f);
+	m_cameraPosition = XMVectorSet(0.0f, 0.0f, -15.0f, 1.0f);
 	m_lookAt         = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	m_up             = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 
@@ -55,8 +55,8 @@ VOID DxUserInput::OnMouseMove(UINT x, UINT y)
 
 
 		//@note X mouse movement corresponds to rotation around Y axis and Y mouse movement corresponds to rotation around X axis
-		m_rotatedAngleY += dxInDegrees; //preserves up direction
-		m_rotatedAngleX += dyInDegrees; //messe up up direction and cause forward to be aligned with up
+		m_rotatedAngleY = dxInDegrees; //preserves up direction
+		m_rotatedAngleX = dyInDegrees; //messe up up direction and cause forward to be aligned with up
 
 		FLOAT xRotInRadians = XMConvertToRadians(m_rotatedAngleX);
 		FLOAT yRotInRadians = XMConvertToRadians(m_rotatedAngleY);
@@ -72,13 +72,28 @@ VOID DxUserInput::OnMouseMove(UINT x, UINT y)
 		XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 		XMVECTOR forward = XMVector3Normalize(m_lookAt - newCameraPos);
 		XMVECTOR right = XMVector3Normalize(XMVector3Cross(worldUp, forward));
+
+
 		m_up = XMVector3Normalize(XMVector3Cross(forward, right));
 
 		XMFLOAT3 temp;
 		XMStoreFloat3(&temp, m_up);
 		m_camera->UpdateCameraViewMatrix(newCameraPos, m_lookAt, m_up);
+        m_cameraPosition = newCameraPos;
 
 		m_prevMouseX = x;
 		m_prevMouseY = y;
 	}
+}
+
+VOID DxUserInput::MoveForward()
+{
+    float speed = 5.0f;
+    FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
+    FLOAT moveDistance = speed * frameDeltaTime;
+	FLOAT camZ = XMVectorGetZ(m_cameraPosition);
+    camZ += moveDistance;
+	m_cameraPosition = XMVectorSetZ(m_cameraPosition, camZ);
+    m_camera->UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
+
 }

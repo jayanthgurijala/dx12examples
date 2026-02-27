@@ -14,6 +14,8 @@
 
 using namespace DirectX;
 
+class DxUserInput;
+
 struct DxModelMatrix
 {
 	DxNodeTransformInfo transformInfo;
@@ -41,6 +43,13 @@ public:
 		return m_transformInfoList.size();
 	}
 
+    inline VOID SetUserInput(DxUserInput* userInput)
+	{
+		m_userInput = userInput;
+	}
+
+	VOID Initialize();
+
 private:
 	VOID CreateViewMatrix();
 	VOID CreateProjectionMatrix();
@@ -56,12 +65,9 @@ private:
 
 	XMMATRIX m_viewMatrix;
 	XMMATRIX m_projectionMatrix;
-	XMVECTOR m_cameraPosition;
+	FLOAT    m_viewportAspectRatio;
 
-	UINT  m_viewportWidth;
-	UINT m_viewportHeight;
-	FLOAT m_viewportAspectRatio;
-	FLOAT m_rotatedAngle;
+    DxUserInput* m_userInput;
 };
 
 

@@ -10,6 +10,13 @@ public:
 	VOID OnMouseDown(UINT x, UINT y, BOOL isLeftButton);
 	VOID OnMouseUp(UINT x, UINT y, BOOL isLeftButton);
 	VOID OnMouseMove(UINT x, UINT y);
+	VOID MoveForward();
+
+	inline XMVECTOR GetCameraPosition()
+	{
+        return m_cameraPosition;
+	}
+
 protected:
 
 
