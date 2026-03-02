@@ -10,76 +10,7 @@
 
 using namespace Microsoft::WRL;
 
-inline CD3DX12_ROOT_PARAMETER operator ""_rcbv(unsigned long long shaderRegister)
-{
-	auto rootCbv = CD3DX12_ROOT_PARAMETER();
-	rootCbv.InitAsConstantBufferView(shaderRegister);
-	return rootCbv;
-}
 
-inline CD3DX12_ROOT_PARAMETER operator ""_rsrv(unsigned long long shaderRegister)
-{
-	auto rootSrv = CD3DX12_ROOT_PARAMETER();
-	rootSrv.InitAsShaderResourceView(shaderRegister);
-	return rootSrv;
-}
-
-inline CD3DX12_ROOT_PARAMETER operator ""_uav(unsigned long long shaderRegister)
-{
-	auto rootUav = CD3DX12_ROOT_PARAMETER();
-	rootUav.InitAsUnorderedAccessView(shaderRegister);
-	return rootUav;
-}
-
-inline CD3DX12_ROOT_PARAMETER operator ""_rc(const char* str, size_t)
-{
-	UINT num32bitValues, shaderRegister;
-	int numRead = sscanf_s(str, "%u_%u", &num32bitValues, &shaderRegister);
-	auto rootConstant = CD3DX12_ROOT_PARAMETER();
-	rootConstant.InitAsConstants(num32bitValues, shaderRegister);
-	return rootConstant;
-}
-
-///@note syntax is "srv_count_base,uav_count_base,cbv_count,base"
-inline CD3DX12_ROOT_PARAMETER operator ""_dt(const char* str, size_t)
-{
-	CD3DX12_ROOT_PARAMETER descriptorTable = {};
-
-	UINT srvCount, srvBase, uavCount, uavBase, cbvCount, cbvBase;
-	int numRead = sscanf_s(str, "srv_%u_%u,uav_%u_%u,cbv_%u_%u", &srvCount, &srvBase, &uavCount, &uavBase, &cbvCount, &cbvBase);
-	auto rootDt = CD3DX12_ROOT_PARAMETER();
-	UINT numRanges = 0;
-	numRanges += (srvCount > 0) ? 1 : 0;
-	numRanges += (uavCount > 0) ? 1 : 0;
-	numRanges += (cbvCount > 0) ? 1 : 0;
-
-	///@todo bad! Fix!
-	static std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges;
-
-	descTableRanges.resize(numRanges);
-
-	UINT rangeIndex = 0;
-	if (srvCount > 0)
-	{
-		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, srvCount, 0);
-		rangeIndex++;
-	}
-
-	if (uavCount > 0)
-	{
-		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, uavCount, 0);
-		rangeIndex++;
-	}
-
-	if (cbvCount > 0)
-	{
-		descTableRanges[rangeIndex].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, cbvCount, 0);
-		rangeIndex++;
-	}
-
-	descriptorTable.InitAsDescriptorTable(numRanges, descTableRanges.data(), D3D12_SHADER_VISIBILITY_ALL);
-	return descriptorTable;
-}
 
 namespace dxhelper
 {
@@ -217,11 +148,10 @@ namespace dxhelper
 		return (value + (alignment - 1)) & ~(alignment - 1);
 	}
 
-	inline VOID DxCreateRootSignature(
-		ID3D12Device* pDevice,
-		ID3D12RootSignature** ppRootSignature,
-		const std::vector<CD3DX12_ROOT_PARAMETER>& rootParameters,
-		const std::vector< CD3DX12_STATIC_SAMPLER_DESC>& staticSampleDesc)
+	inline VOID DxCreateRootSignature(ID3D12Device* pDevice,
+									  ID3D12RootSignature** ppRootSignature,
+									  const std::vector<CD3DX12_ROOT_PARAMETER>& rootParameters,
+									  const std::vector< CD3DX12_STATIC_SAMPLER_DESC>& staticSampleDesc)
 	{
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(
 			rootParameters.size(), 
@@ -250,5 +180,83 @@ namespace dxhelper
 	{
 		std::memcpy(dst, src, sizeof(T) * N);
 	}
+
+    inline CD3DX12_DESCRIPTOR_RANGE GetDescTableRange(D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
+								                      UINT                        numDescriptors,
+		                                              UINT                        baseRegister = 0,
+		                                              UINT                        registerSpace = 0,
+		                                              UINT                        offsetFromTableStart = UINT_MAX)
+	{
+        CD3DX12_DESCRIPTOR_RANGE descRange(rangeType, numDescriptors, baseRegister, registerSpace, offsetFromTableStart);
+        return descRange;
+    }
+
+	inline CD3DX12_DESCRIPTOR_RANGE GetSRVDescRange(UINT numSrvs,
+		                                            UINT baseRegister = 0,
+		                                            UINT registerSpace = 0,
+		                                            UINT offsetFromTableStart = UINT_MAX)
+	{
+        return GetDescTableRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, numSrvs, baseRegister, registerSpace, offsetFromTableStart);
+    }
+
+	inline CD3DX12_DESCRIPTOR_RANGE GetUAVDescRange(UINT numUavs,
+		                                            UINT baseRegister = 0,
+		                                            UINT registerSpace = 0,
+		                                            UINT offsetFromTableStart = UINT_MAX)
+	{
+        return GetDescTableRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, numUavs, baseRegister, registerSpace, offsetFromTableStart);
+    }
+
+	inline CD3DX12_DESCRIPTOR_RANGE GetCBVDescRange(UINT numCbvs,
+		                                            UINT baseRegister = 0,
+		                                            UINT registerSpace = 0,
+		                                            UINT offsetFromTableStart = UINT_MAX)
+	{
+        return GetDescTableRange(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, numCbvs, baseRegister, registerSpace, offsetFromTableStart);
+    }
+
+
+
+	inline CD3DX12_ROOT_PARAMETER GetRootDescTable(std::vector<CD3DX12_DESCRIPTOR_RANGE>& descTableRanges)
+	{
+		CD3DX12_ROOT_PARAMETER descriptorTable = CD3DX12_ROOT_PARAMETER();
+		UINT numRanges = descTableRanges.size();
+		descriptorTable.InitAsDescriptorTable(numRanges, descTableRanges.data(), D3D12_SHADER_VISIBILITY_ALL);
+		return descriptorTable;
+	}
+
+
+	inline CD3DX12_ROOT_PARAMETER GetRootSrv(UINT shaderRegister = 0, UINT registerSpace = 0)
+	{
+		auto rootSrv = CD3DX12_ROOT_PARAMETER();
+        rootSrv.InitAsShaderResourceView(shaderRegister, registerSpace, D3D12_SHADER_VISIBILITY_ALL);
+		return rootSrv;
+	}
+
+	inline CD3DX12_ROOT_PARAMETER GetRootUav(UINT shaderRegister = 0, UINT registerSpace = 0)
+	{
+		auto rootSrv = CD3DX12_ROOT_PARAMETER();
+		rootSrv.InitAsUnorderedAccessView(shaderRegister, registerSpace, D3D12_SHADER_VISIBILITY_ALL);
+		return rootSrv;
+	}
+
+	inline CD3DX12_ROOT_PARAMETER GetRootCbv(UINT shaderRegister = 0, UINT registerSpace = 0)
+	{
+		auto rootSrv = CD3DX12_ROOT_PARAMETER();
+		rootSrv.InitAsConstantBufferView(shaderRegister, registerSpace, D3D12_SHADER_VISIBILITY_ALL);
+		return rootSrv;
+	}
+
+	inline CD3DX12_ROOT_PARAMETER GetRootConstants(UINT num32bitValues, UINT shaderRegister = 0, UINT registerSpace = 0)
+	{
+		auto rootSrv = CD3DX12_ROOT_PARAMETER();
+        rootSrv.InitAsConstants(num32bitValues, shaderRegister, registerSpace, D3D12_SHADER_VISIBILITY_ALL);
+		return rootSrv;
+	}
+
 }
+
+
+
+
 

@@ -17,8 +17,8 @@ public:
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
-	virtual inline UINT NumSRVsNeededForApp() override { return 1; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
+	virtual inline UINT NumSRVsNeededForApp() override { return NumSRVsInScene(); }
 	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
 
 	virtual HRESULT OnInit() override;

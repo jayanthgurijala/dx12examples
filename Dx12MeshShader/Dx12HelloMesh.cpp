@@ -42,12 +42,25 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	D3DX12_MESH_SHADER_PIPELINE_STATE_DESC psoDesc = {};
 
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	const UINT numDescRanges = 1;
+	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
+
+	const UINT numSrvsNeededForApp = NumSRVsNeededForApp();
+	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
+
+	auto rootCbv = dxhelper::GetRootCbv();
+	auto descTable = dxhelper::GetRootDescTable(descRanges);
+	auto materialsRootCbv = dxhelper::GetRootCbv(1);
+
+
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
-			0_rcbv,
-			"srv_4_0,uav_0_0,cbv_0_0"_dt, //texture, vb, ib, uv
+			rootCbv,
+			descTable,
+			materialsRootCbv
 		},
 		{ staticSampler });
 
@@ -104,7 +117,7 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	CreateAppBufferSrvDescriptorAtIndex(3, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
 
 
-	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f };
+	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 	m_meshCommandList->OMSetRenderTargets(1,
 									      &rtvHandle,

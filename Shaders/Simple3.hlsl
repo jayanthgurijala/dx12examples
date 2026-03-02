@@ -9,8 +9,6 @@ VSOutput_3 VSMain(VSInput_3 input)
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
     output.position      = mul(float4(input.position, 1.0f), g_mvpT);
-    output.position      /= output.position.w;
-    
     output.worldPosition = mul(float4(input.position, 1.0f), g_modelMatrixT);
     
     output.normal        = input.normal;
@@ -39,13 +37,11 @@ float4 PSMain(VSOutput_3 input) : SV_TARGET
     float3 N = normalize(input.normal);
     float3 L = normalize(lightDir.xyz);
     
-    float4 baseColor = baseColorFactor;
+
+    float4 baseColor = pbrBaseColorTexture.Sample(gSampler, input.texcoord);
+    float2 wrapped = frac(input.texcoord);
     
-    if (flags & HasBaseColorTexture)
-    {
-        baseColor *= pbrBaseColorTexture.Sample(gSampler, input.texcoord);
-    }
-    
+    //@todo force a=1 for opaque
     return float4(baseColor);
 
 }

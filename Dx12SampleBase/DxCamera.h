@@ -48,6 +48,7 @@ public:
 	VOID OnMouseUp(UINT x, UINT y, BOOL isLeftButton);
 	VOID OnMouseMove(UINT x, UINT y);
 	VOID MoveForward();
+	VOID MoveBack();
 
 	//inline XMVECTOR GetCameraPosition()
 	//{

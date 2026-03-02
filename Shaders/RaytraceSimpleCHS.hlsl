@@ -1,13 +1,16 @@
 #include "Raytracing.hlsli"
 #include "CameraBuffer.hlsli"
 
-Texture2D gTexture    : register(t0);
-SamplerState gSampler : register(s0);
-RaytracingAccelerationStructure Scene : register(t3, space0);
+Texture2D gTexture    : register(t0, space0); //t0 to t4
+
+StructuredBuffer<float2> uvVbBuffer : register(t0, space1);
+StructuredBuffer<uint> indexBuffer    : register(t1, space1);
+
+RaytracingAccelerationStructure Scene : register(t0, space2);
+
 RWTexture2D<float4> UAVOutput : register(u0, space0);
 
-StructuredBuffer<uint> indexBuffer : register(t1, space0);
-StructuredBuffer<float2> uvVbBuffer  : register(t2, space0);
+SamplerState gSampler : register(s0);
 
 
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.

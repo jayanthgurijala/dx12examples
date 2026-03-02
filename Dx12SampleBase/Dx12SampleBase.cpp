@@ -116,6 +116,10 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		{
 			m_sampleBase->m_camera->MoveForward();
         }
+		if (wParam == 'S')
+		{
+			m_sampleBase->m_camera->MoveBack();
+		}
 		break;
 
 	case WM_DESTROY:
@@ -608,7 +612,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
     
 	auto rast = dxhelper::GetRasterizerState(cullMode, fillMode);
     auto blend = dxhelper::GetBlendState(enableBlend);
-    BOOL enableDepthWrite = (enableBlend == TRUE) ? FALSE : TRUE;
+	BOOL enableDepthWrite = TRUE;//(enableBlend == TRUE) ? FALSE : TRUE;
 	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil, FALSE, enableDepthWrite);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -1093,41 +1097,41 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT nodeI
 		pCmdList->IASetVertexBuffers(vbvIndex, 1, &vbv);
 	}
 
-	///@todo this will no longer work for multiple primitives in the scene.
-	/*static UINT       s_numTrianglesToDraw = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
-	static const UINT s_maxTriangles               = s_numTrianglesToDraw;
-	static INT        s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
-
-	ImGui::Text("Triangle Count");
-	ImGui::SameLine();
-
-	if (ImGui::Button("-##tricountminus"))
-		s_numTrianglesToDrawFromUser -= 1;
-
-	ImGui::SameLine();
-
-
-	ImGui::SetNextItemWidth(80);
-	ImGui::InputInt("##trianglecount", &s_numTrianglesToDrawFromUser, 0, 0);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("+##tricountplus"))
-		s_numTrianglesToDrawFromUser += 1;
-
-	ImGui::SameLine();
-
-
-	if (ImGui::Button("Max"))
-		s_numTrianglesToDrawFromUser = s_maxTriangles;
-
-	if (ImGui::Button("Zero"))
-		s_numTrianglesToDrawFromUser = 0;
-
-
-	s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;*/
-
 	auto& primitiveDrawInfo = GetModelDrawInfo(nodeIndex, primitiveIndex);
+
+	/////@todo this will no longer work for multiple primitives in the scene.
+	//static UINT       s_numTrianglesToDraw = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
+	//static const UINT s_maxTriangles               = s_numTrianglesToDraw;
+	//static INT        s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
+	//
+	//ImGui::Text("Triangle Count");
+	//ImGui::SameLine();
+	//
+	//if (ImGui::Button("-##tricountminus"))
+	//	s_numTrianglesToDrawFromUser -= 1;
+	//
+	//ImGui::SameLine();
+	//
+	//
+	//ImGui::SetNextItemWidth(80);
+	//ImGui::InputInt("##trianglecount", &s_numTrianglesToDrawFromUser, 0, 0);
+	//
+	//ImGui::SameLine();
+	//
+	//if (ImGui::Button("+##tricountplus"))
+	//	s_numTrianglesToDrawFromUser += 1;
+	//
+	//ImGui::SameLine();
+	//
+	//
+	//if (ImGui::Button("Max"))
+	//	s_numTrianglesToDrawFromUser = s_maxTriangles;
+	//
+	//if (ImGui::Button("Zero"))
+	//	s_numTrianglesToDrawFromUser = 0;
+	//
+	//
+	//s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;
 
 	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
@@ -1158,11 +1162,12 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 			ID3D12RootSignature* pRootSignature = GetRootSignature();
 
 			assert(GetRootSignature() != nullptr);
+
 			const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
 			char vertexShaderName[64];
 			char pixelShaderName[64];
-			snprintf(vertexShaderName, 64, "Simple%zu_VS.cso", numAttributes);
-			snprintf(pixelShaderName, 64, "Simple%zu_PS.cso", numAttributes);
+			GetVertexShaderName(vertexShaderName, numAttributes);
+			GetPixelShaderName(pixelShaderName, numAttributes);
 
 			D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
 			inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
@@ -1498,7 +1503,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					primMaterialCB.roughnessFactor   = gltfPbrInfo.roughnessFactor;
 
 					// Lambda to load texture from DxGltfTextureInfo
-					auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo) -> ComPtr<ID3D12Resource>
+					auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
 						{
 							ComPtr<ID3D12Resource> textureResource = nullptr;
 
@@ -1514,24 +1519,21 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 									bufferSizeInBytes
 								);
 
-								textureResource = CreateTexture2DWithData(
-									imageData.pixels.data(),
-									imageData.pixels.size(),
-									imageData.width,
-									imageData.height
-								);
+								texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
+																					imageData.pixels.size(),
+																					imageData.width,
+																					imageData.height,
+																				     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 							}
-
-							return textureResource;
 						};
 
-					auto& primTextureInfo                       = currentPrim.materialTextures;
-					primTextureInfo.pbrBaseColorTexture         = LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture);
-					primTextureInfo.normalTexture               = LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture);
-					primTextureInfo.pbrMetallicRoughnessTexture = LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture);
-					primTextureInfo.occlusionTexture            = LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture);
-					primTextureInfo.emissiveTexture             = LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture);
+					auto& primTextureInfo = currentPrim.materialTextures;
 
+				    LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture,         primTextureInfo.pbrBaseColorTexture);
+					LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture,         primTextureInfo.normalTexture);
+					LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
+					LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture,       primTextureInfo.occlusionTexture);
+					LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture,         primTextureInfo.emissiveTexture);
 
 					auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
 						flags |= (texture != nullptr) ? bit : 0;
@@ -1545,11 +1547,11 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 					//HasMetallicRoughnessTex = 1 << 2,
 					//HasOcclusionTexture = 1 << 3,
 					//HasEmissiveTexture = 1 << 4,
-					SetFlag(primMaterialCB.flags, HasBaseColorTexture, primTextureInfo.pbrBaseColorTexture.Get());
-					SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.Get());
-					SetFlag(primMaterialCB.flags, HasEmissiveTexture, primTextureInfo.emissiveTexture.Get());
-					SetFlag(primMaterialCB.flags, HasNormalTexture, primTextureInfo.normalTexture.Get());
-					SetFlag(primMaterialCB.flags, HasOcclusionTexture, primTextureInfo.occlusionTexture.Get());
+					SetFlag(primMaterialCB.flags, HasBaseColorTexture,     primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
+					SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
+					SetFlag(primMaterialCB.flags, HasEmissiveTexture,      primTextureInfo.emissiveTexture.textureInfo.Get());
+					SetFlag(primMaterialCB.flags, HasNormalTexture,        primTextureInfo.normalTexture.textureInfo.Get());
+					SetFlag(primMaterialCB.flags, HasOcclusionTexture,     primTextureInfo.occlusionTexture.textureInfo.Get());
 
 					//DoubleSided = 1 << 7
 					primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
@@ -1595,11 +1597,11 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 			auto& currentPrim = GetPrimitiveInfo(nodeIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
 			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.Get());			//t0
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 1, primTextureInfo.pbrMetallicRoughnessTexture.Get());	//t1
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 2, primTextureInfo.normalTexture.Get());			    //t2
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 3, primTextureInfo.occlusionTexture.Get());				//t3	
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 4, primTextureInfo.emissiveTexture.Get());				//t4
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 1, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());	//t1
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 2, primTextureInfo.normalTexture.textureInfo.Get());			    //t2
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 3, primTextureInfo.occlusionTexture.textureInfo.Get());				//t3	
+			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 4, primTextureInfo.emissiveTexture.textureInfo.Get());				//t4
 			primitiveIndex++;
 		}
 	}

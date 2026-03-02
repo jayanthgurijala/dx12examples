@@ -19,17 +19,26 @@ public:
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp()         override { return 1; }
-	virtual inline UINT NumSRVsNeededForApp()         override { return 3; } //srv tex + vbsrv + ibsrv
+
+	virtual inline UINT NumSRVsNeededForApp()         override 
+	{
+        const UINT numSrvsInScene            = NumSRVsInScene();
+        const UINT numExtraSrvsForRaytracing = NumSrvsForRaytracing(); //uv buffer srv and index buffer srv
+		return numSrvsInScene + numExtraSrvsForRaytracing;
+	} 
+	
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
-	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
+	virtual inline const std::string GltfFileName() override { return "oaktree.gltf"; }
 
 private:
 	VOID BuildBlasAndTlas();
 	VOID CreateRtPSO();
 	VOID BuildShaderTables();
 	VOID CreateUAVOutput();
+
+	inline UINT NumSrvsForRaytracing() { return 2; }
 
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
@@ -49,8 +58,12 @@ private:
 	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_hitTableBaseAddress;
 	D3D12_GPU_VIRTUAL_ADDRESS_RANGE_AND_STRIDE m_missTableBaseAddress;
 
-	ComPtr<ID3D12Resource> m_uavOutputResource;
+	ComPtr<ID3D12Resource>      m_uavOutputResource;
 	ComPtr<ID3D12RootSignature> m_rootSignature;
+
+	UINT m_rootCbvIndex;
+	UINT m_descTableIndex;
+	UINT m_tlasSrvRootParamIndex;
 };
 
 

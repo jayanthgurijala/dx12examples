@@ -18,15 +18,26 @@ Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 
 HRESULT Dx12HelloWorld::OnInit()
 {
-	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
+
+	const UINT numDescRanges = 1;
+    std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
+
+    const UINT numSrvsNeededForApp = NumSRVsNeededForApp();
+	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
+
+	auto rootCbv          = dxhelper::GetRootCbv();
+	auto descTable        = dxhelper::GetRootDescTable(descRanges);
+    auto materialsRootCbv = dxhelper::GetRootCbv(1);
+
 
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
-			0_rcbv,
-			"srv_5_0,uav_0_0,cbv_0_0"_dt,
-			1_rcbv
+			rootCbv,
+			descTable,
+			materialsRootCbv
 		},
 		{ staticSampler });
 
@@ -63,11 +74,11 @@ HRESULT Dx12HelloWorld::RenderFrame()
 
 	UINT primIdxInScene       = 0;
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
-	const UINT numNodes       = NumNodesInScene();
+	const UINT numNodes = NumNodesInScene();
 
 	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 	{
-		const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrims =  NumPrimitivesInNodeMesh(nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
 			auto& curPrimitive = GetPrimitiveInfo(nodeIdx, primIdx);

@@ -18,8 +18,6 @@ using namespace DirectX;
 
 static std::wstring s_hitgroup_1 = L"Hitgroup_1";
 
-
-//@note size must match Ray payload
 struct RayPayload
 {
 	float color[4];
@@ -140,7 +138,25 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 VOID Dx12Raytracing::CreateRtPSO()
 {
+	//@todo gltf description has sampler info for each texture
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+    const UINT numSrvsForModelMaterials  = NumSRVsInScene();
+    const UINT numExtraSrvsForRaytracing = NumSrvsForRaytracing(); //uv buffer srv and index buffer srv
+    const UINT numUavsInScene            = NumUAVsNeededForApp();
+	const UINT numCbvsInScene            = 0;
+
+    ///@note One range for model meterial SRVs(space = 0), one range for vertex buffer SRV and index buffer srv (space = 1), and one for UAV
+	const UINT numDescTableRanges = 3;
+    std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
+    descTableRanges[0] = dxhelper::GetSRVDescRange(numSrvsForModelMaterials, 0, 0); //model material SRVs
+    descTableRanges[1] = dxhelper::GetSRVDescRange(numExtraSrvsForRaytracing, 0, 1); //vertex buffer SRV and index buffer srv
+    descTableRanges[2] = dxhelper::GetUAVDescRange(numUavsInScene, 0, 0); //output UAV
+
+	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
+    auto rootSrv = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
+
+    auto rootCbv = dxhelper::GetRootCbv(); //camera buffer at register space 0
 
 	dxhelper::DxCreateRootSignature
 	(
@@ -149,12 +165,33 @@ VOID Dx12Raytracing::CreateRtPSO()
 		//camera buffer, texture stv, output uav, AS, vertex buffer, index buffer
 		&m_rootSignature,
 		{
-			0_rcbv,  //Camera Data
-			"srv_3_0,uav_1_0,cbv_0_0"_dt, // Texture SRV,  AS SRV, Vertex Buffer SRV, Index Buffer SRV, Output UAV,
-			3_rsrv
+			rootCbv,
+			rootDescriptorTable,
+			rootSrv
 		},
 		{staticSampler}
 	);
+
+	///create the extra two SRV descriptors for raytracing
+	{
+		auto uvVbBufferRes = GetModelUvVertexBufferResource();
+		auto uvVbView = GetModelUvBufferView();
+
+		const UINT uvVbElementSizeInBytes = 4;
+		const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;
+		CreateAppBufferSrvDescriptorAtIndex(numSrvsForModelMaterials + 0, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+
+		auto indexBufferRes = GetModelIndexBufferResource();
+		auto indexBufferView = GetModelIndexBufferView(0);
+
+		const UINT ibElementSizeInBytes = 4;
+		const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
+		CreateAppBufferSrvDescriptorAtIndex(numSrvsForModelMaterials + 1, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+	}
+
+    m_rootCbvIndex = 0;
+    m_descTableIndex = 1;
+	m_tlasSrvRootParamIndex = 2;
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
 
@@ -289,25 +326,20 @@ VOID Dx12Raytracing::CreateUAVOutput()
 		                                D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		                                nullptr,
 		                                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+	//@todo this is a bit confusing beacuse UAVs are created after all SRVs.
+	// in this case after srvs for materials and ray tracing srvs.
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
 HRESULT Dx12Raytracing::RenderFrame()
 {
 	static BOOL vbIbTransitioned = FALSE;
-	auto indexBufferRes = GetModelIndexBufferResource();
-	auto indexBufferView = GetModelIndexBufferView(0);
 
-	const UINT ibElementSizeInBytes = 4;
-	const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
-	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, ibNumElements, ibElementSizeInBytes);
-
+    //@todo optimization - transition resources once in init and keep them in the required state for raytracing instead of transitioning every frame.
+	// This is just to keep the sample code simple and focused on raytracing.
 	auto uvVbBufferRes = GetModelUvVertexBufferResource();
-	auto uvVbView      = GetModelUvBufferView();
-
-	const UINT uvVbElementSizeInBytes = 4;
-	const UINT uvVbNumElements        = uvVbView.SizeInBytes / 4;
-	CreateAppBufferSrvDescriptorAtIndex(2, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+	auto indexBufferRes = GetModelIndexBufferResource();
 
 	ImGui::Text("Ray Tracing");
 
@@ -345,7 +377,8 @@ HRESULT Dx12Raytracing::RenderFrame()
 	//Root args required - UAV in the descriptor heap and Accelaration structure
 	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetCameraBuffer());
 	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppSrvGpuHandle(0));
-	m_dxrCommandList->SetComputeRootShaderResourceView(2, m_tlasResultBuffer->GetGPUVirtualAddress());
+	m_dxrCommandList->SetComputeRootShaderResourceView(m_tlasSrvRootParamIndex, m_tlasResultBuffer->GetGPUVirtualAddress());
+
 
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);
 

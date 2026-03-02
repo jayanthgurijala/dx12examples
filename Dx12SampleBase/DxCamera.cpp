@@ -24,7 +24,7 @@ DxCamera::DxCamera(UINT width, UINT height)
 	m_lookAt = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	m_up = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 
-    m_fovYInRadians = XMConvertToRadians(60);
+    m_fovYInRadians = XMConvertToRadians(45);
 }
 
 XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
@@ -138,8 +138,8 @@ VOID DxCamera::CreateProjectionMatrix()
 {
     m_projectionMatrix = XMMatrixPerspectiveFovLH(m_fovYInRadians,
                                                   m_viewportAspectRatio,
-                                                  1.0f,
-                                                  125.0f);
+                                                  0.01f,
+                                                  1000.0f);
 
 }
 
@@ -306,7 +306,19 @@ VOID DxCamera::OnMouseMove(UINT x, UINT y)
 
 VOID DxCamera::MoveForward()
 {
-	float speed = 5.0f;
+	float speed = 0.5f;
+	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
+	FLOAT moveDistance = speed * frameDeltaTime;
+	FLOAT camZ = XMVectorGetZ(m_cameraPosition);
+	camZ += moveDistance;
+	m_cameraPosition = XMVectorSetZ(m_cameraPosition, camZ);
+	UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
+
+}
+
+VOID DxCamera::MoveBack()
+{
+	float speed = -0.5f;
 	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
 	FLOAT moveDistance = speed * frameDeltaTime;
 	FLOAT camZ = XMVectorGetZ(m_cameraPosition);

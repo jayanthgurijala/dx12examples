@@ -24,13 +24,24 @@ HRESULT Dx12Tessellation::OnInit()
 	auto pDevice = GetDevice();
 
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+
+	const UINT numDescRanges = 1;
+	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
+
+	const UINT numSrvsNeededForApp = NumSRVsNeededForApp();
+	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
+
+	auto rootCbv = dxhelper::GetRootCbv();
+	auto descTable = dxhelper::GetRootDescTable(descRanges);
+	auto rootConstant = dxhelper::GetRootConstants(1, 1);
+
 	dxhelper::DxCreateRootSignature(
 		pDevice,
 		&m_pRootSignature,
 		{
-			0_rcbv,
-			"srv_1_0,uav_0_0,cbv_0_0"_dt,
-			"1_1"_rc
+			rootCbv,
+			descTable,
+			rootConstant
 		},
 		{ staticSampler });
 
@@ -110,7 +121,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
-	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f };
+	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,

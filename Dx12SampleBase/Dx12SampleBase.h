@@ -276,7 +276,10 @@ protected:
 	inline UINT NumSRVsInScene()
 	{
 		assert(UINT_MAX / NumSRVsPerPrimitive() > NumPrimsInScene());
-		return NumPrimsInScene() * NumSRVsPerPrimitive();
+        const UINT numPrimsInScene = NumPrimsInScene();
+        const UINT numSrvsPerPrimitive = NumSRVsPerPrimitive();
+        const UINT totalSrvs = numPrimsInScene * numSrvsPerPrimitive;
+		return totalSrvs;
 	}
 
 	virtual inline DxCamera* GetCamera() { return m_camera.get(); }
@@ -291,7 +294,17 @@ protected:
 	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
 	virtual ID3D12RootSignature* GetRootSignature() { return nullptr; }
 	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
-	//virtual inline const Dx 
+
+    virtual inline void GetVertexShaderName(char* outVsNameString, SIZE_T numVertexAttributes)
+	{
+		snprintf(outVsNameString, 64, "Simple%zu_VS.cso", numVertexAttributes);
+	}
+
+	virtual inline void GetPixelShaderName(char* outPsNameString, SIZE_T numVertexAttributes)
+	{
+		snprintf(outPsNameString, 64, "Simple%zu_PS.cso", numVertexAttributes);
+	}
+
 
 	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);

@@ -194,13 +194,19 @@ struct DxMaterialCB
 	FLOAT padding[3];
 };
 
+struct DxTextureSamplerInfo
+{
+	ComPtr<ID3D12Resource> textureInfo;
+	D3D12_SAMPLER_DESC     samplerInfo;
+};
+
 struct DxMaterialResourceInfo
 {
-	ComPtr<ID3D12Resource> pbrBaseColorTexture;
-	ComPtr<ID3D12Resource> pbrMetallicRoughnessTexture;
-	ComPtr<ID3D12Resource> normalTexture;
-	ComPtr<ID3D12Resource> occlusionTexture;
-	ComPtr<ID3D12Resource> emissiveTexture;
+	DxTextureSamplerInfo pbrBaseColorTexture;
+	DxTextureSamplerInfo pbrMetallicRoughnessTexture;
+	DxTextureSamplerInfo normalTexture;
+	DxTextureSamplerInfo occlusionTexture;
+	DxTextureSamplerInfo emissiveTexture;
 
 	//@note Resource holds data for all the primitives and it is chunked per primitive
 	D3D12_GPU_VIRTUAL_ADDRESS meterialCb;
