@@ -151,14 +151,15 @@ namespace dxhelper
 	inline VOID DxCreateRootSignature(ID3D12Device* pDevice,
 									  ID3D12RootSignature** ppRootSignature,
 									  const std::vector<CD3DX12_ROOT_PARAMETER>& rootParameters,
-									  const std::vector< CD3DX12_STATIC_SAMPLER_DESC>& staticSampleDesc)
+									  const std::vector< CD3DX12_STATIC_SAMPLER_DESC>& staticSampleDesc,
+									  D3D12_ROOT_SIGNATURE_FLAGS flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)
 	{
 		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc(
 			rootParameters.size(), 
 			rootParameters.data(),
 			staticSampleDesc.size(),
 			staticSampleDesc.data(),
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+			flags);
 
 		ComPtr<ID3DBlob> error;
 		ComPtr<ID3DBlob> signature;

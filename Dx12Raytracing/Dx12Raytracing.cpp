@@ -16,7 +16,12 @@
 
 using namespace DirectX;
 
-static std::wstring s_hitgroup_1 = L"Hitgroup_1";
+static LPCWSTR s_hitGroups[] =
+{
+	L"HitGroup_opaque",
+	L"HitGroup_mask"
+};
+
 
 struct RayPayload
 {
@@ -74,6 +79,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 		std::vector< D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(numPrimsInScene);
 		for (UINT primIdx = 0; primIdx < numPrimsInScene; primIdx++)
 		{
+			BOOL isTransparent = IsPrimitiveTransparent(nodeIdx, primIdx);
 			const D3D12_INDEX_BUFFER_VIEW indexBufferView   = GetModelIndexBufferView(nodeIdx, primIdx);
 			const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(nodeIdx, primIdx);
 			const DxDrawPrimitive         drawInfo = GetDrawInfo(nodeIdx, primIdx);
@@ -90,7 +96,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 			//Object space -> new object space
 			geomDesc.Triangles.Transform3x4 = 0;
-			geomDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+			geomDesc.Flags = ((isTransparent == FALSE) ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE);
 		}
 
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = {};
@@ -127,6 +133,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 		D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = instanceDescs[nodeIdx];
 		memcpy(instanceDesc.Transform, &pData, sizeof(instanceDesc.Transform));
 		instanceDesc.InstanceMask = 1;
+		instanceDesc.InstanceContributionToHitGroupIndex = nodeIdx;
 		instanceDesc.AccelerationStructure = m_blasResultBuffer[nodeIdx]->GetGPUVirtualAddress();
 	}
 
@@ -158,6 +165,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	ExecuteBuildAccelerationStructures();
 }
 
+
 VOID Dx12Raytracing::CreateRtPSO()
 {
 	//@todo gltf description has sampler info for each texture
@@ -177,9 +185,13 @@ VOID Dx12Raytracing::CreateRtPSO()
 
 	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
     auto rootSrv = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
-
     auto rootCbv = dxhelper::GetRootCbv(); //camera buffer at register space 0
 
+
+	///@note In Raytracing, root signature needs to be divided into local and global root signature.
+	// Camera Data, TLAS, UAV Output and sampler (for now) - part of global root sig
+	// Prim Textures and Material Data - move to local root signature
+	// Local root sig? - Root CBV with material info and DescTable with "5" textures 
 	dxhelper::DxCreateRootSignature
 	(
 		m_dxrDevice.Get(),
@@ -193,6 +205,27 @@ VOID Dx12Raytracing::CreateRtPSO()
 		},
 		{staticSampler}
 	);
+
+	{
+		const UINT numDescTableRanges = 1;
+		std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
+		descTableRanges[0]       = dxhelper::GetSRVDescRange(NumSRVsPerPrimitive(), 0, 3);
+		auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
+		auto rootCbv             = dxhelper::GetRootCbv(0, 3);
+		dxhelper::DxCreateRootSignature
+		(
+			m_dxrDevice.Get(),
+			&m_localRootSignature,
+			{
+				rootCbv,
+				rootDescriptorTable
+			},
+			{},
+			D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE
+		);
+	}
+
+	assert(m_localRootSignature != nullptr);
 
 	///create the extra two SRV descriptors for raytracing
 	{
@@ -214,6 +247,7 @@ VOID Dx12Raytracing::CreateRtPSO()
     m_rootCbvIndex = 0;
     m_descTableIndex = 1;
 	m_tlasSrvRootParamIndex = 2;
+
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
 
@@ -221,7 +255,8 @@ VOID Dx12Raytracing::CreateRtPSO()
 		{ L"MyRaygenShader", nullptr, D3D12_EXPORT_FLAG_NONE },
 		{ L"MyMissShader", nullptr, D3D12_EXPORT_FLAG_NONE },
 		{ L"CHSBaseColorTexturing", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"CHSNormalMapping", nullptr, D3D12_EXPORT_FLAG_NONE }
+		{ L"CHSNormalMapping", nullptr, D3D12_EXPORT_FLAG_NONE },
+		{ L"AHSAlphaCutOff", nullptr, D3D12_EXPORT_FLAG_NONE}
 	};
 
 	D3D12_DXIL_LIBRARY_DESC dxilLibDesc = {};
@@ -234,16 +269,22 @@ VOID Dx12Raytracing::CreateRtPSO()
 	dxilLibSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
 	dxilLibSubobject.pDesc = &dxilLibDesc;
 
-
-	D3D12_HIT_GROUP_DESC hitGroupDesc = {};
-	hitGroupDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-	hitGroupDesc.HitGroupExport = s_hitgroup_1.c_str();
-	hitGroupDesc.ClosestHitShaderImport = exports[2].Name;
-
-	
+	D3D12_HIT_GROUP_DESC hitGroupOpaqueDesc = {};
+	hitGroupOpaqueDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+	hitGroupOpaqueDesc.HitGroupExport = s_hitGroups[0];
+	hitGroupOpaqueDesc.ClosestHitShaderImport = exports[2].Name;
 	D3D12_STATE_SUBOBJECT hitGroup_1SubObject = {};
 	hitGroup_1SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-	hitGroup_1SubObject.pDesc = &hitGroupDesc;
+	hitGroup_1SubObject.pDesc = &hitGroupOpaqueDesc;
+
+	D3D12_HIT_GROUP_DESC hitGroupMaskDesc = {};
+	hitGroupMaskDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
+	hitGroupMaskDesc.HitGroupExport = s_hitGroups[1];
+	hitGroupMaskDesc.ClosestHitShaderImport = exports[2].Name;
+	hitGroupMaskDesc.AnyHitShaderImport = exports[4].Name;
+	D3D12_STATE_SUBOBJECT hitgroupMaskSubObj = {};
+	hitgroupMaskSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+	hitgroupMaskSubObj.pDesc = &hitGroupMaskDesc;
 
 
 	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
@@ -256,10 +297,10 @@ VOID Dx12Raytracing::CreateRtPSO()
 
 	D3D12_GLOBAL_ROOT_SIGNATURE globalRootSigDesc = {};
 	globalRootSigDesc.pGlobalRootSignature = m_rootSignature.Get();
-
 	D3D12_STATE_SUBOBJECT globalRootSigSubObject = {};
 	globalRootSigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
 	globalRootSigSubObject.pDesc = &globalRootSigDesc;
+
 
 	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
 	pipelineConfig.MaxTraceRecursionDepth = 1;
@@ -268,34 +309,70 @@ VOID Dx12Raytracing::CreateRtPSO()
 	pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
 	pipelineConfigSubobject.pDesc = &pipelineConfig;
 
+	D3D12_LOCAL_ROOT_SIGNATURE localRootSigDesc = {};
+	localRootSigDesc.pLocalRootSignature = m_localRootSignature.Get();
+	D3D12_STATE_SUBOBJECT localRootSigSubObject = {};
+	localRootSigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
+	localRootSigSubObject.pDesc = &localRootSigDesc;
+
+	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigToHitGroup;
+	localRootSigToHitGroup.NumExports = _countof(s_hitGroups);
+	localRootSigToHitGroup.pExports = s_hitGroups;
+	localRootSigToHitGroup.pSubobjectToAssociate = &localRootSigSubObject;
+
+	D3D12_STATE_SUBOBJECT localSigAssociationSubObj;
+	localSigAssociationSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
+	localSigAssociationSubObj.pDesc = &localRootSigToHitGroup;
+
 	D3D12_STATE_SUBOBJECT subobjects[] = {
 				dxilLibSubobject,
 				hitGroup_1SubObject,
+				hitgroupMaskSubObj,
+				localRootSigSubObject,
+				localSigAssociationSubObj,
 				shaderConfigSubObject,
-				globalRootSigSubObject,
-				pipelineConfigSubobject
+				pipelineConfigSubobject,
+				globalRootSigSubObject
 	};
 
-	D3D12_STATE_OBJECT_DESC stateObjectDesc = {};
-	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	stateObjectDesc.NumSubobjects = _countof(subobjects);
-	stateObjectDesc.pSubobjects = subobjects;
+	//$%@#$@#$!@#!@#$@#$@#$ nonsense
+	localRootSigToHitGroup.pSubobjectToAssociate = &subobjects[3];
 
-	m_dxrDevice->CreateStateObject(
-				&stateObjectDesc,
-				IID_PPV_ARGS(&m_rtpso));
+	D3D12_STATE_OBJECT_DESC stateObjectDesc = {};
+	stateObjectDesc.Type                    = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+	stateObjectDesc.NumSubobjects           = _countof(subobjects);
+	stateObjectDesc.pSubobjects             = subobjects;
+
+	m_dxrDevice->CreateStateObject(&stateObjectDesc,
+								   IID_PPV_ARGS(&m_rtpso));
+
+	assert(m_rtpso != nullptr);
 }
 
 VOID Dx12Raytracing::BuildShaderTables()
 {
+	UINT numNodesInScene = NumNodesInScene();
+	UINT totalPrimIdx = 0;
+	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+	{
+		UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+		for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
+		{
+			totalPrimIdx++;
+		}
+	}
+
+	const UINT totalPrimsInScene = totalPrimIdx;
+
 	ComPtr<ID3D12StateObjectProperties> props;
 	m_rtpso->QueryInterface(IID_PPV_ARGS(&props));
 
-	void* raygenShaderID = props->GetShaderIdentifier(L"MyRaygenShader");
-	void* missShaderID   = props->GetShaderIdentifier(L"MyMissShader");
-	void* hitgroupID     = props->GetShaderIdentifier(s_hitgroup_1.c_str());
+	void* raygenShaderID   = props->GetShaderIdentifier(L"MyRaygenShader");
+	void* missShaderID     = props->GetShaderIdentifier(L"MyMissShader");
+	void* hitgroupOpaqueID = props->GetShaderIdentifier(s_hitGroups[0]);
+	void* hitgroupMaskID   = props->GetShaderIdentifier(s_hitGroups[1]);
 
-	assert(raygenShaderID != nullptr && missShaderID != nullptr && hitgroupID != nullptr);
+	assert(raygenShaderID != nullptr && missShaderID != nullptr && hitgroupOpaqueID != nullptr && hitgroupMaskID != nullptr);
 
 	const UINT shaderRecordSize = D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT; // 32 bytes
 	const UINT sectionAlignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;  //64 bytes alignment
@@ -303,36 +380,69 @@ VOID Dx12Raytracing::BuildShaderTables()
 	UINT64 rayGenTableSize   = shaderRecordSize;
 	UINT64 rayGenAlignedSize = dxhelper::DxAlign(rayGenTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
-	UINT64 hitGroupTableSize   = shaderRecordSize;
+	UINT64 hitGroupTableSize   = shaderRecordSize + sizeof(D3D12_GPU_VIRTUAL_ADDRESS) + sizeof (D3D12_GPU_DESCRIPTOR_HANDLE);
 	UINT64 hitGroupAlignedSize = dxhelper::DxAlign(hitGroupTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+	UINT64 hitGroupTotalSizeInBytes = hitGroupAlignedSize * totalPrimsInScene;
 
 	UINT64 missTableSize        = shaderRecordSize;
 	UINT64 missTableAlignedSize = dxhelper::DxAlign(missTableSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
+	UINT numHitGroups = _countof(s_hitGroups);
 
-	const UINT64 sbtTableTotalSize = rayGenAlignedSize + hitGroupAlignedSize + missTableAlignedSize;
-	BYTE* sbtDataStart = static_cast<BYTE*>(malloc(sbtTableTotalSize));
-	BYTE* sbtDataWritePtr = sbtDataStart;
-	memcpy(sbtDataWritePtr, raygenShaderID, rayGenTableSize);
-	sbtDataWritePtr += rayGenAlignedSize;
+	const UINT64 sbtTableTotalSize = rayGenAlignedSize + hitGroupTotalSizeInBytes + missTableAlignedSize;
+	BYTE* const sbtDataStart       = static_cast<BYTE*>(malloc(sbtTableTotalSize));
+	BYTE* sbtDataWritePtr          = sbtDataStart;
 
-	memcpy(sbtDataWritePtr, hitgroupID, hitGroupTableSize);
-	sbtDataWritePtr += hitGroupAlignedSize;
+	{
+		memcpy(sbtDataWritePtr, raygenShaderID, rayGenTableSize);
+		sbtDataWritePtr += rayGenAlignedSize;
+	}
 
+	{
+		BYTE* const pHitGroupStartWritePtr = sbtDataWritePtr;
+		UINT numNodesInScene = NumNodesInScene();
+		UINT totalPrimIdx = 0;
+		const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
+		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+		{
+			UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
+			{
+				auto& curPrimitive    = GetPrimitiveInfo(nodeIdx, primIdx);
+				BOOL needsAnyHit      = IsPrimitiveTransparent(nodeIdx, primIdx);
+				auto gpuVAMaterialsCB = curPrimitive.materialTextures.meterialCb;
+				auto gpuVAMatTex      = GetAppSrvGpuHandle(totalPrimIdx * numSrvsPerPrim);
+				void* curHitGroupID   = (needsAnyHit == TRUE) ? hitgroupMaskID : hitgroupOpaqueID;
+
+				memcpy(sbtDataWritePtr, curHitGroupID, hitGroupTableSize);
+				sbtDataWritePtr += shaderRecordSize;
+				memcpy(sbtDataWritePtr, &gpuVAMaterialsCB, sizeof(gpuVAMaterialsCB));
+				sbtDataWritePtr += sizeof(gpuVAMaterialsCB);
+				memcpy(sbtDataWritePtr, &gpuVAMatTex, sizeof(gpuVAMatTex));
+				sbtDataWritePtr += sizeof(gpuVAMatTex);
+
+				assert(pHitGroupStartWritePtr + totalPrimIdx * hitGroupAlignedSize + hitGroupTableSize == sbtDataWritePtr);
+				totalPrimIdx++;
+				sbtDataWritePtr = pHitGroupStartWritePtr + hitGroupAlignedSize * totalPrimIdx;
+			}
+		}
+	}
+
+	assert(sbtDataWritePtr == sbtDataStart + rayGenAlignedSize + hitGroupAlignedSize * totalPrimsInScene);
 	memcpy(sbtDataWritePtr, missShaderID, missTableSize);
 
 	m_shaderBindingTable = CreateBufferWithData(sbtDataStart, sbtTableTotalSize, "ShaderBindingTable");
 
 	m_rayGenBaseAddress.StartAddress = m_shaderBindingTable->GetGPUVirtualAddress();
-	m_rayGenBaseAddress.SizeInBytes = shaderRecordSize;
+	m_rayGenBaseAddress.SizeInBytes = rayGenTableSize;
 
 	m_hitTableBaseAddress.StartAddress = m_rayGenBaseAddress.StartAddress + rayGenAlignedSize;
-	m_hitTableBaseAddress.SizeInBytes = shaderRecordSize;
-	m_hitTableBaseAddress.StrideInBytes = shaderRecordSize;
+	m_hitTableBaseAddress.SizeInBytes = hitGroupAlignedSize;
+	m_hitTableBaseAddress.StrideInBytes = hitGroupAlignedSize;
 
-	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupAlignedSize;
-	m_missTableBaseAddress.SizeInBytes = shaderRecordSize;
-	m_missTableBaseAddress.StrideInBytes = shaderRecordSize;
+	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupAlignedSize * totalPrimsInScene;
+	m_missTableBaseAddress.SizeInBytes = missTableSize;
+	m_missTableBaseAddress.StrideInBytes = missTableSize;
 
 	free(sbtDataStart);
 }

@@ -1,7 +1,7 @@
 #include "Raytracing.hlsli"
 #include "CameraBuffer.hlsli"
 
-Texture2D gTexture    : register(t0, space0); //t0 to t4
+Texture2D gTexture    : register(t0, space3); //t0 to t4
 
 StructuredBuffer<float2> uvVbBuffer : register(t0, space1);
 StructuredBuffer<uint> indexBuffer    : register(t1, space1);
@@ -43,7 +43,14 @@ void MyRaygenShader()
     ray.TMin      = 0.001;
     ray.TMax      = 100;
     
-    TraceRay(Scene, 0, 0xFF, 0, 0, 0, ray, payload);
+    TraceRay(Scene,
+             0,
+             0xFF,
+             0,
+             0,
+            0,
+            ray,
+            payload);
     
      // Write the raytraced color to the output texture.
     UAVOutput[DispatchRaysIndex().xy] = payload.color;
@@ -90,6 +97,58 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     payload.color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
 }
 
+[shader("anyhit")]
+void AHSAlphaCutOff(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    uint primitiveIndexInGeom = PrimitiveIndex();
+    uint numIndicesPerPrim = 3;
+    uint numBytesPerIndex = 2;
+    uint byteOffsetIntoIndexBuffer = primitiveIndexInGeom * numIndicesPerPrim * numBytesPerIndex;
+    
+    //16-bit buffer Index?
+    uint indexAccessedAs2Byte = byteOffsetIntoIndexBuffer / 2;
+    
+    //32-bit buffer?
+    uint indexAccessedAs4Byte = byteOffsetIntoIndexBuffer / 4;
+
+    
+    uint3 indices;
+    if (indexAccessedAs2Byte % 2 == 0)
+    {
+        indices.x = indexBuffer[indexAccessedAs4Byte] & 0x0000FFFF;
+        indices.y = (indexBuffer[indexAccessedAs4Byte] >> 16) & 0x0000FFFF;
+        indices.z = indexBuffer[indexAccessedAs4Byte + 1] & 0x0000FFFF;
+    }
+    else
+    {
+        indices.x = (indexBuffer[indexAccessedAs4Byte] >> 16) & 0x0000FFFF;
+        indices.y = indexBuffer[indexAccessedAs4Byte + 1] & 0x0000FFFF;
+        indices.z = (indexBuffer[indexAccessedAs4Byte + 1] >> 16) & 0x0000FFFF;
+    }
+
+    float2 uv0 = uvVbBuffer[indices.x];
+    float2 uv1 = uvVbBuffer[indices.y];
+    float2 uv2 = uvVbBuffer[indices.z];
+    
+    float b0 = (1 - attr.barycentrics.x - attr.barycentrics.y);
+    float b1 = attr.barycentrics.x;
+    float b2 = attr.barycentrics.y;
+    
+    float2 uvInterpolated = b1 * uv1 + b2 * uv2 + b0 * uv0;
+    float4 color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
+    
+    if (color.a < 0.5f)
+    {
+        IgnoreHit();
+    }
+    else
+    {
+        AcceptHitAndEndSearch();
+    }
+    
+   
+}
+
 [shader("closesthit")]
 void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -99,5 +158,5 @@ void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    //payload.color = float4(0.8f, 0.1f, 0.1f, 1.0f);
+    payload.color = float4(0.5f, 0.5f, 0.5f, 1.0f);
 }

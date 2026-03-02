@@ -893,7 +893,6 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
 	CreateSceneMVPMatrix();
-	CreateSceneMaterialCb();
 
 	//@todo only for integrating and testing imgui
 	ImGui_ImplDX12_NewFrame();
@@ -1145,9 +1144,6 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT nodeI
 	}
 }
 
-
-
-
 HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 {
 	HRESULT result = S_OK;
@@ -1186,21 +1182,7 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 				                                                         blendEnabled);				    
 		}
 	}
-
 	
-
-	
-
-	
-
-	
-
-
-	
-
-
-	
-
 	return result;
 }
 
@@ -1605,7 +1587,7 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 			primitiveIndex++;
 		}
 	}
-
+	CreateSceneMaterialCb();
 }
 
 

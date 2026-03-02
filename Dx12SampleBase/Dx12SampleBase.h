@@ -167,6 +167,15 @@ protected:
 		return GetMeshInfo(nodeIndex).primitives[primitiveIndex];
 	}
 
+	inline BOOL IsPrimitiveTransparent(UINT nodeIndex, UINT primitiveIndex)
+	{
+		auto curPrim = GetPrimitiveInfo(nodeIndex, primitiveIndex);
+		BOOL isBlend = (((curPrim.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE);
+		BOOL isAlphaMask = (((curPrim.materialCbData.flags & AlphaModeMask) == 0) ? FALSE : TRUE);
+		BOOL isTransparent = (isBlend == TRUE || isAlphaMask == TRUE);
+		return isTransparent;
+	}
+
 	inline DxPrimVertexData& GetPrimitiveVertexData(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
 	{
 		return GetPrimitiveInfo(nodeIndex, primitiveIndex).vertexBufferInfo[vbIndex];
