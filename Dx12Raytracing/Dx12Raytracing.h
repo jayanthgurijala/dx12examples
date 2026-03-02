@@ -43,8 +43,8 @@ private:
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 
-	ComPtr<ID3D12Resource> m_blasResultBuffer;
-	ComPtr<ID3D12Resource> m_blasScratchBuffer;
+	std::vector<ComPtr<ID3D12Resource>> m_blasResultBuffer;
+	std::vector<ComPtr<ID3D12Resource>> m_blasScratchBuffer; //@todo remove this
 
 	ComPtr<ID3D12Resource> m_instanceDescBuffer;
 	ComPtr<ID3D12Resource> m_tlasScratchBuffer;
