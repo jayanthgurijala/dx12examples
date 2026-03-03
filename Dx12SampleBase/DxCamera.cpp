@@ -306,7 +306,7 @@ VOID DxCamera::OnMouseMove(UINT x, UINT y)
 
 VOID DxCamera::MoveForward()
 {
-	float speed = 0.5f;
+	float speed = 1.5f;
 	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
 	FLOAT moveDistance = speed * frameDeltaTime;
 	FLOAT camZ = XMVectorGetZ(m_cameraPosition);

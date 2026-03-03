@@ -437,10 +437,10 @@ VOID Dx12Raytracing::BuildShaderTables()
 	m_rayGenBaseAddress.SizeInBytes = rayGenTableSize;
 
 	m_hitTableBaseAddress.StartAddress = m_rayGenBaseAddress.StartAddress + rayGenAlignedSize;
-	m_hitTableBaseAddress.SizeInBytes = hitGroupAlignedSize;
+	m_hitTableBaseAddress.SizeInBytes  = hitGroupTotalSizeInBytes;
 	m_hitTableBaseAddress.StrideInBytes = hitGroupAlignedSize;
 
-	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupAlignedSize * totalPrimsInScene;
+	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupTotalSizeInBytes;
 	m_missTableBaseAddress.SizeInBytes = missTableSize;
 	m_missTableBaseAddress.StrideInBytes = missTableSize;
 
