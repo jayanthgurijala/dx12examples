@@ -28,7 +28,7 @@ HRESULT Dx12Tessellation::OnInit()
 	const UINT numDescRanges = 1;
 	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-	const UINT numSrvsNeededForApp = NumSRVsNeededForApp();
+	const UINT numSrvsNeededForApp = NumSRVsInScene();
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto rootCbv = dxhelper::GetRootCbv();

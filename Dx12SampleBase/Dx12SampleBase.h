@@ -112,10 +112,17 @@ protected:
 		return handle;
 	}
 
-	inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetAppSrvGpuHandle(UINT index)
+	inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetAppUavGpuHandle(UINT index)
 	{
 		///@todo make this more explicit
 		UINT appSrvStartIndex = NumRTVsNeededForApp();
+		return GetSrvGpuHeapHandle(appSrvStartIndex + index);
+	}
+
+	inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetAppSrvGpuHandle(UINT index)
+	{
+		///@todo make this more explicit
+		UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();
 		return GetSrvGpuHeapHandle(appSrvStartIndex + index);
 	}
 
@@ -271,10 +278,15 @@ protected:
 		return GetMeshInfo(nodeIdx).primitives.size();
 	}
 
+	inline UINT NumSRVsPerPrimForMaterials()
+	{
+		return 5;
+	}
+
 	inline UINT NumSRVsPerPrimitive()
 	{
 		///@note based on PBR shading
-		return 5;
+		return NumSRVsPerPrimForMaterials() + NumSRVsPerPrimNeededForApp();
 	}
 
 	inline UINT NumPrimsInScene()
@@ -291,12 +303,17 @@ protected:
 		return totalSrvs;
 	}
 
+	inline UINT AppSrvOffsetForPrim()
+	{
+		return NumSRVsPerPrimForMaterials();
+	}
+
 	virtual inline DxCamera* GetCamera() { return m_camera.get(); }
 	virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
 	virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
 
 	virtual inline UINT NumRTVsNeededForApp()         { return 0; }
-	virtual inline UINT NumSRVsNeededForApp()         { return 0; }
+	virtual inline UINT NumSRVsPerPrimNeededForApp()  { return 0; }
 	virtual inline UINT NumDSVsNeededForApp()         { return 0; }
 	virtual inline UINT NumUAVsNeededForApp()         { return 0; }
 	virtual inline UINT NumRootConstantsForApp()      { return 0; }

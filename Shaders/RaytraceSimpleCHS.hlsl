@@ -2,9 +2,8 @@
 #include "CameraBuffer.hlsli"
 
 Texture2D gTexture    : register(t0, space3); //t0 to t4
-
-StructuredBuffer<float2> uvVbBuffer : register(t0, space1);
-StructuredBuffer<uint> indexBuffer    : register(t1, space1);
+StructuredBuffer<float2> uvVbBuffer : register(t5, space3); //t5
+StructuredBuffer<uint> indexBuffer    : register(t6, space3);//t6
 
 RaytracingAccelerationStructure Scene : register(t0, space2);
 

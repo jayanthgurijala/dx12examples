@@ -550,7 +550,8 @@ VOID Dx12SampleBase::CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resou
 	{
 		descPtr = &desc;
 	}
-	const UINT appSrvStartIndex = NumRTVsNeededForApp();	//see comment above
+	//@todo common code refactor. Had bit me once
+	const UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();	//see comment above
 	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
 	m_pDevice->CreateShaderResourceView(srvResource, descPtr, srvHandle);
 
@@ -558,14 +559,14 @@ VOID Dx12SampleBase::CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resou
 
 VOID Dx12SampleBase::CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource)
 {
-	const UINT uavStartIndexInDescriptorHeap = NumRTVsNeededForApp() + NumSRVsNeededForApp();
+	const UINT uavStartIndexInDescriptorHeap = NumRTVsNeededForApp();
 	auto uavHandle = GetSrvUavCBvCpuHeapHandle(uavStartIndexInDescriptorHeap + appUavIndex);
 	m_pDevice->CreateUnorderedAccessView(uavResource, nullptr, nullptr, uavHandle);
 }
 
 VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize)
 {
-	const UINT appSrvStartIndex = NumRTVsNeededForApp();
+	const UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();
 	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -1046,7 +1047,7 @@ VOID Dx12SampleBase::InitializeRtvDsvDescHeaps()
 
 VOID Dx12SampleBase::InitializeSrvCbvUavDescHeaps()
 {
-	const UINT numSRVsForApp = NumSRVsNeededForApp();
+	const UINT numSRVsForApp = NumSRVsInScene();
 	const UINT numUAVsForApp = NumUAVsNeededForApp();
 	const UINT numRTVsForApp = NumRTVsNeededForApp();
 	//@note numRTVsForApp is for creating SRVs for the RTVs.

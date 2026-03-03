@@ -20,11 +20,9 @@ public:
 protected:
 	virtual inline UINT NumRTVsNeededForApp()         override { return 1; }
 
-	virtual inline UINT NumSRVsNeededForApp()         override 
+	virtual inline UINT NumSRVsPerPrimNeededForApp()         override 
 	{
-        const UINT numSrvsInScene            = NumSRVsInScene();
-        const UINT numExtraSrvsForRaytracing = NumSrvsForRaytracing(); //uv buffer srv and index buffer srv
-		return numSrvsInScene + numExtraSrvsForRaytracing;
+        return NumSrvsForRaytracing(); //uv buffer srv and index buffer srv
 	} 
 	
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
