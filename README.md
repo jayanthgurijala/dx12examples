@@ -10,6 +10,10 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 - Tessellation
 - Mesh Shading
 - Ray Tracing
+- Camera Movements (work in progress)
+  - Mouse to Rotate   
+  - W S to move Forward and Backward
+
 
 ---
 
