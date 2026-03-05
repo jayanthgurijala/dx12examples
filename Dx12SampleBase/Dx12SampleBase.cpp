@@ -19,7 +19,7 @@
 using namespace WICImageLoader;
 using namespace GltfUtils;
 
-Dx12SampleBase* Dx12SampleBase::m_sampleBase = nullptr;
+Dx12SampleBase* Dx12SampleBase::s_sampleBase = nullptr;
 FLOAT Dx12SampleBase::s_frameDeltaTime = 0;
 
 
@@ -43,7 +43,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr)
 {
-	m_sampleBase = this;
+	s_sampleBase = this;
 
 	m_camera    = std::make_unique<DxCamera>(width, height);
     m_camera->Initialize();
@@ -87,7 +87,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		int y = GET_Y_LPARAM(lParam);
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_camera->OnMouseMove(x, y);
+			s_sampleBase->m_camera->OnMouseMove(x, y);
 		}
 		break;
 	}
@@ -98,7 +98,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		int y = GET_Y_LPARAM(lParam);
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_camera->OnMouseDown(x, y, TRUE);
+			s_sampleBase->m_camera->OnMouseDown(x, y, TRUE);
 		}
 		break;
 	}
@@ -106,7 +106,7 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	case WM_LBUTTONUP:
 		if (isimGuiMoving == FALSE)
 		{
-			m_sampleBase->m_camera->OnMouseUp(0, 0, TRUE);
+			s_sampleBase->m_camera->OnMouseUp(0, 0, TRUE);
 		}
 		break;
 	case WM_KEYDOWN:
@@ -114,11 +114,11 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 			PostQuitMessage(0);
 		if (wParam == 'W')
 		{
-			m_sampleBase->m_camera->MoveForward();
+			s_sampleBase->m_camera->MoveForward();
         }
 		if (wParam == 'S')
 		{
-			m_sampleBase->m_camera->MoveBack();
+			s_sampleBase->m_camera->MoveBack();
 		}
 		break;
 
@@ -269,11 +269,21 @@ HRESULT Dx12SampleBase::CreateCommandQueues()
 {
 	HRESULT result = S_OK;
 
-	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
-	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	{
+		D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+		cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
-	result = m_pDevice->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&m_pCmdQueue));
+		result = m_pDevice->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&m_pCmdQueue));
+	}
+
+	{
+		D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+		cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+		cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		result = m_pDevice->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&m_pComputeCmdQueue));
+
+	}
 
 	return result;
 }
@@ -433,14 +443,25 @@ HRESULT Dx12SampleBase::CreateCommandList()
 {
 	HRESULT result = S_OK;
 
-	result = m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_pCommandAllocator));
-	result = m_pDevice->CreateCommandList(0,
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		m_pCommandAllocator.Get(),
-		nullptr,
-		IID_PPV_ARGS(&m_pCmdList));
-	m_pCmdList->Close();
-	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+	{
+		result = m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_pCommandAllocator));
+		result = m_pDevice->CreateCommandList(0,
+			D3D12_COMMAND_LIST_TYPE_DIRECT,
+			m_pCommandAllocator.Get(),
+			nullptr,
+			IID_PPV_ARGS(&m_pCmdList));
+		m_pCmdList->Close();
+		m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+	}
+
+	{
+		m_pDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, IID_PPV_ARGS(&m_pComputeCmdAllocator));
+		m_pDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+			                         m_pComputeCmdAllocator.Get(), nullptr,
+			                         IID_PPV_ARGS(&m_pComputeCommandList));
+		m_pComputeCommandList->Close();
+		m_pComputeCommandList->Reset(m_pComputeCmdAllocator.Get(), nullptr);
+	}
 	return result;
 }
 
@@ -642,6 +663,8 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	return gfxPipelineState;
 }
 
+
+
 HRESULT Dx12SampleBase::InitializeFrameComposition()
 {
 	HRESULT result = S_OK;
@@ -680,6 +703,120 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 	result = (m_simpleComposition.vertexBuffer != NULL) ? S_OK : E_FAIL;
 
 	return result;
+}
+
+VOID Dx12SampleBase::InitializeMipGenerationPipeline()
+{
+	//compute root signature - srv and uav
+	//computepso - compute shader
+	//descriptorheap
+
+	UINT numDescHeapRanges = 2;
+	std::vector <CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescHeapRanges);
+	descTableRanges[0] = dxhelper::GetSRVDescRange(1);
+	descTableRanges[1] = dxhelper::GetUAVDescRange(1);
+	auto descTable = dxhelper::GetRootDescTable(descTableRanges);
+	auto rootConstants = dxhelper::GetRootConstants(2);
+
+	dxhelper::DxCreateRootSignature(
+		m_pDevice.Get(),
+		&m_computeGenerateMips.rootSignature,
+		{ descTable,
+		  rootConstants},
+		{},
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS
+	);
+
+	ComPtr<ID3DBlob> computeShader = GetCompiledShaderBlob("CsGenerateMips.cso");
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC desc = {};
+	desc.pRootSignature = m_computeGenerateMips.rootSignature.Get();
+	desc.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+	desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+	m_pDevice->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_computeGenerateMips.pipelineState));
+}
+
+VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT height)
+{
+	const UINT numMipLevels = dxhelper::GetNumMipLevels(width, height);
+	const UINT localX = 8;
+	const UINT localY = 8;
+
+	///@todo need to wait on CPU for generating mips for multiple textures. Find a better way
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.NumDescriptors             = numMipLevels * 2;
+	heapDesc.Flags                      = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	heapDesc.Type                       = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	ComPtr<ID3D12DescriptorHeap> csMipHeap;
+	m_pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&csMipHeap));
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuDescHandleBase(csMipHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuDescHandleBase(csMipHeap->GetGPUDescriptorHandleForHeapStart());
+
+	const UINT heapIncrementSize = m_srvUavCbvDescriptorSize;
+
+	for (UINT mipLevel = 1; mipLevel < numMipLevels; mipLevel++)
+	{
+		CD3DX12_SHADER_RESOURCE_VIEW_DESC srvMip = CD3DX12_SHADER_RESOURCE_VIEW_DESC::Tex2D(tex2D->GetDesc().Format, 1, mipLevel - 1);
+
+		assert(tex2D->GetDesc().Format == DXGI_FORMAT_R8G8B8A8_UNORM || tex2D->GetDesc().Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+		CD3DX12_UNORDERED_ACCESS_VIEW_DESC uavMip = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, mipLevel);
+
+
+		m_pDevice->CreateShaderResourceView(tex2D, &srvMip, cpuDescHandleBase);
+		cpuDescHandleBase.Offset(1, m_srvUavCbvDescriptorSize);
+		m_pDevice->CreateUnorderedAccessView(tex2D, nullptr, &uavMip, cpuDescHandleBase);
+		cpuDescHandleBase.Offset(1, m_srvUavCbvDescriptorSize);
+	}
+
+	UINT mipLevelWidth = width;
+	UINT mipLevelHeight = height;
+	ID3D12DescriptorHeap* descHeaps[] = { csMipHeap.Get() };
+	m_pComputeCommandList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+	m_pComputeCommandList->SetComputeRootSignature(m_computeGenerateMips.rootSignature.Get());
+	m_pComputeCommandList->SetPipelineState(m_computeGenerateMips.pipelineState.Get());
+	for (UINT mipLevel = 1; mipLevel < numMipLevels; mipLevel++)
+	{
+		mipLevelWidth  /= 2;
+		mipLevelHeight /= 2;
+
+		UINT dispatchX = mipLevelWidth / localX;
+		UINT dispatchY = mipLevelHeight / localY;
+
+		if (dispatchX == 0)
+		{
+			dispatchX = 1;
+		}
+
+		if (dispatchY == 0)
+		{
+			dispatchY = 1;
+		}
+
+
+		m_pComputeCommandList->SetComputeRootDescriptorTable(0, gpuDescHandleBase);
+		m_pComputeCommandList->SetComputeRoot32BitConstants(1, 1, &mipLevelWidth, 0);
+		m_pComputeCommandList->SetComputeRoot32BitConstants(1, 1, &mipLevelWidth, 1);
+		m_pComputeCommandList->Dispatch(dispatchX, dispatchY, 1);
+		gpuDescHandleBase.Offset(2, m_srvUavCbvDescriptorSize);
+
+		// After dispatch for a mip level
+		CD3DX12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(tex2D);
+		m_pComputeCommandList->ResourceBarrier(1, &uavBarrier);
+	}
+	
+	m_pComputeCommandList->Close();
+	ID3D12CommandList* cmdLists[] = {m_pComputeCommandList.Get()};
+	m_pComputeCmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+	m_pComputeCommandList->Reset(m_pComputeCmdAllocator.Get(), nullptr);
+	m_pComputeCmdQueue->Signal(m_fence.Get(), m_fenceValue);
+	WaitForFenceCompletion(m_pComputeCmdQueue.Get());
 }
 
 ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData,
@@ -731,7 +868,7 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 	ComPtr<ID3D12Resource> texture2D;
 
 	auto heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	auto resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1);
+	auto resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 	m_pDevice->CreateCommittedResource(&heapProps,
 		D3D12_HEAP_FLAG_NONE,
@@ -748,8 +885,12 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 			pCmdQueue,
 			texture2D.Get(),
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+		GenerateMipLevels(texture2D.Get(), width, height);
 	}
+
+	
 
 	return texture2D;
 }
@@ -768,7 +909,6 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
 
 	D3D12_RESOURCE_DESC dstResDesc = pDstRes->GetDesc();
 
-	assert(dstResDesc.MipLevels == 1);
 	assert(dstResDesc.DepthOrArraySize = 1);
 
 	//@todo test and add more
@@ -1026,6 +1166,7 @@ VOID Dx12SampleBase::InitlializeDeviceCmdQueueAndCmdList()
 	CreateSwapChain();
 	CreateFence();
 	InitializeFrameComposition();
+	InitializeMipGenerationPipeline();
 }
 
 VOID Dx12SampleBase::InitializeRtvDsvDescHeaps()
@@ -1506,7 +1647,7 @@ HRESULT Dx12SampleBase::LoadGltfFile()
 																					imageData.pixels.size(),
 																					imageData.width,
 																					imageData.height,
-																				     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+																				     DXGI_FORMAT_R8G8B8A8_UNORM);
 							}
 						};
 

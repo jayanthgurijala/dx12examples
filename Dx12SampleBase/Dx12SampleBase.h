@@ -77,7 +77,7 @@ protected:
 											    BOOL isUploadHeap = FALSE);
 
 	///@note gltf basecolor formats are sRGB
-	ComPtr<ID3D12Resource> CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
+	ComPtr<ID3D12Resource> CreateTexture2DWithData(void* cpuData, SIZE_T sizeInBytes, UINT width, UINT height, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
 
 	inline ID3D12Device* GetDevice() { return m_pDevice.Get(); }
 	inline ID3D12GraphicsCommandList* GetCmdList() { return m_pCmdList.Get(); }
@@ -193,7 +193,7 @@ protected:
 		return GetPrimitiveInfo(nodeIndex, primitiveIndex).indexBufferInfo;
 	}
 
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
+	inline D3D12_VERTEX_BUFFER_VIEW& const GetModelVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
 	{
 		auto& vbv = GetPrimitiveVertexData(nodeIndex, primitiveIndex, vbIndex).modelVbv;
 		assert(vbv.BufferLocation != 0);
@@ -364,8 +364,15 @@ private:
 		ComPtr<ID3D12RootSignature> rootSignature;
 		ComPtr<ID3D12PipelineState> pipelineState;
 		ComPtr<ID3D12Resource>      vertexBuffer;
-		ComPtr<ID3D12Heap>          rtvHeap;
 		D3D12_VERTEX_BUFFER_VIEW    vertexBufferView;
+	};
+
+	struct ComputeGenerateMips
+	{
+		ComPtr<ID3D12RootSignature> rootSignature;
+		ComPtr<ID3D12PipelineState> pipelineState;
+		ComPtr<ID3D12Heap>          srvUavCbvHeap;
+
 	};
 
 	HRESULT CreateDevice();
@@ -374,6 +381,8 @@ private:
 	HRESULT CreateCommandList();
 
 	HRESULT InitializeFrameComposition();
+	VOID InitializeMipGenerationPipeline();
+	VOID GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT height);
 	HRESULT CreateFence();
 
 	///@todo refactor this, maybe use single function
@@ -389,6 +398,7 @@ private:
 	ComPtr<IDXGIFactory7>      m_dxgiFactory7;    ///< OS graphics infracture e.g. creation of swapchain
 	ComPtr<ID3D12Device>       m_pDevice;
 	ComPtr<ID3D12CommandQueue> m_pCmdQueue;
+	ComPtr<ID3D12CommandQueue> m_pComputeCmdQueue;
 	ComPtr<IDXGISwapChain4>    m_swapChain4;
 
 	ComPtr<ID3D12DescriptorHeap>        m_rtvDescHeap;
@@ -396,6 +406,9 @@ private:
 	ComPtr<ID3D12DescriptorHeap>        m_srvUavCbvDescHeap;
 	ComPtr<ID3D12CommandAllocator>      m_pCommandAllocator;
 	ComPtr<ID3D12GraphicsCommandList>   m_pCmdList;
+
+	ComPtr<ID3D12CommandAllocator> m_pComputeCmdAllocator;
+	ComPtr<ID3D12GraphicsCommandList> m_pComputeCommandList;
 
 	std::vector<ComPtr<ID3D12Resource>> m_swapChainBuffers;
 	///@todo created on application basis, kept here because most samples need it
@@ -406,6 +419,7 @@ private:
 	std::unique_ptr<FileReader>	  m_assetReader;
 
 	FrameComposition			m_simpleComposition;
+	ComputeGenerateMips         m_computeGenerateMips;
 
 	ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
 	ComPtr<ID3D12Resource>      m_materialConstantBuffer;
@@ -427,7 +441,7 @@ private:
 	DxAppFrameInfo                 m_appFrameInfo;
 	std::unique_ptr<DxGltfLoader>  m_gltfLoader;
 
-	static 	Dx12SampleBase* m_sampleBase;
+	static 	Dx12SampleBase* s_sampleBase;
 
 	DxSceneInfo	m_sceneInfo;
 };

@@ -255,6 +255,12 @@ namespace dxhelper
 		return rootSrv;
 	}
 
+	inline UINT GetNumMipLevels(UINT width, UINT height)
+	{
+		UINT mipCount = 1 + (UINT)floor(log2((float)max(width, height)));
+		return mipCount;
+	}
+
 }
 
 
