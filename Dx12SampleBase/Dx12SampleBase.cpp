@@ -1149,7 +1149,7 @@ HRESULT Dx12SampleBase::Initialize()
 	HRESULT result = S_OK;
 
 	InitlializeDeviceCmdQueueAndCmdList();
-	LoadGltfFile();
+	LoadGltfFiles();
 	InitializeRtvDsvDescHeaps();
 	InitializeSrvCbvUavDescHeaps();
 	LoadSceneMaterialInfo();
@@ -1522,199 +1522,203 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	}
 }
 
-HRESULT Dx12SampleBase::LoadGltfFile()
+VOID Dx12SampleBase::LoadGltfFiles()
 {
-	HRESULT result                 = S_OK;
-	const std::string gltfFileName = GltfFileName();
-	std::string modelPath          = m_assetReader->GetFullModelFilePath(gltfFileName);
-	m_gltfLoader                   = std::make_unique<DxGltfLoader>(modelPath);
+	const std::vector<std::string> gltfFileNames = GltfFileName();
+	const UINT numgltfFiles = gltfFileNames.size();
 
-	m_gltfLoader->LoadModel();
-	
-	const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
-	m_sceneInfo.nodes.resize(numNodesInScene);
+	m_sceneInfo.clear();
+	m_sceneInfo.resize(numgltfFiles);
 
-	UINT primitiveIndex = 0;
-	for (UINT node = 0; node < numNodesInScene; node++)
+	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
-		auto& currentNode = GetNodeInfo(node);
-		currentNode.name = m_gltfLoader->GetNodeName(0, node);
-		DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(node).transformInfo;
-		m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, node);
-		AddTransformInfo(meshTransformInfo);
+		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx]);
+		m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 
-		BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(0, node);
-		if (isMeshPrimInfoValid == TRUE)
+		m_gltfLoader->LoadModel();
+		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
+		m_sceneInfo[0].nodes.resize(numNodesInScene);
+
+		UINT primitiveIndex = 0;
+		for (UINT node = 0; node < numNodesInScene; node++)
 		{
-			const UINT numPrimitives = m_gltfLoader->NumPrimitives(0, node);
-			currentNode.meshInfo.primitives.resize(numPrimitives);
+			auto& currentNode = GetNodeInfo(node);
+			currentNode.name = m_gltfLoader->GetNodeName(0, node);
+			DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(node).transformInfo;
+			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, node);
+			AddTransformInfo(meshTransformInfo);
 
-			for (UINT primitive = 0; primitive < numPrimitives; primitive++)
+			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(0, node);
+			if (isMeshPrimInfoValid == TRUE)
 			{
-				///@note Load VB, IB and textures for each primitive.
-				DxGltfPrimInfo gltfPrimInfo;
-				m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, 0, node, primitive);
+				const UINT numPrimitives = m_gltfLoader->NumPrimitives(0, node);
+				currentNode.meshInfo.primitives.resize(numPrimitives);
 
-				const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-				auto& currentPrim = GetPrimitiveInfo(node, primitive);
-				currentPrim.vertexBufferInfo.resize(numVertexAttributes);
-				currentPrim.modelIaSemantics.resize(numVertexAttributes);
-
-				currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
-
-				m_camera->AddMinMaxExtents(gltfPrimInfo.extents);
-
-				///@Fill in vertex buffer info for each vertex buffer view in the primitive.
+				for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 				{
-					for (UINT k = 0; k < numVertexAttributes; k++)
+					///@note Load VB, IB and textures for each primitive.
+					DxGltfPrimInfo gltfPrimInfo;
+					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, 0, node, primitive);
+
+					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
+					auto& currentPrim = GetPrimitiveInfo(node, primitive);
+					currentPrim.vertexBufferInfo.resize(numVertexAttributes);
+					currentPrim.modelIaSemantics.resize(numVertexAttributes);
+
+					currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
+
+					m_camera->AddMinMaxExtents(gltfPrimInfo.extents);
+
+					///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 					{
-						auto& vbInfo = currentPrim.vertexBufferInfo[k];
-						const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
-
-						const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
-						const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
-						const UINT   bufferIndex = gltfVbInfo.bufferIndex;
-						const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
-						BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
-						vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-							(UINT)bufferSizeInBytes,
-							gltfVbInfo.iaLayoutInfo.name.c_str());
-
-						vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
-						vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
-						vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
-						vbInfo.semanticName = gltfVbInfo.iaLayoutInfo.name;
-
-						auto& inputElementDesc = currentPrim.modelIaSemantics[k];
-						auto& iaSemanticInfo = gltfVbInfo.iaLayoutInfo;
-						const UINT semanticIndex = iaSemanticInfo.isIndexValid ? iaSemanticInfo.index : 0;
-						inputElementDesc.SemanticName = vbInfo.semanticName.c_str();
-						inputElementDesc.AlignedByteOffset = 0;
-						inputElementDesc.SemanticIndex = semanticIndex;
-						inputElementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-						inputElementDesc.InstanceDataStepRate = 0;
-						inputElementDesc.Format = iaSemanticInfo.format;
-						inputElementDesc.InputSlot = k;
-					}
-				}
-
-				///@Fill in index buffer info if indexed draw
-				{
-					if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
-					{
-						auto& ibInfo = currentPrim.indexBufferInfo;
-						const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
-						const UINT64 bufferSizeInBytes = gltfPrimInfo.ibInfo.bufferSizeInBytes;
-						const UINT   bufferIndex = gltfPrimInfo.ibInfo.bufferIndex;
-						BYTE* bufferData = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
-						ibInfo.indexBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-							(UINT)bufferSizeInBytes,
-							gltfPrimInfo.ibInfo.name.c_str());
-						ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
-						ibInfo.modelIbv.SizeInBytes = bufferSizeInBytes;
-						ibInfo.modelIbv.Format = gltfPrimInfo.ibInfo.indexFormat;
-					}
-				}
-
-
-				///@Fill in material and texture info if material is defined for the primitive
-				{
-					const auto& gltfMaterial   = gltfPrimInfo.materialInfo;
-					const auto& gltfPbrInfo    = gltfMaterial.pbrMetallicRoughness;
-					const auto& gltfNormalInfo = gltfMaterial.normalInfo;
-					const auto& gltfOcclusion  = gltfMaterial.occlusionInfo;
-					const auto& gltfEmissive   = gltfMaterial.emissiveInfo;
-					auto& primMaterialCB       = currentPrim.materialCbData;
-
-					dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
-					dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
-					primMaterialCB.alphaCutoff       = gltfMaterial.alphaCutOff;
-					primMaterialCB.metallicFactor    = gltfMaterial.pbrMetallicRoughness.metallicFactor;
-					primMaterialCB.normalScale       = gltfNormalInfo.scale;
-					primMaterialCB.occlusionStrength = gltfOcclusion.strength;
-					primMaterialCB.roughnessFactor   = gltfPbrInfo.roughnessFactor;
-
-					// Lambda to load texture from DxGltfTextureInfo
-					auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
+						for (UINT k = 0; k < numVertexAttributes; k++)
 						{
-							ComPtr<ID3D12Resource> textureResource = nullptr;
+							auto& vbInfo = currentPrim.vertexBufferInfo[k];
+							const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
 
-							if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
-							{
-								const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-								BYTE* bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-								UINT64 bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
-								UINT64 bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
+							const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
+							const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
+							const UINT   bufferIndex = gltfVbInfo.bufferIndex;
+							const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
+							BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
+							vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+								(UINT)bufferSizeInBytes,
+								gltfVbInfo.iaLayoutInfo.name.c_str());
 
-								ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
-									&bufferData[bufferOffsetInBytes],
-									bufferSizeInBytes
-								);
+							vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
+							vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
+							vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
+							vbInfo.semanticName = gltfVbInfo.iaLayoutInfo.name;
 
-								texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
-																					imageData.pixels.size(),
-																					imageData.width,
-																					imageData.height,
-																				     DXGI_FORMAT_R8G8B8A8_UNORM);
-							}
-						};
-
-					auto& primTextureInfo = currentPrim.materialTextures;
-
-				    LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture,         primTextureInfo.pbrBaseColorTexture);
-					LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture,         primTextureInfo.normalTexture);
-					LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
-					LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture,       primTextureInfo.occlusionTexture);
-					LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture,         primTextureInfo.emissiveTexture);
-
-					auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
-						flags |= (texture != nullptr) ? bit : 0;
-						};
-
-					primMaterialCB.flags = 0;
-
-
-					//HasBaseColorTexture = 1 << 0,
-					//HasNormalTexture = 1 << 1,
-					//HasMetallicRoughnessTex = 1 << 2,
-					//HasOcclusionTexture = 1 << 3,
-					//HasEmissiveTexture = 1 << 4,
-					SetFlag(primMaterialCB.flags, HasBaseColorTexture,     primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
-					SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
-					SetFlag(primMaterialCB.flags, HasEmissiveTexture,      primTextureInfo.emissiveTexture.textureInfo.Get());
-					SetFlag(primMaterialCB.flags, HasNormalTexture,        primTextureInfo.normalTexture.textureInfo.Get());
-					SetFlag(primMaterialCB.flags, HasOcclusionTexture,     primTextureInfo.occlusionTexture.textureInfo.Get());
-
-					//DoubleSided = 1 << 7
-					primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
-
-					//AlphaModeMask = 1 << 5,
-					//AlphaModeBlend = 1 << 6,
-					//enum DxAlphaMode
-					//{
-					//	DxOpaque,
-					//	DxMask,
-					//	DxBlend
-					//};
-					switch (gltfMaterial.alphaMode)
-					{
-					case DxBlend:
-						primMaterialCB.flags |= AlphaModeBlend;
-						break;
-					case DxMask:
-						primMaterialCB.flags |= AlphaModeMask;
-						break;
-					case DxOpaque:
-						break;
+							auto& inputElementDesc = currentPrim.modelIaSemantics[k];
+							auto& iaSemanticInfo = gltfVbInfo.iaLayoutInfo;
+							const UINT semanticIndex = iaSemanticInfo.isIndexValid ? iaSemanticInfo.index : 0;
+							inputElementDesc.SemanticName = vbInfo.semanticName.c_str();
+							inputElementDesc.AlignedByteOffset = 0;
+							inputElementDesc.SemanticIndex = semanticIndex;
+							inputElementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+							inputElementDesc.InstanceDataStepRate = 0;
+							inputElementDesc.Format = iaSemanticInfo.format;
+							inputElementDesc.InputSlot = k;
+						}
 					}
-				}
-				primitiveIndex++;
-			}
-		}
-		SetNumTotalPrimitivesInScene(primitiveIndex);
-	}
 
-	return result;
+					///@Fill in index buffer info if indexed draw
+					{
+						if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
+						{
+							auto& ibInfo = currentPrim.indexBufferInfo;
+							const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
+							const UINT64 bufferSizeInBytes = gltfPrimInfo.ibInfo.bufferSizeInBytes;
+							const UINT   bufferIndex = gltfPrimInfo.ibInfo.bufferIndex;
+							BYTE* bufferData = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
+							ibInfo.indexBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+								(UINT)bufferSizeInBytes,
+								gltfPrimInfo.ibInfo.name.c_str());
+							ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
+							ibInfo.modelIbv.SizeInBytes = bufferSizeInBytes;
+							ibInfo.modelIbv.Format = gltfPrimInfo.ibInfo.indexFormat;
+						}
+					}
+
+
+					///@Fill in material and texture info if material is defined for the primitive
+					{
+						const auto& gltfMaterial = gltfPrimInfo.materialInfo;
+						const auto& gltfPbrInfo = gltfMaterial.pbrMetallicRoughness;
+						const auto& gltfNormalInfo = gltfMaterial.normalInfo;
+						const auto& gltfOcclusion = gltfMaterial.occlusionInfo;
+						const auto& gltfEmissive = gltfMaterial.emissiveInfo;
+						auto& primMaterialCB = currentPrim.materialCbData;
+
+						dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
+						dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
+						primMaterialCB.alphaCutoff = gltfMaterial.alphaCutOff;
+						primMaterialCB.metallicFactor = gltfMaterial.pbrMetallicRoughness.metallicFactor;
+						primMaterialCB.normalScale = gltfNormalInfo.scale;
+						primMaterialCB.occlusionStrength = gltfOcclusion.strength;
+						primMaterialCB.roughnessFactor = gltfPbrInfo.roughnessFactor;
+
+						// Lambda to load texture from DxGltfTextureInfo
+						auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
+							{
+								ComPtr<ID3D12Resource> textureResource = nullptr;
+
+								if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
+								{
+									const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
+									BYTE* bufferData = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
+									UINT64 bufferSizeInBytes = imageBufferInfo.bufferSizeInBytes;
+									UINT64 bufferOffsetInBytes = imageBufferInfo.bufferOffsetInBytes;
+
+									ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
+										&bufferData[bufferOffsetInBytes],
+										bufferSizeInBytes
+									);
+
+									texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
+										imageData.pixels.size(),
+										imageData.width,
+										imageData.height,
+										DXGI_FORMAT_R8G8B8A8_UNORM);
+								}
+							};
+
+						auto& primTextureInfo = currentPrim.materialTextures;
+
+						LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture, primTextureInfo.pbrBaseColorTexture);
+						LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture, primTextureInfo.normalTexture);
+						LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
+						LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture, primTextureInfo.occlusionTexture);
+						LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture, primTextureInfo.emissiveTexture);
+
+						auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
+							flags |= (texture != nullptr) ? bit : 0;
+							};
+
+						primMaterialCB.flags = 0;
+
+
+						//HasBaseColorTexture = 1 << 0,
+						//HasNormalTexture = 1 << 1,
+						//HasMetallicRoughnessTex = 1 << 2,
+						//HasOcclusionTexture = 1 << 3,
+						//HasEmissiveTexture = 1 << 4,
+						SetFlag(primMaterialCB.flags, HasBaseColorTexture, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
+						SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
+						SetFlag(primMaterialCB.flags, HasEmissiveTexture, primTextureInfo.emissiveTexture.textureInfo.Get());
+						SetFlag(primMaterialCB.flags, HasNormalTexture, primTextureInfo.normalTexture.textureInfo.Get());
+						SetFlag(primMaterialCB.flags, HasOcclusionTexture, primTextureInfo.occlusionTexture.textureInfo.Get());
+
+						//DoubleSided = 1 << 7
+						primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
+
+						//AlphaModeMask = 1 << 5,
+						//AlphaModeBlend = 1 << 6,
+						//enum DxAlphaMode
+						//{
+						//	DxOpaque,
+						//	DxMask,
+						//	DxBlend
+						//};
+						switch (gltfMaterial.alphaMode)
+						{
+						case DxBlend:
+							primMaterialCB.flags |= AlphaModeBlend;
+							break;
+						case DxMask:
+							primMaterialCB.flags |= AlphaModeMask;
+							break;
+						case DxOpaque:
+							break;
+						}
+					}
+					primitiveIndex++;
+				}
+			}
+			SetNumTotalPrimitivesInScene(primitiveIndex);
+		}
+	}
 }
 
 VOID Dx12SampleBase::LoadSceneMaterialInfo()

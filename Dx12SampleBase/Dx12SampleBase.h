@@ -159,9 +159,9 @@ protected:
 		return 2;
 	}
 
-	inline DxNodeInfo& GetNodeInfo(UINT nodeIndex = 0)
+	inline DxNodeInfo& GetNodeInfo(UINT sceneIdx = 0, UINT nodeIndex = 0)
 	{
-		return m_sceneInfo.nodes[nodeIndex];
+		return m_sceneInfo[sceneIdx].nodes[nodeIndex];
 	}
 
 	inline DxMeshInfo& GetMeshInfo(UINT nodeIndex = 0)
@@ -245,9 +245,9 @@ protected:
 		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbv;
 	}
 
-	inline DxDrawPrimitive& GetDrawInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx = 0, UINT nodeIndex = 0, UINT primitiveIndex = 0)
 	{
-		return m_sceneInfo.nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
+		return m_sceneInfo[sceneIdx].nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
 	}
 
 	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT nodeIndex = 0, UINT primitiveIndex = 0)
@@ -268,9 +268,9 @@ protected:
 		m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
 	}
 
-	inline UINT NumNodesInScene()
+	inline UINT NumNodesInScene(UINT sceneIdx = 0)
 	{
-		return m_sceneInfo.nodes.size();
+		return m_sceneInfo[sceneIdx].nodes.size();
 	}
 
 	inline UINT NumPrimitivesInNodeMesh(UINT nodeIdx)
@@ -289,9 +289,9 @@ protected:
 		return NumSRVsPerPrimForMaterials() + NumSRVsPerPrimNeededForApp();
 	}
 
-	inline UINT NumPrimsInScene()
+	inline UINT NumPrimsInScene(UINT sceneIdx = 0)
 	{
-		return m_sceneInfo.numTotalPrimitivesInScene;
+		return m_sceneInfo[sceneIdx].numTotalPrimitivesInScene;
 	}
 
 	inline UINT NumSRVsInScene()
@@ -319,7 +319,7 @@ protected:
 	virtual inline UINT NumRootConstantsForApp()      { return 0; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
 	virtual ID3D12RootSignature* GetRootSignature() { return nullptr; }
-	virtual inline const std::string GltfFileName() { return "triangle.gltf"; }
+	virtual inline const std::vector<std::string> GltfFileName() { return { "triangle.gltf" }; }
 
     virtual inline void GetVertexShaderName(char* outVsNameString, SIZE_T numVertexAttributes)
 	{
@@ -340,7 +340,7 @@ protected:
 
 	static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-	HRESULT LoadGltfFile();
+	VOID LoadGltfFiles();
 	VOID LoadSceneMaterialInfo();
 	HRESULT CreateVSPSPipelineStateFromModel();
 
@@ -354,9 +354,9 @@ private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
 
-	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims)
+	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims, UINT sceneIdx = 0)
 	{
-		m_sceneInfo.numTotalPrimitivesInScene = numPrims;
+		m_sceneInfo[sceneIdx].numTotalPrimitivesInScene = numPrims;
 	}
 
 	struct FrameComposition
@@ -443,7 +443,7 @@ private:
 
 	static 	Dx12SampleBase* s_sampleBase;
 
-	DxSceneInfo	m_sceneInfo;
+	std::vector<DxSceneInfo>	m_sceneInfo;
 };
 
 

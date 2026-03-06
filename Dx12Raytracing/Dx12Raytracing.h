@@ -28,7 +28,7 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
-	virtual inline const std::string GltfFileName() override { return "oaktree.gltf"; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "oaktree.gltf" }; }
 
 private:
 	VOID BuildBlasAndTlas();
