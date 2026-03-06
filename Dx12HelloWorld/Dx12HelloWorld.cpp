@@ -54,7 +54,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
-	FLOAT clearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,

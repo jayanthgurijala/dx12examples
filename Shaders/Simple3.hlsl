@@ -37,9 +37,9 @@ float4 PSMain(VSOutput_3 input) : SV_TARGET
     float3 N = normalize(input.normal);
     float3 L = normalize(lightDir.xyz);
     
-
-    float4 baseColor = pbrBaseColorTexture.Sample(gSampler, input.texcoord);
-    float2 wrapped = frac(input.texcoord);
+    float2 uv = input.texcoord;
+    
+    float4 baseColor = pbrBaseColorTexture.Sample(gSampler, uv);
     
     //@todo force a=1 for opaque
     return float4(baseColor);
