@@ -241,16 +241,24 @@ VOID Dx12Raytracing::CreateRtPSO()
 			auto uvVbBufferRes = GetModelUvVertexBufferResource(nodeIdx, primIdx);
 			auto uvVbView      = GetModelUvBufferView(nodeIdx, primIdx);
 
-			const UINT uvVbElementSizeInBytes = 4;
-			const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;
+			const UINT uvVbElementSizeInBytes = 8;
+			const UINT uvVbNumElements = uvVbView.SizeInBytes / 8;
 			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+
+			auto posVbBufferRes = GetModelPositionVertexBufferResource(nodeIdx, primIdx);
+			auto posVbView      = GetModelPositionVertexBufferView(nodeIdx, primIdx);
+			const UINT posVbElementSizeInBytes = 12;
+			const UINT numPosElements = posVbView.SizeInBytes / 12;
+			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
 
 			auto indexBufferRes = GetModelIndexBufferResource(nodeIdx, primIdx);
 			auto indexBufferView = GetModelIndexBufferView(nodeIdx, primIdx);
 
 			const UINT ibElementSizeInBytes = 4;
 			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
-			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 1, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 2, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+
+
 			totalPrimIdx++;
 		}
 	}

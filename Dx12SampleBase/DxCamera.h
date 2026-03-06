@@ -42,6 +42,11 @@ public:
 		return m_transformInfoList.size();
 	}
 
+	inline FLOAT GetFovYInRadians()
+	{
+		return m_fovYInRadians;
+	}
+
 	VOID Initialize();
 
 	VOID OnMouseDown(UINT x, UINT y, BOOL isLeftButton);

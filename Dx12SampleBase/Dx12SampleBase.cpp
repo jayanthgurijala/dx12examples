@@ -588,7 +588,7 @@ VOID Dx12SampleBase::CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resou
 VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize)
 {
 	const UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();
-	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+	auto srvHandle              = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	if (elementSize == 0)
@@ -1347,11 +1347,14 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	assert(numNodeTransforms > 0);
 
 	const UINT numMatrix = 4; //model matrix, MPV matrix, Inverse_viewProj(RayTracing) and normal matrix
-	const UINT numFloat4 = 1; //camera position
+	const UINT numFloat4 = 2; //camera position, FovY + padding
 	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
 	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
 	const UINT64 constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
-		                                   (float4SizeInBytes * numFloat4);
+		                                     (float4SizeInBytes * numFloat4);
+
+	//already hit 288 bytes, might need to split model and vp data
+	//assert(constantBufferSizeInBytes < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
 	const UINT64 cbAlignedSizeInBytes = dxhelper::DxAlign(constantBufferSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 
@@ -1389,8 +1392,11 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
 
 		//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
-		XMFLOAT4X4 normalData = m_camera->GetNormalMatrixData(nodeIdx);
-		XMFLOAT4   camPosition = m_camera->GetCameraPosition();
+		XMFLOAT4X4 normalData    = m_camera->GetNormalMatrixData(nodeIdx);
+		XMFLOAT4   camPosition   = m_camera->GetCameraPosition();
+		FLOAT      fovYInRadians = m_camera->GetFovYInRadians();
+
+		FLOAT fovY[] = { fovYInRadians, 0, 0, 0 };
 
 		memcpy(pWritePtr, &mmData, matrixSizeInBytes);
 		pWritePtr += matrixSizeInBytes;
@@ -1401,6 +1407,8 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		memcpy(pWritePtr, &normalData, matrixSizeInBytes);
 		pWritePtr += matrixSizeInBytes;
 		memcpy(pWritePtr, &camPosition, float4SizeInBytes);
+		pWritePtr += float4SizeInBytes;
+		memcpy(pWritePtr, fovY, float4SizeInBytes);
 		pWritePtr += float4SizeInBytes;
 
 		assert(pMappedPtr != nullptr);

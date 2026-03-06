@@ -36,7 +36,7 @@ private:
 	VOID BuildShaderTables();
 	VOID CreateUAVOutput();
 
-	inline UINT NumSrvsForRaytracing() { return 2; }
+	inline UINT NumSrvsForRaytracing() { return 3; }
 
 	ComPtr<ID3D12Device5>              m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;

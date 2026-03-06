@@ -10,6 +10,8 @@ cbuffer MVP : register(b0)
     float4x4 g_vpInv;
     float4x4 g_normalMatrix;
     float4   g_cameraPosition;
+    float    g_fovInRadians;
+    float3   camBufferpadding;
 }
 
 static const uint HasBaseColorTexture = 1 << 0;
