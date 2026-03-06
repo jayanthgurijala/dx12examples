@@ -24,12 +24,12 @@
     <ClInclude Include="Resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Dx12HelloWorld.h">
+    <ClInclude Include="Dx12HelloForest.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Dx12HelloWorld.cpp">
+    <ClCompile Include="Dx12HelloForest.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

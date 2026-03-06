@@ -5,18 +5,18 @@
 // Dx12HelloWorld.cpp : Defines the entry point for the application.
 //
 
-#include "Dx12HelloWorld.h"
+#include "Dx12HelloForest.h"
 #include "ExampleEntryPoint.h"
 #include <d3dx12.h>
 #include "dxhelper.h"
 #include <imgui.h>
 
-Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
+Dx12HelloForest::Dx12HelloForest(UINT width, UINT height) :
 	Dx12SampleBase(width, height)
 {
 }
 
-HRESULT Dx12HelloWorld::OnInit()
+HRESULT Dx12HelloForest::OnInit()
 {
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
 
@@ -46,7 +46,7 @@ HRESULT Dx12HelloWorld::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12HelloWorld::RenderFrame()
+HRESULT Dx12HelloForest::RenderFrame()
 {
 	ImGui::Text("Hello World");
 
@@ -96,7 +96,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	return S_OK;
 }
 
-DX_ENTRY_POINT(Dx12HelloWorld);
+DX_ENTRY_POINT(Dx12HelloForest);
 
 
 

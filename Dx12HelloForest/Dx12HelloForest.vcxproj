@@ -128,13 +128,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Dx12HelloWorld.h" />
+    <ClInclude Include="Dx12HelloForest.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Dx12HelloWorld.cpp" />
+    <ClCompile Include="Dx12HelloForest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Dx12HelloWorld.rc" />
