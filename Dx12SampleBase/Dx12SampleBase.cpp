@@ -1230,15 +1230,15 @@ VOID Dx12SampleBase::InitializeImgui()
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT nodeIndex, UINT primitiveIndex)
 {
-	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(nodeIndex, primitiveIndex);
+	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(0, nodeIndex, primitiveIndex);
 
 	for (UINT vbvIndex = 0; vbvIndex < numVertexBufferViews; vbvIndex++)
 	{
-		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(nodeIndex, primitiveIndex, vbvIndex);
+		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(0, nodeIndex, primitiveIndex, vbvIndex);
 		pCmdList->IASetVertexBuffers(vbvIndex, 1, &vbv);
 	}
 
-	auto& primitiveDrawInfo = GetModelDrawInfo(nodeIndex, primitiveIndex);
+	auto& primitiveDrawInfo = GetModelDrawInfo(0, nodeIndex, primitiveIndex);
 
 	/////@todo this will no longer work for multiple primitives in the scene.
 	//static UINT       s_numTrianglesToDraw = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
@@ -1276,7 +1276,7 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT nodeI
 
 	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
-		auto& indexBufferView = GetModelIndexBufferView(nodeIndex, primitiveIndex);
+		auto& indexBufferView = GetModelIndexBufferView(0, nodeIndex, primitiveIndex);
 		pCmdList->IASetIndexBuffer(&indexBufferView);
 		pCmdList->DrawIndexedInstanced(primitiveDrawInfo.numIndices, 1, 0, 0, 0);
 	}
@@ -1290,13 +1290,13 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 {
 	HRESULT result = S_OK;
 
-	const UINT numNodesInScene = NumNodesInScene();
+	const UINT numNodesInScene = NumNodesInScene(0);
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-		const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(nodeIdx, primIdx);
+			auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
 			ID3D12RootSignature* pRootSignature = GetRootSignature();
 
 			assert(GetRootSignature() != nullptr);
@@ -1339,7 +1339,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	HRESULT result = S_OK;
 
 	const UINT numNodeTransforms = m_camera->NumModelTransforms();
-	const UINT numNodesInScene = NumNodesInScene();
+	const UINT numNodesInScene = NumNodesInScene(0);
 
 	///@note each node should have TRS information else we create identitty matrix
 	assert(numNodesInScene == numNodeTransforms);
@@ -1375,10 +1375,10 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
 		for (int nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			auto& nodeInfo         = GetNodeInfo(nodeIdx);
+			auto& nodeInfo         = GetNodeInfo(0, nodeIdx);
 			nodeInfo.gpuCameraData = baseGpuVa + cbAlignedSizeInBytes * nodeIdx;
 		}
-		assert(baseGpuVa + totalConstantBufferSize == GetNodeInfo(numNodesInScene - 1).gpuCameraData + cbAlignedSizeInBytes);
+		assert(baseGpuVa + totalConstantBufferSize == GetNodeInfo(0, numNodesInScene - 1).gpuCameraData + cbAlignedSizeInBytes);
 	}
 
 	assert(pMappedPtr != nullptr);
@@ -1445,11 +1445,11 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	const UINT materialSize        = sizeof(DxMaterialCB);
 	const UINT alignedMaterialSize = dxhelper::DxAlign(materialSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	UINT totalPrimitivesInScene    = 0;
-	const UINT numNodesInScene     = NumNodesInScene();
+	const UINT numNodesInScene     = NumNodesInScene(0);
 
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-		const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrims = NumPrimitivesInNodeMesh(0, nodeIdx);
 		totalPrimitivesInScene += numPrims;
 	}
 
@@ -1477,10 +1477,10 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		DxPrimitiveInfo* lastPrim = nullptr;
 		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+			const UINT numPrims = NumPrimitivesInNodeMesh(0, nodeIdx);
 			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 			{
-				auto& prim = GetPrimitiveInfo(nodeIdx, primIdx);
+				auto& prim = GetPrimitiveInfo(0, nodeIdx, primIdx);
 				if (firstPrim == nullptr)
 				{
 					firstPrim = &prim;
@@ -1506,11 +1506,11 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		UINT absolutePrimIndex = 0;
 		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+			const UINT numPrims = NumPrimitivesInNodeMesh(0, nodeIdx);
 			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 			{
 				BYTE* pWritePtr = pMappedBytePtr + absolutePrimIndex * alignedMaterialSize;
-				auto& prim = GetPrimitiveInfo(nodeIdx, primIdx);
+				auto& prim = GetPrimitiveInfo(0, nodeIdx, primIdx);
 
 				assert(sizeof(prim.materialCbData) == materialSize);
 
@@ -1536,32 +1536,32 @@ VOID Dx12SampleBase::LoadGltfFiles()
 		m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 
 		m_gltfLoader->LoadModel();
-		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene(0);
+		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene();
 		m_sceneInfo[0].nodes.resize(numNodesInScene);
 
 		UINT primitiveIndex = 0;
 		for (UINT node = 0; node < numNodesInScene; node++)
 		{
-			auto& currentNode = GetNodeInfo(node);
-			currentNode.name = m_gltfLoader->GetNodeName(0, node);
-			DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(node).transformInfo;
-			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, 0, node);
+			auto& currentNode = GetNodeInfo(fileIdx, node);
+			currentNode.name = m_gltfLoader->GetNodeName(node);
+			DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(fileIdx, node).transformInfo;
+			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, node);
 			AddTransformInfo(meshTransformInfo);
 
-			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(0, node);
+			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(node);
 			if (isMeshPrimInfoValid == TRUE)
 			{
-				const UINT numPrimitives = m_gltfLoader->NumPrimitives(0, node);
+				const UINT numPrimitives = m_gltfLoader->NumPrimitives(node);
 				currentNode.meshInfo.primitives.resize(numPrimitives);
 
 				for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 				{
 					///@note Load VB, IB and textures for each primitive.
 					DxGltfPrimInfo gltfPrimInfo;
-					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, 0, node, primitive);
+					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, node, primitive);
 
 					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-					auto& currentPrim = GetPrimitiveInfo(node, primitive);
+					auto& currentPrim = GetPrimitiveInfo(0, node, primitive);
 					currentPrim.vertexBufferInfo.resize(numVertexAttributes);
 					currentPrim.modelIaSemantics.resize(numVertexAttributes);
 
@@ -1724,13 +1724,13 @@ VOID Dx12SampleBase::LoadGltfFiles()
 VOID Dx12SampleBase::LoadSceneMaterialInfo()
 {
     UINT primitiveIndex = 0;
-    const UINT numNodesInScene = NumNodesInScene();
+    const UINT numNodesInScene = NumNodesInScene(0);
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-        const UINT numPrims = NumPrimitivesInNodeMesh(nodeIdx);
+        const UINT numPrims = NumPrimitivesInNodeMesh(0, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
-			auto& currentPrim = GetPrimitiveInfo(nodeIdx, primIdx);
+			auto& currentPrim = GetPrimitiveInfo(0, nodeIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
 			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0

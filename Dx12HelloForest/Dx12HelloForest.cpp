@@ -74,16 +74,16 @@ HRESULT Dx12HelloForest::RenderFrame()
 
 	UINT primIdxInScene       = 0;
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
-	const UINT numNodes = NumNodesInScene();
+	const UINT numNodes = NumNodesInScene(0);
 
 	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 	{
-		const UINT numPrims =  NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrims =  NumPrimitivesInNodeMesh(0, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(nodeIdx, primIdx);
+			auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(nodeIdx).gpuCameraData);
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0, nodeIdx).gpuCameraData);
 			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
 			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, nodeIdx, 0);

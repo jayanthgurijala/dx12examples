@@ -101,16 +101,16 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	assert(rtvHandle.ptr != 0);
 	assert(dsvHandle.ptr != 0);
 
-	auto indexBufferRes = GetModelIndexBufferResource();
-	auto indexBufferView = GetModelIndexBufferView(0);
+	auto indexBufferRes = GetModelIndexBufferResource(0, 0, 0);
+	auto indexBufferView = GetModelIndexBufferView(0, 0, 0);
 	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
 
-	auto vertexBufferRes = GetModelPositionVertexBufferResource();
-	auto vertexBufferView = GetModelPositionVertexBufferView();
+	auto vertexBufferRes = GetModelPositionVertexBufferResource(0, 0, 0);
+	auto vertexBufferView = GetModelPositionVertexBufferView(0, 0, 0);
 	CreateAppBufferSrvDescriptorAtIndex(2, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
 
-	auto uvVbBufferRes = GetModelUvVertexBufferResource();
-	auto uvVbView = GetModelUvBufferView();
+	auto uvVbBufferRes = GetModelUvVertexBufferResource(0, 0, 0, 0);
+	auto uvVbView = GetModelUvBufferView(0, 0, 0, 0);
 
 	const UINT uvVbElementSizeInBytes = 4;
 	const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;

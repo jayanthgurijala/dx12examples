@@ -22,17 +22,13 @@ HRESULT DxGltfLoader::LoadModel()
 
 UINT DxGltfLoader::NumScenes()
 {
-	return m_model.scenes.size();
+	assert(m_model.scenes.size() == 1);
+	return 1;
 }
 
-UINT DxGltfLoader::NumNodesInScene(UINT index)
+VOID DxGltfLoader::GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT nodeIndex)
 {
-	return m_model.scenes[index].nodes.size();
-}
-
-VOID DxGltfLoader::GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT sceneIndex, UINT nodeIndex)
-{
-	tinygltf::Node& nodeDesc = GetNode(sceneIndex, nodeIndex);
+	tinygltf::Node& nodeDesc = GetNode(nodeIndex);
 
 	meshTransformInfo.hasScale       = (nodeDesc.scale.size() != 0);
 	meshTransformInfo.hasTranslation = (nodeDesc.translation.size() != 0);
@@ -51,10 +47,10 @@ VOID DxGltfLoader::GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, 
 * 2. Vertex Buffers - (size, stride) (bufferIndex, Offset)
 * 3. Index Buffers
 */
-VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex)
+VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeIndex, UINT primitiveIndex)
 {
-	const tinygltf::Mesh& mesh = GetMesh(sceneIndex, nodeIndex);
-	const tinygltf::Primitive& primitive = GetPrimitive(sceneIndex, nodeIndex, primitiveIndex);
+	const tinygltf::Mesh& mesh = GetMesh(nodeIndex);
+	const tinygltf::Primitive& primitive = GetPrimitive(nodeIndex, primitiveIndex);
 	const UINT totalAttributesInPrimitive = min(m_supportedAttributes.size(), primitive.attributes.size());
 	primInfo.vbInfo.resize(totalAttributesInPrimitive);
 	primInfo.name = mesh.name;

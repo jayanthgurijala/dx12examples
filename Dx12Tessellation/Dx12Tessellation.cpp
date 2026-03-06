@@ -45,7 +45,7 @@ HRESULT Dx12Tessellation::OnInit()
 		},
 		{ staticSampler });
 
-	auto& curPrimitive = GetPrimitiveInfo(0, 0);
+	auto& curPrimitive = GetPrimitiveInfo(0, 0, 0);
 	const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
 	char vertexShaderName[64];
 	char hullShaderName[64];

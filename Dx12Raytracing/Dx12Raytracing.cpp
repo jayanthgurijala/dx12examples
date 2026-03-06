@@ -67,7 +67,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 	//@note should this be in UAV? Sample apps use UAV but there is DebugLayer warning
 	const D3D12_RESOURCE_STATES scratchState = D3D12_RESOURCE_STATE_COMMON;
 
-	const UINT numNodesInScene = NumNodesInScene();
+	const UINT numNodesInScene = NumNodesInScene(0);
 	m_blasResultBuffer.clear();
 	m_blasResultBuffer.resize(numNodesInScene);
 	m_blasScratchBuffer.clear();
@@ -75,14 +75,14 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-		const UINT numPrimsInScene = NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrimsInScene = NumPrimitivesInNodeMesh(0, nodeIdx);
 		std::vector< D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(numPrimsInScene);
 		for (UINT primIdx = 0; primIdx < numPrimsInScene; primIdx++)
 		{
-			BOOL isTransparent = IsPrimitiveTransparent(nodeIdx, primIdx);
-			const D3D12_INDEX_BUFFER_VIEW indexBufferView   = GetModelIndexBufferView(nodeIdx, primIdx);
-			const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(nodeIdx, primIdx);
-			const DxDrawPrimitive         drawInfo = GetDrawInfo(nodeIdx, primIdx);
+			BOOL isTransparent = IsPrimitiveTransparent(0, nodeIdx, primIdx);
+			const D3D12_INDEX_BUFFER_VIEW indexBufferView   = GetModelIndexBufferView(0, nodeIdx, primIdx);
+			const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
+			const DxDrawPrimitive         drawInfo = GetDrawInfo(0, nodeIdx, primIdx);
 
 			D3D12_RAYTRACING_GEOMETRY_DESC& geomDesc = geomDescs[primIdx];
 			geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -92,7 +92,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 			geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
 			geomDesc.Triangles.VertexCount = drawInfo.numVertices;
-			geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(nodeIdx, primIdx);
+			geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(0, nodeIdx, primIdx);
 
 			//Object space -> new object space
 			geomDesc.Triangles.Transform3x4 = 0;
@@ -225,11 +225,11 @@ VOID Dx12Raytracing::CreateRtPSO()
 	assert(m_localRootSignature != nullptr);
 
 	///create the extra two SRV descriptors for raytracing
-	const UINT numNodesInScene = NumNodesInScene();
+	const UINT numNodesInScene = NumNodesInScene(0);
 	UINT totalPrimIdx = 0;
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-		const UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+		const UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 		{
 			const UINT numTotalSrvsPerPrim = NumSRVsPerPrimitive();
@@ -238,21 +238,21 @@ VOID Dx12Raytracing::CreateRtPSO()
 			const UINT appSrvOffsetForPrim = primSrvDescriptorBase + appSrvOffset;
 			assert(appSrvOffsetForPrim >= 0);
 
-			auto uvVbBufferRes = GetModelUvVertexBufferResource(nodeIdx, primIdx);
-			auto uvVbView      = GetModelUvBufferView(nodeIdx, primIdx);
+			auto uvVbBufferRes = GetModelUvVertexBufferResource(0, nodeIdx, primIdx, 0);
+			auto uvVbView      = GetModelUvBufferView(0, nodeIdx, primIdx, 0);
 
 			const UINT uvVbElementSizeInBytes = 8;
 			const UINT uvVbNumElements = uvVbView.SizeInBytes / 8;
 			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
 
-			auto posVbBufferRes = GetModelPositionVertexBufferResource(nodeIdx, primIdx);
-			auto posVbView      = GetModelPositionVertexBufferView(nodeIdx, primIdx);
+			auto posVbBufferRes = GetModelPositionVertexBufferResource(0,nodeIdx, primIdx);
+			auto posVbView      = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
 			const UINT posVbElementSizeInBytes = 12;
 			const UINT numPosElements = posVbView.SizeInBytes / 12;
 			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
 
-			auto indexBufferRes = GetModelIndexBufferResource(nodeIdx, primIdx);
-			auto indexBufferView = GetModelIndexBufferView(nodeIdx, primIdx);
+			auto indexBufferRes = GetModelIndexBufferResource(0, nodeIdx, primIdx);
+			auto indexBufferView = GetModelIndexBufferView(0, nodeIdx, primIdx);
 
 			const UINT ibElementSizeInBytes = 4;
 			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
@@ -370,11 +370,11 @@ VOID Dx12Raytracing::CreateRtPSO()
 
 VOID Dx12Raytracing::BuildShaderTables()
 {
-	UINT numNodesInScene = NumNodesInScene();
+	UINT numNodesInScene = NumNodesInScene(0);
 	UINT totalPrimIdx = 0;
 	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 	{
-		UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+		UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 		{
 			totalPrimIdx++;
@@ -419,16 +419,16 @@ VOID Dx12Raytracing::BuildShaderTables()
 
 	{
 		BYTE* const pHitGroupStartWritePtr = sbtDataWritePtr;
-		UINT numNodesInScene = NumNodesInScene();
+		UINT numNodesInScene = NumNodesInScene(0);
 		UINT totalPrimIdx = 0;
 		const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
 		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(nodeIdx);
+			UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
 			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 			{
-				auto& curPrimitive    = GetPrimitiveInfo(nodeIdx, primIdx);
-				BOOL needsAnyHit      = IsPrimitiveTransparent(nodeIdx, primIdx);
+				auto& curPrimitive    = GetPrimitiveInfo(0, nodeIdx, primIdx);
+				BOOL needsAnyHit      = IsPrimitiveTransparent(0, nodeIdx, primIdx);
 				auto gpuVAMaterialsCB = curPrimitive.materialTextures.meterialCb;
 				auto gpuVAMatTex      = GetAppSrvGpuHandle(totalPrimIdx * numSrvsPerPrim);
 				void* curHitGroupID   = (needsAnyHit == TRUE) ? hitgroupMaskID : hitgroupOpaqueID;
@@ -489,8 +489,8 @@ HRESULT Dx12Raytracing::RenderFrame()
 
     //@todo optimization - transition resources once in init and keep them in the required state for raytracing instead of transitioning every frame.
 	// This is just to keep the sample code simple and focused on raytracing.
-	auto uvVbBufferRes = GetModelUvVertexBufferResource();
-	auto indexBufferRes = GetModelIndexBufferResource();
+	auto uvVbBufferRes = GetModelUvVertexBufferResource(0, 0, 0, 0);
+	auto indexBufferRes = GetModelIndexBufferResource(0, 0, 0);
 
 	ImGui::Text("Ray Tracing");
 

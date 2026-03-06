@@ -19,7 +19,7 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
 	virtual inline UINT NumSRVsPerPrimNeededForApp() override { return 0; }
-	virtual inline const std::string GltfFileName() override { return "deer.gltf"; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
 
 	virtual HRESULT OnInit() override;
 

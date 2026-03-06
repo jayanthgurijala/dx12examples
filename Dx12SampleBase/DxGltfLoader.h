@@ -21,51 +21,56 @@ public:
 	DxGltfLoader(std::string filename);
 	HRESULT LoadModel();
 	UINT NumScenes();
-	UINT NumNodesInScene(UINT index);
+	
 
-	VOID GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT sceneIndex, UINT nodeIndex);
-	VOID LoadMeshPrimitiveInfo(DxGltfPrimInfo& meshInfo, UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex);
+	VOID GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT nodeIndex);
+	VOID LoadMeshPrimitiveInfo(DxGltfPrimInfo& meshInfo, UINT nodeIndex, UINT primitiveIndex);
 
 	inline unsigned char* GetBufferData(UINT index)
 	{
 		return m_model.buffers[index].data.data();
 	}
 
-	inline BOOL IsNodeMeshInfoValid(UINT sceneIndex, UINT nodeIndex)
+	inline BOOL IsNodeMeshInfoValid(UINT nodeIndex)
 	{
-		return (GetNode(sceneIndex, nodeIndex).mesh != -1);
+		return (GetNode(nodeIndex).mesh != -1);
 	}
 
-	inline UINT NumPrimitives(UINT sceneIndex, UINT nodeIndex)
+	inline UINT NumPrimitives(UINT nodeIndex)
 	{
-		return GetMesh(sceneIndex, nodeIndex).primitives.size();
+		return GetMesh(nodeIndex).primitives.size();
 	}
 
-	inline std::string GetNodeName(UINT sceneIndex, UINT nodeIndex)
+	inline std::string GetNodeName(UINT nodeIndex)
 	{
-		return GetNode(sceneIndex, nodeIndex).name;
+		return GetNode(nodeIndex).name;
+	}
+
+	inline UINT NumNodesInScene()
+	{
+		return m_model.scenes[0].nodes.size();
 	}
 
 private:
 
-	inline tinygltf::Node& GetNode(UINT sceneIndex, UINT nodeIndex)
+	inline tinygltf::Node& GetNode(UINT nodeIndex)
 	{
 
 		return m_model.nodes[
-			m_model.scenes[sceneIndex].nodes[nodeIndex]
+			m_model.scenes[0].nodes[nodeIndex]
 		];
 	}
 
-	inline tinygltf::Mesh& GetMesh(UINT sceneIndex, UINT nodeIndex)
+	inline tinygltf::Mesh& GetMesh(UINT nodeIndex)
 	{
-		auto& node = GetNode(sceneIndex, nodeIndex);
+		auto& node = GetNode(nodeIndex);
 		int meshIdx =node.mesh;
 		return m_model.meshes[meshIdx];
 	}
 
-	inline tinygltf::Primitive& GetPrimitive(UINT sceneIndex, UINT nodeIndex, UINT primitiveIndex)
+	inline tinygltf::Primitive& GetPrimitive(UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetMesh(sceneIndex, nodeIndex).primitives[primitiveIndex];
+		return GetMesh(nodeIndex).primitives[primitiveIndex];
 	}
 
 	inline tinygltf::Accessor& GetAccessor(UINT index)

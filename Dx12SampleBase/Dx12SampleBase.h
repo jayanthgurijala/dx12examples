@@ -159,101 +159,101 @@ protected:
 		return 2;
 	}
 
-	inline DxNodeInfo& GetNodeInfo(UINT sceneIdx = 0, UINT nodeIndex = 0)
+	inline DxNodeInfo& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
 	{
 		return m_sceneInfo[sceneIdx].nodes[nodeIndex];
 	}
 
-	inline DxMeshInfo& GetMeshInfo(UINT nodeIndex = 0)
+	inline DxMeshInfo& GetMeshInfo(UINT sceneIdx, UINT nodeIndex)
 	{
-		return GetNodeInfo(nodeIndex).meshInfo;
+		return GetNodeInfo(sceneIdx, nodeIndex).meshInfo; 
 	}
 
-	inline DxPrimitiveInfo& GetPrimitiveInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DxPrimitiveInfo& GetPrimitiveInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetMeshInfo(nodeIndex).primitives[primitiveIndex];
+		return GetMeshInfo(sceneIdx, nodeIndex).primitives[primitiveIndex];
 	}
 
-	inline BOOL IsPrimitiveTransparent(UINT nodeIndex, UINT primitiveIndex)
+	inline BOOL IsPrimitiveTransparent(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		auto curPrim = GetPrimitiveInfo(nodeIndex, primitiveIndex);
+		auto curPrim = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex);
 		BOOL isBlend = (((curPrim.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE);
 		BOOL isAlphaMask = (((curPrim.materialCbData.flags & AlphaModeMask) == 0) ? FALSE : TRUE);
 		BOOL isTransparent = (isBlend == TRUE || isAlphaMask == TRUE);
 		return isTransparent;
 	}
 
-	inline DxPrimVertexData& GetPrimitiveVertexData(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
+	inline DxPrimVertexData& GetPrimitiveVertexData(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT vbIndex)
 	{
-		return GetPrimitiveInfo(nodeIndex, primitiveIndex).vertexBufferInfo[vbIndex];
+		return GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).vertexBufferInfo[vbIndex];
 	}
 
-	inline DxPrimIndexData& GetPrimitiveIndexData(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DxPrimIndexData& GetPrimitiveIndexData(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetPrimitiveInfo(nodeIndex, primitiveIndex).indexBufferInfo;
+		return GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).indexBufferInfo;
 	}
 
-	inline D3D12_VERTEX_BUFFER_VIEW& const GetModelVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT vbIndex = 0)
+	inline D3D12_VERTEX_BUFFER_VIEW& const GetModelVertexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT vbIndex)
 	{
-		auto& vbv = GetPrimitiveVertexData(nodeIndex, primitiveIndex, vbIndex).modelVbv;
+		auto& vbv = GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, vbIndex).modelVbv;
 		assert(vbv.BufferLocation != 0);
 		assert(vbv.SizeInBytes != 0);
 		assert(vbv.StrideInBytes != 0);
 		return vbv;
 	}
 
-	inline DxDrawPrimitive& GetModelDrawInfo(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DxDrawPrimitive& GetModelDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetPrimitiveInfo(nodeIndex, primitiveIndex).modelDrawPrimitive;
+		return GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).modelDrawPrimitive;
 	}
 
-	inline ID3D12Resource* GetModelIndexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline ID3D12Resource* GetModelIndexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetPrimitiveIndexData(nodeIndex, primitiveIndex).indexBuffer.Get();
+		return GetPrimitiveIndexData(sceneIdx, nodeIndex, primitiveIndex).indexBuffer.Get();
 	}
 
-	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return  GetPrimitiveIndexData(nodeIndex, primitiveIndex).modelIbv;
+		return  GetPrimitiveIndexData(sceneIdx, nodeIndex, primitiveIndex).modelIbv;
 	}
 
-	inline UINT NumVertexAttributesInPrimitive(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline UINT NumVertexAttributesInPrimitive(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return static_cast<UINT>(GetPrimitiveInfo(nodeIndex, primitiveIndex).vertexBufferInfo.size());
+		return static_cast<UINT>(GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).vertexBufferInfo.size());
 	}
 
 
 	///@todo Assumptions, POSITION, NORMAL, TEXCOORD0, TEXCOORD1 etc as per semantic order in gltfloader
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, 0).modelVbv;
+		return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, 0).modelVbv;
 	}
 
-	inline ID3D12Resource* GetModelPositionVertexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline ID3D12Resource* GetModelPositionVertexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, 0).modelVbBuffer.Get();
+		return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, 0).modelVbBuffer.Get();
 	}
 
-	inline ID3D12Resource* GetModelUvVertexBufferResource(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT texCoordIndex = 0)
+	inline ID3D12Resource* GetModelUvVertexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT texCoordIndex)
 	{
-		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbBuffer.Get();
+		return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbBuffer.Get();
 	}
 
-	inline D3D12_VERTEX_BUFFER_VIEW& GetModelUvBufferView(UINT nodeIndex = 0, UINT primitiveIndex = 0, UINT texCoordIndex = 0)
+	inline D3D12_VERTEX_BUFFER_VIEW& GetModelUvBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT texCoordIndex)
 	{
 		//@note POSITION = 0, NORMAL = 1, TEXCOORD0 = 2, TEXCOORD1 = 3 and so on as per gltfloader semantic order
-		return GetPrimitiveVertexData(nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbv;
+		return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbv;
 	}
 
-	inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx = 0, UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
 		return m_sceneInfo[sceneIdx].nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
 	}
 
-	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT nodeIndex = 0, UINT primitiveIndex = 0)
+	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
 		///@note POSITION is always the first semantic in the list as per gltfloader, this is an assumption we are making here
-		auto& positionInfo = GetPrimitiveInfo(nodeIndex, primitiveIndex).modelIaSemantics[0];
+		auto& positionInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).modelIaSemantics[0];
 
 		assert(std::strcmp(positionInfo.SemanticName, "POSITION") == 0);
 
@@ -268,14 +268,14 @@ protected:
 		m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
 	}
 
-	inline UINT NumNodesInScene(UINT sceneIdx = 0)
+	inline UINT NumNodesInScene(UINT sceneIdx)
 	{
 		return m_sceneInfo[sceneIdx].nodes.size();
 	}
 
-	inline UINT NumPrimitivesInNodeMesh(UINT nodeIdx)
+	inline UINT NumPrimitivesInNodeMesh(UINT sceneIdx, UINT nodeIdx)
 	{
-		return GetMeshInfo(nodeIdx).primitives.size();
+		return GetMeshInfo(sceneIdx, nodeIdx).primitives.size();
 	}
 
 	inline UINT NumSRVsPerPrimForMaterials()
