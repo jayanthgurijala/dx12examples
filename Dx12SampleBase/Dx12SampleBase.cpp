@@ -1309,17 +1309,18 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 
 			assert(GetRootSignature() != nullptr);
 
-			const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
+			std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
+			const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
+			assert(numAttributes == modelIaSemantics.size());
+			
 			char vertexShaderName[64];
 			char pixelShaderName[64];
 			GetVertexShaderName(vertexShaderName, numAttributes);
 			GetPixelShaderName(pixelShaderName, numAttributes);
 
-			D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
-			inputLayoutDesc.NumElements = static_cast<UINT>(numAttributes);
-			inputLayoutDesc.pInputElementDescs = curPrimitive.modelIaSemantics.data();
+			D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes,  };
 
-			const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
+			const BOOL doubleSied   = ((curPrimitive.materialCbData.flags & DoubleSided)    == 0) ? FALSE : TRUE;
             const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
 
 			curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
@@ -1532,6 +1533,27 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	assert(pMappedBytePtr == pMappedPtr);
 }
 
+UINT Dx12SampleBase::CreateInputElementDesc(const std::vector<DxPrimVertexData>& inData, std::vector<D3D12_INPUT_ELEMENT_DESC>& outData)
+{
+	const UINT numAttributes = inData.size();
+	outData.resize(numAttributes);
+	for (UINT idx = 0; idx < numAttributes; idx++)
+	{
+		const auto& inElementDesc = inData[idx].iaSemantic;
+		auto& curSemantic = outData[idx];
+
+		curSemantic.SemanticName         = inElementDesc.name.c_str();
+		curSemantic.AlignedByteOffset    = 0;
+		curSemantic.SemanticIndex        = (inElementDesc.isIndexValid == TRUE) ? inElementDesc.index : 0;
+		curSemantic.InputSlotClass       = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+		curSemantic.InstanceDataStepRate = 0;
+		curSemantic.Format               = inElementDesc.format;
+		curSemantic.InputSlot            = idx;
+
+	}
+	return numAttributes;
+}
+
 VOID Dx12SampleBase::LoadGltfFiles()
 {
 	const std::vector<std::string> gltfFileNames = GltfFileName();
@@ -1571,9 +1593,15 @@ VOID Dx12SampleBase::LoadGltfFiles()
 					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, node, primitive);
 
 					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-					auto& currentPrim = GetPrimitiveInfo(0, node, primitive);
-					currentPrim.vertexBufferInfo.resize(numVertexAttributes);
-					currentPrim.modelIaSemantics.resize(numVertexAttributes);
+					auto& currentPrim              = GetPrimitiveInfo(0, node, primitive);
+					const auto& gltfMaterial       = gltfPrimInfo.materialInfo;
+					const auto& gltfPbrInfo        = gltfMaterial.pbrMetallicRoughness;
+					const auto& gltfNormalInfo     = gltfMaterial.normalInfo;
+					const auto& gltfOcclusion      = gltfMaterial.occlusionInfo;
+					const auto& gltfEmissive       = gltfMaterial.emissiveInfo;
+					auto& primMaterialCB           = currentPrim.materialCbData;
+
+					currentPrim.vertexBufferInfo.clear();
 
 					currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
 
@@ -1583,33 +1611,51 @@ VOID Dx12SampleBase::LoadGltfFiles()
 					{
 						for (UINT k = 0; k < numVertexAttributes; k++)
 						{
-							auto& vbInfo = currentPrim.vertexBufferInfo[k];
+							currentPrim.vertexBufferInfo.emplace_back();
+							auto& vbInfo = currentPrim.vertexBufferInfo.back();
 							const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
 
-							const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
-							const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
-							const UINT   bufferIndex = gltfVbInfo.bufferIndex;
-							const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
-							BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
-							vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-								(UINT)bufferSizeInBytes,
-								gltfVbInfo.iaLayoutInfo.name.c_str());
+							BOOL isVertexAttribNeeded = TRUE;
 
-							vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
-							vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
-							vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
-							vbInfo.semanticName = gltfVbInfo.iaLayoutInfo.name;
-							
-							auto& inputElementDesc = currentPrim.modelIaSemantics[k];
-							auto& iaSemanticInfo = gltfVbInfo.iaLayoutInfo;
-							const UINT semanticIndex = iaSemanticInfo.isIndexValid ? iaSemanticInfo.index : 0;
-							inputElementDesc.SemanticName = vbInfo.semanticName.c_str();
-							inputElementDesc.AlignedByteOffset = 0;
-							inputElementDesc.SemanticIndex = semanticIndex;
-							inputElementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-							inputElementDesc.InstanceDataStepRate = 0;
-							inputElementDesc.Format = iaSemanticInfo.format;
-							inputElementDesc.InputSlot = k;
+							if ((gltfVbInfo.iaLayoutInfo.isIndexValid                           == TRUE) &&
+								(dxhelper::IsSemanticNameTexCoord(gltfVbInfo.iaLayoutInfo.name) == TRUE))
+							{
+								isVertexAttribNeeded       = FALSE;
+								const UINT semanticIndex   = gltfVbInfo.iaLayoutInfo.index;
+								auto IsIndexUsedInMaterial = [semanticIndex](const DxGltfTextureInfo& textureInfo) -> BOOL
+									{
+										return (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0 &&
+											textureInfo.texCoordIndex == semanticIndex);
+									};
+
+								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.baseColorTexture);
+								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.metallicRoughnessTexture);
+								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfNormalInfo.normalTexture);
+								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfOcclusion.occlusionTexture);
+								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfEmissive.emissiveTexture);
+							}
+
+							if (isVertexAttribNeeded == TRUE)
+							{
+								const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
+								const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
+								const UINT   bufferIndex = gltfVbInfo.bufferIndex;
+								const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
+								BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
+
+								vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+									(UINT)bufferSizeInBytes,
+									gltfVbInfo.iaLayoutInfo.name.c_str());
+
+								vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
+								vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
+								vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
+								vbInfo.iaSemantic = gltfVbInfo.iaLayoutInfo;
+							}
+							else
+							{
+								currentPrim.vertexBufferInfo.pop_back();
+							}
 						}
 					}
 
@@ -1634,13 +1680,6 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 					///@Fill in material and texture info if material is defined for the primitive
 					{
-						const auto& gltfMaterial = gltfPrimInfo.materialInfo;
-						const auto& gltfPbrInfo = gltfMaterial.pbrMetallicRoughness;
-						const auto& gltfNormalInfo = gltfMaterial.normalInfo;
-						const auto& gltfOcclusion = gltfMaterial.occlusionInfo;
-						const auto& gltfEmissive = gltfMaterial.emissiveInfo;
-						auto& primMaterialCB = currentPrim.materialCbData;
-
 						dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
 						dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
 						primMaterialCB.alphaCutoff = gltfMaterial.alphaCutOff;

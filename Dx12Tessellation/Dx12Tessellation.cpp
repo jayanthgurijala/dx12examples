@@ -46,7 +46,12 @@ HRESULT Dx12Tessellation::OnInit()
 		{ staticSampler });
 
 	auto& curPrimitive = GetPrimitiveInfo(0, 0, 0);
-	const SIZE_T numAttributes = curPrimitive.modelIaSemantics.size();
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementsDesc;
+	const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, inputElementsDesc);
+
+
+
 	char vertexShaderName[64];
 	char hullShaderName[64];
 	char domainShaderName[64];
@@ -64,7 +69,7 @@ HRESULT Dx12Tessellation::OnInit()
 	assert(vertexShader != nullptr && hullShader != nullptr && domainShader != nullptr && pixelShader != nullptr);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.InputLayout = { curPrimitive.modelIaSemantics.data() , static_cast<UINT>(curPrimitive.modelIaSemantics.size()) };
+	pipelineStateDesc.InputLayout = { inputElementsDesc.data() , numAttributes };
 	pipelineStateDesc.pRootSignature = m_pRootSignature.Get();
 	
 	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());

@@ -228,7 +228,7 @@ struct DxPrimVertexData
 {
 	ComPtr<ID3D12Resource>   modelVbBuffer;
 	D3D12_VERTEX_BUFFER_VIEW modelVbv;
-	std::string              semanticName;
+	DxIASemantic             iaSemantic;
 };
 
 struct DxPrimIndexData
@@ -243,7 +243,6 @@ struct DxPrimitiveInfo
 
 	std::string                           name;
 	std::vector<DxPrimVertexData>         vertexBufferInfo;
-	std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
 	DxPrimIndexData			              indexBufferInfo;
 
 

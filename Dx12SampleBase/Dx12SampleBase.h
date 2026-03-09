@@ -261,11 +261,11 @@ protected:
 	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
 		///@note POSITION is always the first semantic in the list as per gltfloader, this is an assumption we are making here
-		auto& positionInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).modelIaSemantics[0];
+		auto& vertexAttribute = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).vertexBufferInfo[0].iaSemantic;
 
-		assert(std::strcmp(positionInfo.SemanticName, "POSITION") == 0);
+		assert(vertexAttribute.name == "POSITION");
 
-		return positionInfo.Format;
+		return vertexAttribute.format;
 	}
 
 	inline VOID SetFrameInfo(ID3D12Resource* frameResource = nullptr, UINT rtvIndex = UINT_MAX, D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_RENDER_TARGET)
@@ -373,6 +373,8 @@ protected:
 
 	HRESULT CreateSceneMVPMatrix();
 	VOID CreateSceneMaterialCb();
+
+	UINT CreateInputElementDesc(const std::vector<DxPrimVertexData>& inData, std::vector<D3D12_INPUT_ELEMENT_DESC>& outData);
 
 private:
 
