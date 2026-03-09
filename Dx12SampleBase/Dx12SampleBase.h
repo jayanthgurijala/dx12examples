@@ -16,6 +16,8 @@
 using namespace DirectX;
 using namespace Microsoft::WRL;
 
+
+
 class Dx12SampleBase
 {
 public:
@@ -41,7 +43,7 @@ public:
 
 	int RunApp(HINSTANCE hInstance, int nCmdShow);
 
-	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList, UINT nodeIndex = 0, UINT primitiveIndex = 0);
+	VOID RenderModel(ID3D12GraphicsCommandList* pCommandList, UINT sceneIdx, UINT nodeIndex = 0, UINT primitiveIndex = 0);
 
 
 	static FLOAT s_frameDeltaTime;
@@ -158,6 +160,12 @@ protected:
 	{
 		return 2;
 	}
+
+	inline UINT NumSceneElementsLoaded()
+	{
+		return m_sceneInfo.size();
+	}
+
 
 	inline DxNodeInfo& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
 	{
@@ -289,15 +297,15 @@ protected:
 		return NumSRVsPerPrimForMaterials() + NumSRVsPerPrimNeededForApp();
 	}
 
-	inline UINT NumPrimsInScene(UINT sceneIdx = 0)
+	inline UINT NumPrimsInScene(UINT sceneIdx)
 	{
 		return m_sceneInfo[sceneIdx].numTotalPrimitivesInScene;
 	}
 
-	inline UINT NumSRVsInScene()
+	inline UINT NumSRVsInScene(UINT sceneIdx)
 	{
-		assert(UINT_MAX / NumSRVsPerPrimitive() > NumPrimsInScene());
-        const UINT numPrimsInScene = NumPrimsInScene();
+		assert(UINT_MAX / NumSRVsPerPrimitive() > NumPrimsInScene(sceneIdx));
+        const UINT numPrimsInScene = NumPrimsInScene(sceneIdx);
         const UINT numSrvsPerPrimitive = NumSRVsPerPrimitive();
         const UINT totalSrvs = numPrimsInScene * numSrvsPerPrimitive;
 		return totalSrvs;
@@ -331,6 +339,22 @@ protected:
 		snprintf(outPsNameString, 64, "Simple%zu_PS.cso", numVertexAttributes);
 	}
 
+	template<typename Func>
+	void ForEachSceneNode(Func&& func)
+	{
+		const UINT numSceneElements = NumSceneElementsLoaded();
+
+		for (UINT idx = 0; idx < numSceneElements; idx++)
+		{
+			const UINT numNodesInScene = NumNodesInScene(idx);
+
+			for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+			{
+				func(idx, nodeIdx);
+			}
+		}
+	}
+
 
 	VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
 	VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
@@ -354,7 +378,7 @@ private:
 
 	inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
 
-	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims, UINT sceneIdx = 0)
+	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims, UINT sceneIdx)
 	{
 		m_sceneInfo[sceneIdx].numTotalPrimitivesInScene = numPrims;
 	}

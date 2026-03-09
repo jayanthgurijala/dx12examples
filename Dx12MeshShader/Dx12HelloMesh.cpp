@@ -46,7 +46,7 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	const UINT numDescRanges = 1;
 	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-	const UINT numSrvsNeededForApp = NumSRVsInScene();
+	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto rootCbv = dxhelper::GetRootCbv();

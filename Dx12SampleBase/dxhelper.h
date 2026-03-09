@@ -261,6 +261,11 @@ namespace dxhelper
 		return mipCount;
 	}
 
+	inline BOOL IsSemanticNameTexCoord(std::string semanticName)
+	{
+		return (semanticName.substr(0, 8) == "TEXCOORD");
+	}
+
 }
 
 

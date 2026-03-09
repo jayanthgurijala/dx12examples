@@ -28,7 +28,7 @@ HRESULT Dx12Tessellation::OnInit()
 	const UINT numDescRanges = 1;
 	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-	const UINT numSrvsNeededForApp = NumSRVsInScene();
+	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto rootCbv = dxhelper::GetRootCbv();
@@ -148,7 +148,7 @@ HRESULT Dx12Tessellation::RenderFrame()
 	UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
 	pCmdList->SetGraphicsRoot32BitConstant(2, bits, 0);
 
-	RenderModel(pCmdList);
+	RenderModel(pCmdList, 0, 0, 0);
 
 	return S_OK;
 }

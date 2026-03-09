@@ -23,7 +23,7 @@ HRESULT Dx12HelloWorld::OnInit()
 	const UINT numDescRanges = 1;
     std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-    const UINT numSrvsNeededForApp = NumSRVsInScene();
+    const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto rootCbv          = dxhelper::GetRootCbv();
@@ -86,7 +86,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0, nodeIdx).gpuCameraData);
 			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
 			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
-			RenderModel(pCmdList, nodeIdx, 0);
+			RenderModel(pCmdList, 0, nodeIdx, primIdx);
 			primIdxInScene++;
 		}
 	}
