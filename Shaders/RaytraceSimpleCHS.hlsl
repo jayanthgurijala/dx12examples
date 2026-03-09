@@ -89,34 +89,78 @@ uint3 GetHitTriangleIndices()
     
 }
 
+// Estimates the texture footprint (rho) for a ray hit using a ray cone approximation.
+// This is useful for choosing the correct mip level when sampling a texture in ray tracing.
+//
+// p  - triangle vertex positions in world space (3 points of the hit triangle)
+// uv - corresponding texture coordinates for those triangle vertices
+//
+// Returns:
+// rho - an estimate of the texture footprint in texel space (used for mip selection)
 float CalculateRayConeUVFootPrint(float3 p[3], float2 uv[3])
 {
+    // Distance along the ray where the hit occurred.
+    // In ray tracing shaders, RayTCurrent() gives the parametric
+    // distance to the closest intersection along the ray.
     float rayHitT = RayTCurrent();
+    
+    // Compute tangent of half the camera field of view.
+    // This is used to estimate how much the ray cone spreads
+    // as the ray travels through space.
     float tanValue = tan(g_fovInRadians * 0.5f);
+    
+    // Estimate the radius of the ray cone at the hit distance.
+    // As the ray travels farther from the camera, the cone widens.
     float rayConeRadius = rayHitT * tanValue;
+    
+     // Convert cone radius into screen-space spread.
+    // DispatchRaysDimensions().x is the width of the ray dispatch
+    // (typically the screen width).
+    //
+    // This approximates how much world space area a single pixel ray covers.
     float spread = rayConeRadius / DispatchRaysDimensions().x;
 
+    // Compute triangle edge vectors in world space.
+    // These represent the geometric edges of the triangle.
     float3 dp1 = p[1] - p[0];
     float3 dp2 = p[2] - p[0];
     
+    // Lengths of the geometric edges in world space.
+    // Used to measure how large the triangle edges are physically.
     float lendp1 = length(dp1);
     float lendp2 = length(dp2);
     
+     // Compute the equivalent edges in UV (texture) space.
+    // These show how much the texture coordinates change across the triangle.
     float2 duv1 = uv[1] - uv[0];
     float2 duv2 = uv[2] - uv[0];
+    
+    // Lengths of the UV edges.
+    // These indicate how much texture space corresponds to each triangle edge.
     float lenduv1 = length(duv1);
     float lenduv2 = length(duv2);
     
+    // Compute the UV gradient relative to world-space edges.
+    // Essentially: "how much UV changes per unit of world space".
+    //
+    // This approximates the texture coordinate derivative.
     float dduv1 = lenduv1 / lendp1;
     float dduv2 = lenduv2 / lendp2;
     
+    // Use the maximum gradient as a conservative estimate.
+    // This ensures the mip selection will not undersample the texture.
     float maxddu = max(dduv1, dduv2);
     
+    // Convert the ray cone world-space spread into UV space spread.
+    // This gives an estimate of how large the ray footprint is in UV coordinates.
     float uvFootPrint = spread * maxddu;
 
     uint width, height;
     gTexture.GetDimensions(width, height);
     
+    // Convert UV footprint into texel footprint.
+    // Multiplying by the larger texture dimension produces
+    // an approximate footprint size in texel units.
     float rho = uvFootPrint * max(width, height);
     
     return rho;
