@@ -9,6 +9,7 @@
 
 DxCamera::DxCamera(UINT width, UINT height)
 {
+	m_sceneExtents = {};
     m_transformInfoList.clear();
     m_viewportAspectRatio = (FLOAT)width / height;
 
@@ -91,15 +92,31 @@ VOID DxCamera::AddMinMaxExtents(DxExtents extents)
 		newMax = XMVectorMax(newMax, corners[i]);
 	}
 
-	XMFLOAT3 minOut;
-	XMFLOAT3 maxOut;
+	{
 
-	XMStoreFloat3(&minOut, newMin);
-	XMStoreFloat3(&maxOut, newMax);
+		XMFLOAT3 minOut;
+		XMFLOAT3 maxOut;
+
+		XMStoreFloat3(&minOut, newMin);
+		XMStoreFloat3(&maxOut, newMax);
 
 
-	XMVECTOR center = 0.5f * (XMLoadFloat3(&minOut) + XMLoadFloat3(&maxOut));
-	XMVECTOR size   = XMLoadFloat3(&maxOut) - XMLoadFloat3(&minOut);
+		m_sceneExtents.hasValidExtents = TRUE;
+		m_sceneExtents.min[0] += minOut.x;
+		m_sceneExtents.min[1] += minOut.y;
+		m_sceneExtents.min[2] += minOut.z;
+
+		m_sceneExtents.max[0] += maxOut.x;
+		m_sceneExtents.max[1] += maxOut.y;
+		m_sceneExtents.max[2] += maxOut.z;
+	}
+
+	XMFLOAT3 minScene = { m_sceneExtents.min[0], m_sceneExtents.min[1] , m_sceneExtents.min[2] };
+	XMFLOAT3 maxScene = { m_sceneExtents.max[0], m_sceneExtents.max[1] , m_sceneExtents.max[2] };
+
+
+	XMVECTOR center = 0.5f * (XMLoadFloat3(&minScene) + XMLoadFloat3(&maxScene));
+	XMVECTOR size   = XMLoadFloat3(&maxScene) - XMLoadFloat3(&minScene);
 	float radius    = XMVectorGetX(XMVector3Length(size)) * 0.5f; // half diagonal
 
     float distance = radius / sinf(m_fovYInRadians * 0.5f);

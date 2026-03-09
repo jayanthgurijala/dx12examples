@@ -195,7 +195,7 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
     
-    //payload.color = float4(mipLevel / 11.0, 0, 0, 1);
+    //payload.color = float4(mipLevel, 0, 0, 1);
     payload.color = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
 }
 

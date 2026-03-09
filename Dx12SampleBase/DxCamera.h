@@ -87,6 +87,8 @@ private:
 	XMVECTOR m_lookAt;
 	XMVECTOR m_up;
 
+	DxExtents m_sceneExtents;
+
 	FLOAT m_fovYInRadians;
 };
 

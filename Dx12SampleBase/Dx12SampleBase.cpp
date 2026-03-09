@@ -807,7 +807,7 @@ VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT h
 		gpuDescHandleBase.Offset(2, m_srvUavCbvDescriptorSize);
 
 		// After dispatch for a mip level
-		CD3DX12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(tex2D);
+		CD3DX12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
 		m_pComputeCommandList->ResourceBarrier(1, &uavBarrier);
 	}
 	
@@ -1593,7 +1593,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, node, primitive);
 
 					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-					auto& currentPrim              = GetPrimitiveInfo(0, node, primitive);
+					auto& currentPrim              = GetPrimitiveInfo(fileIdx, node, primitive);
 					const auto& gltfMaterial       = gltfPrimInfo.materialInfo;
 					const auto& gltfPbrInfo        = gltfMaterial.pbrMetallicRoughness;
 					const auto& gltfNormalInfo     = gltfMaterial.normalInfo;
