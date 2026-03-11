@@ -267,7 +267,7 @@ struct DxNodeInfo
 	D3D12_GPU_VIRTUAL_ADDRESS gpuCameraData;
 };
 
-struct DxSceneInfo
+struct DxSceneElements
 {
 	std::vector<DxNodeInfo> nodes;
 	UINT numTotalPrimitivesInScene;

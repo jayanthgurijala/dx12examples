@@ -38,7 +38,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
 	m_assetReader(std::make_unique<FileReader>()),
-	m_sceneInfo({}),
+	m_sceneElements({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr)
@@ -509,13 +509,15 @@ HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
 	m_rtvResources.clear();
 	m_rtvResources.resize(numResources);
 
+	FLOAT* clearColor4 = RenderTargetClearColor().data();
+
 	//@todo find a way to match these 	FLOAT clearColor[4] = { 0.7f, 0.7f, 1.0f, 1.0f};
 	D3D12_CLEAR_VALUE clearValue = {};
 	clearValue.Format = GetBackBufferFormat();
-	clearValue.Color[0] = 0.5f;
-	clearValue.Color[1] = 0.5f;
-	clearValue.Color[2] = 0.5f;
-	clearValue.Color[3] = 1.0f;
+	clearValue.Color[0] = clearColor4[0];
+	clearValue.Color[1] = clearColor4[1];
+	clearValue.Color[2] = clearColor4[2];
+	clearValue.Color[3] = clearColor4[3];
 
 	auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
@@ -1595,8 +1597,8 @@ VOID Dx12SampleBase::LoadGltfFiles()
 	const std::vector<std::string> gltfFileNames = GltfFileName();
 	const UINT numgltfFiles = gltfFileNames.size();
 
-	m_sceneInfo.clear();
-	m_sceneInfo.resize(numgltfFiles);
+	m_sceneElements.clear();
+	m_sceneElements.resize(numgltfFiles);
 
 	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
@@ -1605,7 +1607,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 		m_gltfLoader->LoadModel();
 		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene();
-		m_sceneInfo[fileIdx].nodes.resize(numNodesInScene);
+		m_sceneElements[fileIdx].nodes.resize(numNodesInScene);
 
 		UINT primitiveIndex = 0;
 		for (UINT node = 0; node < numNodesInScene; node++)

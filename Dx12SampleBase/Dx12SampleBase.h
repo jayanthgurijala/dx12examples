@@ -163,13 +163,13 @@ protected:
 
 	inline UINT NumSceneElementsLoaded()
 	{
-		return m_sceneInfo.size();
+		return m_sceneElements.size();
 	}
 
 
 	inline DxNodeInfo& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
 	{
-		return m_sceneInfo[sceneIdx].nodes[nodeIndex];
+		return m_sceneElements[sceneIdx].nodes[nodeIndex];
 	}
 
 	inline DxMeshInfo& GetMeshInfo(UINT sceneIdx, UINT nodeIndex)
@@ -255,7 +255,7 @@ protected:
 
 	inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
 	{
-		return m_sceneInfo[sceneIdx].nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
+		return m_sceneElements[sceneIdx].nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
 	}
 
 	inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -278,7 +278,7 @@ protected:
 
 	inline UINT NumNodesInScene(UINT sceneIdx)
 	{
-		return m_sceneInfo[sceneIdx].nodes.size();
+		return m_sceneElements[sceneIdx].nodes.size();
 	}
 
 	inline UINT NumPrimitivesInNodeMesh(UINT sceneIdx, UINT nodeIdx)
@@ -299,7 +299,7 @@ protected:
 
 	inline UINT NumPrimsInScene(UINT sceneIdx)
 	{
-		return m_sceneInfo[sceneIdx].numTotalPrimitivesInScene;
+		return m_sceneElements[sceneIdx].numTotalPrimitivesInScene;
 	}
 
 	inline UINT NumSRVsInScene(UINT sceneIdx)
@@ -383,7 +383,7 @@ private:
 
 	inline VOID SetNumTotalPrimitivesInScene(UINT numPrims, UINT sceneIdx)
 	{
-		m_sceneInfo[sceneIdx].numTotalPrimitivesInScene = numPrims;
+		m_sceneElements[sceneIdx].numTotalPrimitivesInScene = numPrims;
 	}
 
 	struct FrameComposition
@@ -470,7 +470,7 @@ private:
 
 	static 	Dx12SampleBase* s_sampleBase;
 
-	std::vector<DxSceneInfo>	m_sceneInfo;
+	std::vector<DxSceneElements>	m_sceneElements;
 };
 
 
