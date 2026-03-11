@@ -1507,9 +1507,9 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	const UINT alignedMaterialSize = dxhelper::DxAlign(materialSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	UINT totalPrimitivesInScene    = 0;
 
-	ForEachSceneNode([&totalPrimitivesInScene](UINT sceneIdx, UINT nodeIdx)
+	ForEachSceneNode([&totalPrimitivesInScene, this](UINT sceneIdx, UINT nodeIdx)
 	{
-			totalPrimitivesInScene++;
+			totalPrimitivesInScene += NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
 	});
 
 
@@ -1537,8 +1537,6 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		D3D12_GPU_VIRTUAL_ADDRESS lastAddressWritten = 0;
 		ForEachSceneNode([this, baseGpuVa, alignedMaterialSize, alignedTotalMaterialBufferSize, &firstPrim, &lastPrim, &absolutePrimIndex, &lastAddressWritten](UINT sceneIdx, UINT nodeIdx)
 		{
-
-
 			const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
 			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 			{

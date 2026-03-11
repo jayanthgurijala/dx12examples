@@ -273,6 +273,22 @@ struct DxSceneElements
 	UINT numTotalPrimitivesInScene;
 };
 
+struct DxSceneElementTRS
+{
+	FLOAT translation[3];
+	FLOAT rotationInRadians[3];
+	FLOAT scale[3];
+};
+
+struct DxSceneElementInstance
+{
+	UINT sceneElementIdx;
+	UINT numInstances;
+	std::vector<DxSceneElementTRS> trsMatrix;
+};
+
+
+
 
 
 
