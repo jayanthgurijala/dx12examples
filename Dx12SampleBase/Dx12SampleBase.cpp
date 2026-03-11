@@ -1298,41 +1298,77 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 {
 	HRESULT result = S_OK;
 
-	const UINT numNodesInScene = NumNodesInScene(0);
-	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+	ForEachSceneNode([this](UINT sceneIdx, UINT nodeIdx)
 	{
-		const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
-		for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
-		{
-			auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
-			ID3D12RootSignature* pRootSignature = GetRootSignature();
+			const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
+			for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
+			{
+				auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+				ID3D12RootSignature* pRootSignature = GetRootSignature();
 
-			assert(GetRootSignature() != nullptr);
+				assert(GetRootSignature() != nullptr);
 
-			std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
-			const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
-			assert(numAttributes == modelIaSemantics.size());
-			
-			char vertexShaderName[64];
-			char pixelShaderName[64];
-			GetVertexShaderName(vertexShaderName, numAttributes);
-			GetPixelShaderName(pixelShaderName, numAttributes);
+				std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
+				const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
+				assert(numAttributes == modelIaSemantics.size());
 
-			D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes,  };
+				char vertexShaderName[64];
+				char pixelShaderName[64];
+				GetVertexShaderName(vertexShaderName, numAttributes);
+				GetPixelShaderName(pixelShaderName, numAttributes);
 
-			const BOOL doubleSied   = ((curPrimitive.materialCbData.flags & DoubleSided)    == 0) ? FALSE : TRUE;
-            const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+				D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes, };
 
-			curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
-				                                                        pixelShaderName,
-				                                                        pRootSignature,
-				                                                        inputLayoutDesc,
-																		FALSE,                  //wireframe
-																	    doubleSied,				//doubleSided
-																	    TRUE,				    //depth enable?
-				                                                         blendEnabled);				    
-		}
-	}
+				const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
+				const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+
+				curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
+					pixelShaderName,
+					pRootSignature,
+					inputLayoutDesc,
+					FALSE,                  //wireframe
+					doubleSied,				//doubleSided
+					TRUE,				    //depth enable?
+					blendEnabled);
+			}
+	});
+
+
+	//const UINT numNodesInScene = NumNodesInScene(0);
+	//for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+	//{
+	//	const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
+	//	for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
+	//	{
+	//		auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
+	//		ID3D12RootSignature* pRootSignature = GetRootSignature();
+	//
+	//		assert(GetRootSignature() != nullptr);
+	//
+	//		std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
+	//		const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
+	//		assert(numAttributes == modelIaSemantics.size());
+	//		
+	//		char vertexShaderName[64];
+	//		char pixelShaderName[64];
+	//		GetVertexShaderName(vertexShaderName, numAttributes);
+	//		GetPixelShaderName(pixelShaderName, numAttributes);
+	//
+	//		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes,  };
+	//
+	//		const BOOL doubleSied   = ((curPrimitive.materialCbData.flags & DoubleSided)    == 0) ? FALSE : TRUE;
+    //        const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+	//
+	//		curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
+	//			                                                        pixelShaderName,
+	//			                                                        pRootSignature,
+	//			                                                        inputLayoutDesc,
+	//																	FALSE,                  //wireframe
+	//																    doubleSied,				//doubleSided
+	//																    TRUE,				    //depth enable?
+	//			                                                         blendEnabled);				    
+	//	}
+	//}
 	
 	return result;
 }
@@ -1773,13 +1809,13 @@ VOID Dx12SampleBase::LoadGltfFiles()
 VOID Dx12SampleBase::LoadSceneMaterialInfo()
 {
     UINT primitiveIndex = 0;
-    const UINT numNodesInScene = NumNodesInScene(0);
-	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+
+	ForEachSceneNode([this, &primitiveIndex](UINT sceneIdx, UINT nodeIdx)
 	{
-        const UINT numPrims = NumPrimitivesInNodeMesh(0, nodeIdx);
+		const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
 		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
-			auto& currentPrim = GetPrimitiveInfo(0, nodeIdx, primIdx);
+			auto& currentPrim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
 			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
@@ -1789,7 +1825,9 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 4, primTextureInfo.emissiveTexture.textureInfo.Get());				//t4
 			primitiveIndex++;
 		}
-	}
+	});
+
+   
 	CreateSceneMaterialCb();
 }
 

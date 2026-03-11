@@ -102,13 +102,13 @@ VOID DxCamera::AddMinMaxExtents(DxExtents extents)
 
 
 		m_sceneExtents.hasValidExtents = TRUE;
-		m_sceneExtents.min[0] += minOut.x;
-		m_sceneExtents.min[1] += minOut.y;
-		m_sceneExtents.min[2] += minOut.z;
+		m_sceneExtents.min[0] = min(minOut.x, m_sceneExtents.min[0]);
+		m_sceneExtents.min[1] = min(minOut.y, m_sceneExtents.min[1]);
+		m_sceneExtents.min[2] = min(minOut.z, m_sceneExtents.min[2]);
 
-		m_sceneExtents.max[0] += maxOut.x;
-		m_sceneExtents.max[1] += maxOut.y;
-		m_sceneExtents.max[2] += maxOut.z;
+		m_sceneExtents.max[0] = max(maxOut.x, m_sceneExtents.max[0]);
+		m_sceneExtents.max[1] = max(maxOut.y, m_sceneExtents.max[1]);
+		m_sceneExtents.max[2] = max(maxOut.z, m_sceneExtents.max[2]);
 	}
 
 	XMFLOAT3 minScene = { m_sceneExtents.min[0], m_sceneExtents.min[1] , m_sceneExtents.min[2] };

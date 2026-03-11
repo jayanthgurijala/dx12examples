@@ -328,6 +328,7 @@ protected:
 	virtual inline UINT NumRootSrvDescriptorsForApp() { return 0; }
 	virtual ID3D12RootSignature* GetRootSignature() { return nullptr; }
 	virtual inline const std::vector<std::string> GltfFileName() { return { "triangle.gltf" }; }
+	virtual inline std::array<FLOAT, 4> RenderTargetClearColor() { return{ 0.2f, 0.2f, 0.2f, 1.0f }; }
 
     virtual inline void GetVertexShaderName(char* outVsNameString, SIZE_T numVertexAttributes)
 	{

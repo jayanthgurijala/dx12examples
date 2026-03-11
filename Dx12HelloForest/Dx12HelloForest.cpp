@@ -54,15 +54,13 @@ HRESULT Dx12HelloForest::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
-	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
-
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,
 		FALSE,                   //RTsSingleHandleToDescriptorRange
 		&dsvHandle);
 
 	pCmdList->ClearRenderTargetView(rtvHandle,
-		clearColor,
+		RenderTargetClearColor().data(),
 		0,
 		nullptr);
 
@@ -75,20 +73,25 @@ HRESULT Dx12HelloForest::RenderFrame()
 	UINT primIdxInScene       = 0;
 
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
-	const UINT numNodes = NumNodesInScene(0);
 
-	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+	const UINT numSceneElements = NumSceneElementsLoaded();
+
+	for (UINT sceneIdx = 0; sceneIdx < numSceneElements; sceneIdx++)
 	{
-		const UINT numPrims =  NumPrimitivesInNodeMesh(0, nodeIdx);
-		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+		const UINT numNodes = NumNodesInScene(sceneIdx);
+		for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
-			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0, nodeIdx).gpuCameraData);
-			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
-			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
-			RenderModel(pCmdList, 0, nodeIdx, primIdx);
-			primIdxInScene++;
+			const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
+			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+			{
+				auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+				pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+				pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(sceneIdx, nodeIdx).gpuCameraData);
+				pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
+				pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+				RenderModel(pCmdList, sceneIdx, nodeIdx, primIdx);
+				primIdxInScene++;
+			}
 		}
 	}
 
