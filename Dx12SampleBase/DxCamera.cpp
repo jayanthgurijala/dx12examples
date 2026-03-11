@@ -44,9 +44,36 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 		up);
 }
 
-VOID DxCamera::AddTransformInfo(DxNodeTransformInfo transformInfo)
+VOID DxCamera::AddTransformInfo(const DxNodeTransformInfo& transformInfo, const DxSceneElementTRS* const sceneElementTRS)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
+
+	if (sceneElementTRS != nullptr)
+	{
+		XMVECTOR translationVec = XMVectorSet(sceneElementTRS->translation[0],
+								              sceneElementTRS->translation[1],
+											  sceneElementTRS->translation[2], 1.0f);
+
+
+		XMVECTOR qRotVec = XMQuaternionRotationRollPitchYaw(
+			XMConvertToRadians(sceneElementTRS->rotationInDegrees[0]),						    
+			XMConvertToRadians(sceneElementTRS->rotationInDegrees[1]),
+			XMConvertToRadians(sceneElementTRS->rotationInDegrees[2])
+		);
+
+		XMVECTOR scaleVec = XMVectorSet(sceneElementTRS->scale[0],
+								        sceneElementTRS->scale[1],
+									    sceneElementTRS->scale[2], 1.0f);
+
+		XMMATRIX T = XMMatrixTranslationFromVector(translationVec);
+		XMMATRIX R = XMMatrixRotationQuaternion(qRotVec);
+		XMMATRIX S = XMMatrixScalingFromVector(scaleVec);
+
+		XMMATRIX sceneWorldMatrix = S * R * T;
+
+		worldMatrix = sceneWorldMatrix * worldMatrix;
+
+	}
 
 	///@note no need to transpose here as we should be using Transpose of inverse.
 	///      DirectX to Hlsl needs a transpose, so transpose(transpose) cancel.

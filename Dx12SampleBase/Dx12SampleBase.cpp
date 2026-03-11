@@ -550,6 +550,35 @@ VOID Dx12SampleBase::CreateRenderTargetSRVs(UINT numSrvs)
 }
 
 /*
+* Base implementation to render all loaded scene elements once.
+*/
+VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
+{
+	const UINT numSceneElements = NumSceneElementsLoaded();
+	sceneDescription.resize(numSceneElements);
+
+	for (UINT idx = 0; idx < numSceneElements; idx++)
+	{
+		sceneDescription[idx].numInstances = 1;
+		sceneDescription[idx].sceneElementIdx = idx;
+
+		sceneDescription[idx].trsMatrix.resize(1);
+		auto& trsMatrix = sceneDescription[idx].trsMatrix[0];
+		trsMatrix.translation[0] = 0.0f;
+		trsMatrix.translation[1] = 0.0f;
+		trsMatrix.translation[2] = 0.0f;
+
+		trsMatrix.rotationInDegrees[0] = 0.0f;
+		trsMatrix.rotationInDegrees[1] = 0.0f;
+		trsMatrix.rotationInDegrees[2] = 0.0f;
+
+		trsMatrix.scale[0] = 1.0f;
+		trsMatrix.scale[1] = 1.0f;
+		trsMatrix.scale[2] = 1.0f;
+	}
+}
+
+/*
 *
 * SRV Heap Layout is
 *
@@ -1155,6 +1184,10 @@ HRESULT Dx12SampleBase::Initialize()
 	InitializeRtvDsvDescHeaps();
 	InitializeSrvCbvUavDescHeaps();
 	LoadSceneMaterialInfo();
+
+	LoadSceneDescription(m_sceneDescription);
+	LoadScene();
+
 	InitializeImgui();
 
 	return result;
@@ -1375,11 +1408,6 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 	return result;
 }
 
-
-VOID Dx12SampleBase::AddTransformInfo(const DxNodeTransformInfo& transformInfo)
-{
-	m_camera->AddTransformInfo(transformInfo);
-}
 
 HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
@@ -1612,9 +1640,9 @@ VOID Dx12SampleBase::LoadGltfFiles()
 		{
 			auto& currentNode = GetNodeInfo(fileIdx, node);
 			currentNode.name = m_gltfLoader->GetNodeName(node);
+
 			DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(fileIdx, node).transformInfo;
 			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, node);
-			AddTransformInfo(meshTransformInfo);
 
 			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(node);
 			if (isMeshPrimInfoValid == TRUE)
@@ -1640,8 +1668,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 					currentPrim.vertexBufferInfo.clear();
 
 					currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
-
-					m_camera->AddMinMaxExtents(gltfPrimInfo.extents);
+					currentPrim.meshExtents        = gltfPrimInfo.extents;
 
 					///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 					{
@@ -1829,6 +1856,38 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 
    
 	CreateSceneMaterialCb();
+}
+
+/*
+* 
+* 1. Add all the model transforms required for every instance of every scene element in Scene (later creates one CB and chunks it)
+* 2. We now have a scene transform and model transform, need to combine, 
+* 
+*/
+VOID Dx12SampleBase::LoadScene()
+{
+	const UINT numElementsInScene = m_sceneDescription.size();
+	for (UINT idx = 0; idx < numElementsInScene; idx++)
+	{
+		const UINT numInstances    = m_sceneDescription[idx].numInstances;
+		const UINT sceneElementIdx = m_sceneDescription[idx].sceneElementIdx;
+		auto& sceneElement = m_sceneElements[sceneElementIdx];
+		for (UINT instance = 0; instance < numInstances; instance++)
+		{
+			const UINT numNodes = NumNodesInScene(sceneElementIdx);
+			for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+			{
+				m_camera->AddTransformInfo(sceneElement.nodes[nodeIdx].transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
+				const UINT numPrimitives = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
+				for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)
+				{
+					auto& curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+					m_camera->AddMinMaxExtents(curPrim.meshExtents);
+				}
+			}
+		}
+
+	}
 }
 
 

@@ -11,6 +11,7 @@
 #include "FileReader.h"
 #include <DirectXMath.h>
 #include <d3dx12.h>
+#include "dxtypes.h"
 
 using namespace DirectX;
 
@@ -24,7 +25,7 @@ struct DxModelMatrix
 class DxCamera
 {
 public:
-	VOID AddTransformInfo(DxNodeTransformInfo transformInfo);
+	VOID AddTransformInfo(const DxNodeTransformInfo& transformInfo, const DxSceneElementTRS* const sceneElementTRS);
 	VOID AddMinMaxExtents(DxExtents extents);
 	XMFLOAT4X4 GetViewProjectionMatrixTranspose();
 	XMFLOAT4X4 GetWorldMatrixTranspose(UINT index);

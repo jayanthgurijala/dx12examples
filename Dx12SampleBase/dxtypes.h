@@ -239,18 +239,18 @@ struct DxPrimIndexData
 
 struct DxPrimitiveInfo
 {
-	DxDrawPrimitive                       modelDrawPrimitive;
-
-	std::string                           name;
-	std::vector<DxPrimVertexData>         vertexBufferInfo;
-	DxPrimIndexData			              indexBufferInfo;
-
-
-	ComPtr<ID3D12PipelineState>           pipelineState;
-	CD3DX12_ROOT_PARAMETER                descriptorTable;
-
-	DxMaterialCB                          materialCbData;
-	DxMaterialResourceInfo                materialTextures;
+	DxDrawPrimitive               modelDrawPrimitive;
+								  
+	std::string                   name;
+	std::vector<DxPrimVertexData> vertexBufferInfo;
+	DxPrimIndexData			      indexBufferInfo;
+								  
+	ComPtr<ID3D12PipelineState>   pipelineState;
+	CD3DX12_ROOT_PARAMETER        descriptorTable;
+								  
+	DxMaterialCB                  materialCbData;
+	DxMaterialResourceInfo        materialTextures;
+	DxExtents                     meshExtents;
 };
 
 struct DxMeshInfo
@@ -273,10 +273,11 @@ struct DxSceneElements
 	UINT numTotalPrimitivesInScene;
 };
 
+
 struct DxSceneElementTRS
 {
 	FLOAT translation[3];
-	FLOAT rotationInRadians[3];
+	FLOAT rotationInDegrees[3];
 	FLOAT scale[3];
 };
 
