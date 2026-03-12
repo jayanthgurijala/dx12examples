@@ -39,6 +39,8 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 
 [Mesh Shader Deer Geometry Debugging](https://www.youtube.com/watch?v=P3Ig0_-qH4Q)
 
+[RayTracing OakTree Debugging](https://www.youtube.com/watch?v=GdAYPBeFWrM)
+
 
 ## 🛠 Requirements
 
