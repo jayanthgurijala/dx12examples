@@ -72,24 +72,19 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	UINT primIdxInScene       = 0;
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
-	const UINT numNodes = NumNodesInScene(0);
 
-	for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
-	{
-		const UINT numPrims =  NumPrimitivesInNodeMesh(0, nodeIdx);
-		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+
+	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT primIdxInObject, UINT sceneElementIdx)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
+			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(0, nodeIdx).gpuCameraData);
-			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
+			pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
 			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
-			RenderModel(pCmdList, 0, nodeIdx, primIdx);
-			primIdxInScene++;
-		}
-	}
+			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+		});
 
 	SetFrameInfo(nullptr, 0);
 

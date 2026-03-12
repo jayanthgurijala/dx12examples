@@ -561,6 +561,7 @@ VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& s
 	{
 		sceneDescription[idx].numInstances = 1;
 		sceneDescription[idx].sceneElementIdx = idx;
+		sceneDescription[idx].addToExtents = TRUE;
 
 		sceneDescription[idx].trsMatrix.resize(1);
 		auto& trsMatrix = sceneDescription[idx].trsMatrix[0];

@@ -85,32 +85,6 @@ HRESULT Dx12HelloForest::RenderFrame()
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 	});
 
-	//for (UINT sceneEleIdx = 0; sceneEleIdx < numElementsInSceneLoad; sceneEleIdx++)
-	//{
-	//	auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
-	//	const UINT numNodes = NumNodesInScene(sceneLoadElement.sceneElementIdx);
-	//	const UINT numInstances = sceneLoadElement.numInstances;
-	//	UINT flatInstanceNodeIdx = 0;
-	//	for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
-	//	{
-	//		UINT primIdxInScene = sceneLoadElement.sceneElementIdx;
-	//		for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
-	//		{
-	//			const UINT numPrims = NumPrimitivesInNodeMesh(sceneLoadElement.sceneElementIdx, nodeIdx);
-	//			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
-	//			{
-	//				auto& curPrimitive = GetPrimitiveInfo(sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
-	//				pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-	//				pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
-	//				pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
-	//				pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
-	//				RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
-	//				primIdxInScene++;
-	//			}
-	//			flatInstanceNodeIdx++;
-	//		}
-	//	}
-	//}
 
 	SetFrameInfo(nullptr, 0);
 
