@@ -1419,16 +1419,6 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	HRESULT result = S_OK;
 
 	const UINT numNodeTransforms = m_camera->NumModelTransforms();
-	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
-
-
-	UINT numNodesInScene = 0;
-	for (UINT idx = 0; idx < numSceneElementsLoaded; idx++)
-	{
-		numNodesInScene += NumNodesInScene(idx);
-	}
-	///@note each node should have TRS information else we create identitty matrix
-	assert(numNodesInScene == numNodeTransforms);
 
 	assert(numNodeTransforms > 0);
 
@@ -1460,15 +1450,22 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 
 		const D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
 		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVaToWrite = baseGpuVa;
-		for (UINT idx = 0; idx < numSceneElementsLoaded; idx++)
+		const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
+		for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
 		{
-			const UINT numNodesInCurScene = NumNodesInScene(idx);
-			for (int nodeIdx = 0; nodeIdx < numNodesInCurScene; nodeIdx++)
+			auto& curSceneLoadElement = SceneElementInstance(idx);
+			const UINT numNodesInCurScene = NumNodesInScene(curSceneLoadElement.sceneElementIdx);
+			const UINT numInstances       = curSceneLoadElement.numInstances;
+			UINT linearIdx = 0;
+			for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
 			{
-				auto& nodeInfo = GetNodeInfo(idx, nodeIdx);
-				assert(nodeInfo.gpuCameraData == 0);
-				nodeInfo.gpuCameraData = baseGpuVaToWrite;
-				baseGpuVaToWrite += cbAlignedSizeInBytes;
+				for (int nodeIdx = 0; nodeIdx < numNodesInCurScene; nodeIdx++)
+				{
+					curSceneLoadElement.instanceCameraGpuVa[linearIdx] = baseGpuVaToWrite;
+					linearIdx++;
+					baseGpuVaToWrite += cbAlignedSizeInBytes;
+				}
+				assert(linearIdx == curSceneLoadElement.instanceCameraGpuVa.size());
 			}
 		}
 		//@note increasing afrer writing
@@ -1478,36 +1475,43 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	assert(pMappedPtr != nullptr);
 	assert(pMappedBytePtr == pMappedPtr);
 
-	for (int nodeIdx = 0; nodeIdx < numNodeTransforms; nodeIdx++)
 	{
-		BYTE*      pWritePtr = pMappedBytePtr + nodeIdx * cbAlignedSizeInBytes;
-		XMFLOAT4X4 mmData    = m_camera->GetWorldMatrixTranspose(nodeIdx);
-		XMFLOAT4X4 mvpData   = m_camera->GetModelViewProjectionMatrixTranspose(nodeIdx);
-		XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
+		UINT linearIndex = 0;
+		for (UINT idx=0; idx < numNodeTransforms; idx++)
+		{
+				BYTE* pWritePtr = pMappedBytePtr + linearIndex * cbAlignedSizeInBytes;
+				XMFLOAT4X4 mmData = m_camera->GetWorldMatrixTranspose(linearIndex);
+				XMFLOAT4X4 mvpData = m_camera->GetModelViewProjectionMatrixTranspose(linearIndex);
+				XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
 
-		//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
-		XMFLOAT4X4 normalData    = m_camera->GetNormalMatrixData(nodeIdx);
-		XMFLOAT4   camPosition   = m_camera->GetCameraPosition();
-		FLOAT      fovYInRadians = m_camera->GetFovYInRadians();
+				//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
+				XMFLOAT4X4 normalData = m_camera->GetNormalMatrixData(linearIndex);
+				XMFLOAT4   camPosition = m_camera->GetCameraPosition();
+				FLOAT      fovYInRadians = m_camera->GetFovYInRadians();
 
-		FLOAT fovY[] = { fovYInRadians, 0, 0, 0 };
+				FLOAT fovY[] = { fovYInRadians, 0, 0, 0 };
 
-		memcpy(pWritePtr, &mmData, matrixSizeInBytes);
-		pWritePtr += matrixSizeInBytes;
-		memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
-		pWritePtr += matrixSizeInBytes;
-		memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
-		pWritePtr += matrixSizeInBytes;
-		memcpy(pWritePtr, &normalData, matrixSizeInBytes);
-		pWritePtr += matrixSizeInBytes;
-		memcpy(pWritePtr, &camPosition, float4SizeInBytes);
-		pWritePtr += float4SizeInBytes;
-		memcpy(pWritePtr, fovY, float4SizeInBytes);
-		pWritePtr += float4SizeInBytes;
+				memcpy(pWritePtr, &mmData, matrixSizeInBytes);
+				pWritePtr += matrixSizeInBytes;
+				memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
+				pWritePtr += matrixSizeInBytes;
+				memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
+				pWritePtr += matrixSizeInBytes;
+				memcpy(pWritePtr, &normalData, matrixSizeInBytes);
+				pWritePtr += matrixSizeInBytes;
+				memcpy(pWritePtr, &camPosition, float4SizeInBytes);
+				pWritePtr += float4SizeInBytes;
+				memcpy(pWritePtr, fovY, float4SizeInBytes);
+				pWritePtr += float4SizeInBytes;
 
-		assert(pMappedPtr != nullptr);
-		assert(pMappedBytePtr == pMappedPtr);
+				assert(pMappedPtr != nullptr);
+				assert(pMappedBytePtr == pMappedPtr);
+
+				linearIndex++;
+		}
+
 	}
+
 
 	///@note it is critical that we do not want to change this else debugging will be so very difficult
 	assert(pMappedPtr    != nullptr);
@@ -1871,19 +1875,28 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 */
 VOID Dx12SampleBase::LoadScene()
 {
-	const UINT numElementsInScene = m_sceneDescription.size();
-	for (UINT idx = 0; idx < numElementsInScene; idx++)
+	const UINT numElementsInSceneDesc = m_sceneDescription.size();
+	m_sceneLoadInfo.clear();
+	m_sceneLoadInfo.resize(numElementsInSceneDesc);
+
+	for (UINT idx = 0; idx < numElementsInSceneDesc; idx++)
 	{
 		const auto& currentSceneElementDesc = m_sceneDescription[idx];
+		auto& curElementSceneLoadInfo       = m_sceneLoadInfo[idx];
+		const UINT numInstances             = currentSceneElementDesc.numInstances;
+		const UINT sceneElementIdx          = currentSceneElementDesc.sceneElementIdx;
+		const UINT numNodes                 = NumNodesInScene(sceneElementIdx);
+		curElementSceneLoadInfo.sceneElementIdx = sceneElementIdx;
+		curElementSceneLoadInfo.numInstances = numInstances;
 
-		const UINT numInstances    = currentSceneElementDesc.numInstances;
-		const UINT sceneElementIdx = currentSceneElementDesc.sceneElementIdx;
+		curElementSceneLoadInfo.instanceCameraGpuVa.resize(numNodes * numInstances);
 		auto& sceneElement = m_sceneElements[sceneElementIdx];
 		for (UINT instance = 0; instance < numInstances; instance++)
 		{
-			const UINT numNodes = NumNodesInScene(sceneElementIdx);
+			
 			for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 			{
+				///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
 				m_camera->AddTransformInfo(sceneElement.nodes[nodeIdx].transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
 				const UINT numPrimitives = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
 				for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)

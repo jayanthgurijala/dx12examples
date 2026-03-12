@@ -28,9 +28,9 @@ protected:
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
 
-	VOID InitTerrain(DxSceneElementInstance& sceneElement);
-	VOID InitAnimalsDeer(DxSceneElementInstance& sceneElement);
-	VOID InitOakTrees(DxSceneElementInstance& sceneElement);
+	VOID InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx = 0);
+	VOID InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx = 0);
+	VOID InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx = 0);
 
 };
 

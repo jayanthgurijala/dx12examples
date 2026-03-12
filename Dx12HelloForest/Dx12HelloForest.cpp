@@ -70,30 +70,47 @@ HRESULT Dx12HelloForest::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	UINT primIdxInScene       = 0;
 
-	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
+	const UINT numSrvsPerPrim         = NumSRVsPerPrimitive();
+	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
 
-	const UINT numSceneElements = NumSceneElementsLoaded();
-
-	for (UINT sceneIdx = 0; sceneIdx < numSceneElements; sceneIdx++)
+	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT primIdxInObject, UINT sceneElementIdx)
 	{
-		const UINT numNodes = NumNodesInScene(sceneIdx);
-		for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
-		{
-			const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
-			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
-			{
-				auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
-				pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-				pCmdList->SetGraphicsRootConstantBufferView(0, GetNodeInfo(sceneIdx, nodeIdx).gpuCameraData);
-				pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
-				pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
-				RenderModel(pCmdList, sceneIdx, nodeIdx, primIdx);
-				primIdxInScene++;
-			}
-		}
-	}
+			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
+			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+			pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
+			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+	});
+
+	//for (UINT sceneEleIdx = 0; sceneEleIdx < numElementsInSceneLoad; sceneEleIdx++)
+	//{
+	//	auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
+	//	const UINT numNodes = NumNodesInScene(sceneLoadElement.sceneElementIdx);
+	//	const UINT numInstances = sceneLoadElement.numInstances;
+	//	UINT flatInstanceNodeIdx = 0;
+	//	for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
+	//	{
+	//		UINT primIdxInScene = sceneLoadElement.sceneElementIdx;
+	//		for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+	//		{
+	//			const UINT numPrims = NumPrimitivesInNodeMesh(sceneLoadElement.sceneElementIdx, nodeIdx);
+	//			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+	//			{
+	//				auto& curPrimitive = GetPrimitiveInfo(sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+	//				pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+	//				pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+	//				pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInScene * numSrvsPerPrim));
+	//				pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+	//				RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+	//				primIdxInScene++;
+	//			}
+	//			flatInstanceNodeIdx++;
+	//		}
+	//	}
+	//}
 
 	SetFrameInfo(nullptr, 0);
 
@@ -109,30 +126,38 @@ HRESULT Dx12HelloForest::RenderFrame()
 
 VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
 {
-	const UINT numSceneElements = NumSceneElementsLoaded();
+	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
+	const UINT numSceneElements = NumSceneElementsLoaded() + 1;
 	sceneDescription.resize(numSceneElements);
+
+	UINT terrainIdx = 0;
+	UINT deerIdx    = 0;
+	UINT oakTreeIdx = 0;
 
 	for (UINT idx = 0; idx < numSceneElements; idx++)
 	{
 		auto& currentSceneElement = sceneDescription[idx];
-		currentSceneElement.sceneElementIdx = idx;
+		currentSceneElement.sceneElementIdx = (idx < numSceneElementsLoaded) ? idx : numSceneElementsLoaded - 1 ;
 
 		if (idx == 0)
 		{
-			InitTerrain(currentSceneElement);
+			InitTerrain(currentSceneElement, terrainIdx);
+			terrainIdx++;
 		}
 		else if (idx == 1)
 		{
-			InitAnimalsDeer(currentSceneElement);
+			InitAnimalsDeer(currentSceneElement, deerIdx);
+			deerIdx++;
 		}
-		else if (idx == 2)
+		else if (idx == 2 || idx == 3)
 		{
-			InitOakTrees(currentSceneElement);
+			InitOakTrees(currentSceneElement, oakTreeIdx);
+			oakTreeIdx++;
 		}
 	}
 }
 
-VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement)
+VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
 	sceneElement.numInstances = 1;
 	sceneElement.addToExtents = FALSE;
@@ -153,7 +178,7 @@ VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement)
 	trsMatrix.scale[2] = 1.0f;
 }
 
-VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement)
+VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
 	sceneElement.addToExtents = TRUE;
 	sceneElement.numInstances = 1;
@@ -174,7 +199,7 @@ VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement)
 	trsMatrix.scale[2] = 1.0f;
 }
 
-VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement)
+VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
 	sceneElement.numInstances = 1;
 	sceneElement.addToExtents = FALSE;
@@ -183,7 +208,7 @@ VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement)
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
-	trsMatrix.translation[0] = 0.8f; //looking from rear of Deer moving right
+	trsMatrix.translation[0] = 0.8f + localIdx * 0.8f; //looking from rear of Deer moving right
 	trsMatrix.translation[1] = 0.0f; //moving forward towards Deer nose
 	trsMatrix.translation[2] = 0.8; //moving down
 

@@ -166,7 +166,6 @@ protected:
         return m_sceneElements.size();
     }
 
-
     inline DxNodeInfo& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
     {
         return m_sceneElements[sceneIdx].nodes[nodeIndex];
@@ -316,6 +315,17 @@ protected:
         return NumSRVsPerPrimForMaterials();
     }
 
+    //<---------------------------- scene load info ----------------------------------->
+    inline UINT NumElementsInSceneLoad()
+    {
+        return m_sceneLoadInfo.size();
+    }
+
+    inline DxSceneLoadInfo& SceneElementInstance(UINT idx)
+    {
+        return m_sceneLoadInfo[idx];
+    }
+
     virtual inline DxCamera* GetCamera() { return m_camera.get(); }
     virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
     virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
@@ -352,6 +362,36 @@ protected:
             for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
             {
                 func(idx, nodeIdx);
+            }
+        }
+    }
+
+    template<typename Func>
+    void ProcessSceneInstancesNodesPrims(Func&& func)
+    {
+        const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
+        for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
+        {
+            auto& sceneLoadElement     = SceneElementInstance(idx);
+            const UINT sceneElementIdx = sceneLoadElement.sceneElementIdx;
+            const UINT numNodes        = NumNodesInScene(sceneElementIdx);
+            const UINT numInstances    = sceneLoadElement.numInstances;
+            UINT flatInstanceNodeIdx   = 0;
+
+            for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
+            {
+                UINT primIdxInScene = sceneElementIdx;
+                for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+                {
+                    const UINT numPrims = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
+                    for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
+                    {
+                        func(idx, instanceIdx, nodeIdx, primIdx, flatInstanceNodeIdx, primIdxInScene, sceneElementIdx);
+                        primIdxInScene++;
+
+                    }
+                    flatInstanceNodeIdx++;
+                }
             }
         }
     }
@@ -473,6 +513,10 @@ private:
     static 	Dx12SampleBase*             s_sampleBase;
 
     std::vector<DxSceneElementInstance> m_sceneDescription;
+
+    std::vector<DxSceneLoadInfo>        m_sceneLoadInfo;
+
+
 };
 
 

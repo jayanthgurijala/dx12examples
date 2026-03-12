@@ -264,7 +264,6 @@ struct DxNodeInfo
 	BOOL                      hasMeshInfo;
 	DxNodeTransformInfo	      transformInfo;
 	DxMeshInfo		          meshInfo;
-	D3D12_GPU_VIRTUAL_ADDRESS gpuCameraData;
 };
 
 struct DxSceneElements
@@ -287,6 +286,17 @@ struct DxSceneElementInstance
 	UINT numInstances;
 	std::vector<DxSceneElementTRS> trsMatrix;
 	BOOL addToExtents;
+};
+
+struct DxSceneLoadInfo
+{
+	UINT sceneElementIdx;
+	//A scene element can have > 1 nodes. 
+	//e.g. A oaktree has 2 nodes and say 100 instances
+	//Need to store 200 GPUVAs organized as gpuVA_1_node1, gpuVA_1_node2 .... gpuVA_100_node1, gpuVA_100_node2
+	UINT numInstances;
+
+	std::vector<D3D12_GPU_VIRTUAL_ADDRESS> instanceCameraGpuVa;
 };
 
 
