@@ -1030,7 +1030,7 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
 		srcCopyLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		srcCopyLoc.pResource = stagingResource.Get();
 		srcCopyLoc.PlacedFootprint = footprint;
-
+		
 		pCmdList->CopyTextureRegion(&dstCopyLoc, 0, 0, 0, &srcCopyLoc, nullptr);
 	}
 	else
@@ -1051,6 +1051,7 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
 
 	WaitForFenceCompletion(pCmdQueue);
 
+	m_pCommandAllocator->Reset();
 	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
 	return result;
@@ -1064,9 +1065,9 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 
 	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
+
 	CreateSceneMVPMatrix();
 
-	//@todo only for integrating and testing imgui
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
@@ -1088,6 +1089,7 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	m_pCmdList->RSSetScissorRects(1, &rect);
 
 	WaitForFenceCompletion(m_pCmdQueue.Get());
+
 	result = RenderFrame();
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
@@ -1144,7 +1146,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
 	m_pCmdList->SetDescriptorHeaps(1, heaps);
 	ImGui::Render();
-
+	
 	ImGui_ImplDX12_RenderDrawData(
 		ImGui::GetDrawData(),
 		m_pCmdList.Get()
@@ -1163,12 +1165,15 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 
 	ID3D12CommandList* pCmdLists[] = { m_pCmdList.Get() };
 	m_pCmdQueue->ExecuteCommandLists(_countof(pCmdLists), pCmdLists);
-	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+	
 
 
 	m_swapChain4->Present(1, 0);
 
 	WaitForFenceCompletion(m_pCmdQueue.Get());
+
+	m_pCommandAllocator->Reset();
+	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 
 	return result;
 
@@ -1909,7 +1914,10 @@ VOID Dx12SampleBase::ExecuteBuildAccelerationStructures()
 	m_pCmdList->Close();
 	ID3D12CommandList* cmdLists[] = { m_pCmdList.Get() };
 	m_pCmdQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
+
 	WaitForFenceCompletion(m_pCmdQueue.Get());
+
+	m_pCommandAllocator->Reset();
 	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
 }
 
