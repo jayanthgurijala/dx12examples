@@ -286,6 +286,7 @@ struct DxSceneElementInstance
 	UINT sceneElementIdx;
 	UINT numInstances;
 	std::vector<DxSceneElementTRS> trsMatrix;
+	BOOL addToExtents;
 };
 
 

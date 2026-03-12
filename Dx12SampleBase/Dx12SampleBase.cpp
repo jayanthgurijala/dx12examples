@@ -665,7 +665,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
     
 	auto rast = dxhelper::GetRasterizerState(cullMode, fillMode);
     auto blend = dxhelper::GetBlendState(enableBlend);
-	BOOL enableDepthWrite = TRUE;//(enableBlend == TRUE) ? FALSE : TRUE;
+	BOOL enableDepthWrite = (enableBlend == TRUE) ? FALSE : TRUE;
 	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil, FALSE, enableDepthWrite);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
@@ -1874,8 +1874,10 @@ VOID Dx12SampleBase::LoadScene()
 	const UINT numElementsInScene = m_sceneDescription.size();
 	for (UINT idx = 0; idx < numElementsInScene; idx++)
 	{
-		const UINT numInstances    = m_sceneDescription[idx].numInstances;
-		const UINT sceneElementIdx = m_sceneDescription[idx].sceneElementIdx;
+		const auto& currentSceneElementDesc = m_sceneDescription[idx];
+
+		const UINT numInstances    = currentSceneElementDesc.numInstances;
+		const UINT sceneElementIdx = currentSceneElementDesc.sceneElementIdx;
 		auto& sceneElement = m_sceneElements[sceneElementIdx];
 		for (UINT instance = 0; instance < numInstances; instance++)
 		{
@@ -1887,7 +1889,10 @@ VOID Dx12SampleBase::LoadScene()
 				for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)
 				{
 					auto& curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-					m_camera->AddMinMaxExtents(curPrim.meshExtents);
+					if (currentSceneElementDesc.addToExtents == TRUE)
+					{
+						m_camera->AddMinMaxExtents(curPrim.meshExtents);
+					}
 				}
 			}
 		}

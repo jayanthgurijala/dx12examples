@@ -19,12 +19,18 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
 	virtual inline UINT NumSRVsPerPrimNeededForApp() override { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return {"deer.gltf", "oaktree.gltf"}; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return {"terrain_gridlines.gltf", "deer.gltf", "oaktree.gltf" }; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
 	virtual HRESULT OnInit() override;
+	virtual VOID LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription) override;
+	virtual inline std::array<FLOAT, 4> RenderTargetClearColor() { return{ 0.2f, 0.2f, 0.3f, 1.0f }; }
 
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
+
+	VOID InitTerrain(DxSceneElementInstance& sceneElement);
+	VOID InitAnimalsDeer(DxSceneElementInstance& sceneElement);
+	VOID InitOakTrees(DxSceneElementInstance& sceneElement);
 
 };
 
