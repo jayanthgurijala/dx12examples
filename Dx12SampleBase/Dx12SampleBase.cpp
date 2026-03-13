@@ -1423,7 +1423,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 
 	assert(numNodeTransforms > 0);
 
-	const UINT numMatrix = 4; //model matrix, MPV matrix, Inverse_viewProj(RayTracing) and normal matrix
+	const UINT numMatrix = 4; //viewProj, model matrix, Inverse_viewProj(RayTracing) and normal matrix
 	const UINT numFloat4 = 2; //camera position, FovY + padding
 	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
 	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
@@ -1481,8 +1481,8 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		for (UINT idx=0; idx < numNodeTransforms; idx++)
 		{
 				BYTE* pWritePtr = pMappedBytePtr + linearIndex * cbAlignedSizeInBytes;
+				XMFLOAT4X4 vpTData = m_camera->GetViewProjectionTranspose();
 				XMFLOAT4X4 mmData = m_camera->GetWorldMatrixTranspose(linearIndex);
-				XMFLOAT4X4 mvpData = m_camera->GetModelViewProjectionMatrixTranspose(linearIndex);
 				XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
 
 				//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
@@ -1492,9 +1492,9 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 
 				FLOAT fovY[] = { fovYInRadians, 0, 0, 0 };
 
-				memcpy(pWritePtr, &mmData, matrixSizeInBytes);
+				memcpy(pWritePtr, &vpTData, matrixSizeInBytes);
 				pWritePtr += matrixSizeInBytes;
-				memcpy(pWritePtr, &mvpData, matrixSizeInBytes);
+				memcpy(pWritePtr, &mmData, matrixSizeInBytes);
 				pWritePtr += matrixSizeInBytes;
 				memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
 				pWritePtr += matrixSizeInBytes;

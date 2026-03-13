@@ -6,6 +6,7 @@ struct VSOutput
     float3 normal    : NORMAL;
     float2 uv        : TEXCOORD0;
     float4 color     : COLOR0;
+    float4 WorldPosition : WORLDPOSITION;
 };
 
 struct Vertex
@@ -81,9 +82,17 @@ void MSMain(uint3 gid       : SV_GroupID,
         vertexData[1] = float4(posVb[indexData.y].position, 1.0f);
         vertexData[2] = float4(posVb[indexData.z].position, 1.0f);
         
-        vertices[vertexIndex.x].position = mul(vertexData[0], g_mvpT);
-        vertices[vertexIndex.y].position = mul(vertexData[1], g_mvpT);
-        vertices[vertexIndex.z].position = mul(vertexData[2], g_mvpT);
+        float4 worldPosition0 = mul(vertexData[0], g_modelMatrixT);
+        float4 worldPosition1 = mul(vertexData[1], g_modelMatrixT);
+        float4 worldPosition2 = mul(vertexData[2], g_modelMatrixT);
+        
+        float4 position0 = mul(worldPosition0, g_viewProjT);
+        float4 position1 = mul(worldPosition1, g_viewProjT);
+        float4 position2 = mul(worldPosition2, g_viewProjT);
+        
+        vertices[vertexIndex.x].position = position0;
+        vertices[vertexIndex.y].position = position1;
+        vertices[vertexIndex.z].position = position2;
         
         vertices[vertexIndex.x].uv = uvVbBuffer[indexData.x];
         vertices[vertexIndex.y].uv = uvVbBuffer[indexData.y];

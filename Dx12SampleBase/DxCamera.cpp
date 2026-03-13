@@ -276,12 +276,15 @@ XMFLOAT4 DxCamera::GetCameraPosition()
 XMFLOAT4X4 DxCamera::GetViewProjectionInverse()
 {
 	XMMATRIX vpMatrix = m_viewMatrix * m_projectionMatrix;
-	//PrintUtils::PrintXMMatrix("ViewProj", vpMatrix);
 	XMMATRIX vpInverse = XMMatrixInverse(nullptr, vpMatrix);
-	//PrintUtils::PrintXMMatrix("ViewProjInverse", vpInverse);
-	XMMATRIX chackMatrix = vpMatrix * vpInverse;
-	//PrintUtils::PrintXMMatrix("Check", chackMatrix);
+
 	return GetDataFromMatrix(XMMatrixTranspose(vpInverse));
+}
+
+XMFLOAT4X4 DxCamera::GetViewProjectionTranspose()
+{
+	XMMATRIX vpMatrix = m_viewMatrix * m_projectionMatrix;
+	return GetDataFromMatrix(XMMatrixTranspose(vpMatrix));
 }
 
 

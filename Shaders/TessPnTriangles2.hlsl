@@ -122,8 +122,11 @@ DSOutput_2 DSMain(HSConstantsTriOutput input, const OutputPatch<HSOutput_2, 3> p
     output.position = float4(position, 1.0);
     output.normal = normal;
     
-    output.position = mul(output.position, g_mvpT);
-    output.worldPosition = mul(output.position, g_modelMatrixT);
+    //output.position = mul(output.position, g_mvpT);
+    //output.worldPosition = mul(output.position, g_modelMatrixT);
+
+    
+    COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
 
     return output;
 }

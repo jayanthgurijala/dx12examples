@@ -5,12 +5,10 @@
 VSOutput_2 VSMain(VSInput_2 input)
 {
     VSOutput_2 output;
-    
-    //if transposed on CPU then hlsl reads this as row-major
-    //in row-major, v' = v * M
-    output.position = mul(float4(input.position, 1.0f), g_mvpT);
+ 
+    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
-    output.worldPosition = mul(float4(input.position, 1.0f), g_modelMatrixT);
+    
  
     return output;
 }

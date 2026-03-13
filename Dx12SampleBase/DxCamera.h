@@ -33,6 +33,7 @@ public:
 	XMFLOAT4X4 GetNormalMatrixData(UINT index);
 	XMFLOAT4   GetCameraPosition();
 	XMFLOAT4X4 GetViewProjectionInverse();
+	XMFLOAT4X4 GetViewProjectionTranspose();
 	VOID Update(FLOAT frameDeltaTime);
 	DxCamera(UINT width, UINT height);
 	XMFLOAT4X4 GetDxrModelTransposeMatrix(UINT index);

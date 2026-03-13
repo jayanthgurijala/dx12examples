@@ -49,8 +49,11 @@ DSOutput_3 DSMain(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_Domain
                       (TessCoord.y * patch[1].position) +
                       (TessCoord.z * patch[2].position);
     
-    output.position = mul(output.position, g_mvpT);
-    output.worldPosition = mul(output.position, g_modelMatrixT);
+    //output.position      = mul(output.position, g_mvpT);
+    //output.worldPosition = mul(output.position, g_modelMatrixT);
+    
+    COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
+    
     //output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
    
     output.texcoord0 = patch[0].texcoord0 * TessCoord.x + patch[1].texcoord0 * TessCoord.y + patch[2].texcoord0 * TessCoord.z;

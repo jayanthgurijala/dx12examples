@@ -8,9 +8,7 @@ VSOutput_3 VSMain(VSInput_3 input)
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    output.position      = mul(float4(input.position, 1.0f), g_mvpT);
-    output.worldPosition = mul(float4(input.position, 1.0f), g_modelMatrixT);
-    
+    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     output.normal        = input.normal;
     output.texcoord      = input.texcoord;
     
