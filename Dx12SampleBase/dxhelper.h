@@ -266,6 +266,13 @@ namespace dxhelper
 		return (semanticName.substr(0, 8) == "TEXCOORD");
 	}
 
+	template<typename T>
+	inline VOID GetSizeAndAlignedSizeInfo(UINT& size, UINT& alignedSize)
+	{
+		size = sizeof(T);
+		alignedSize = dxhelper::DxAlign(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	}
+
 }
 
 

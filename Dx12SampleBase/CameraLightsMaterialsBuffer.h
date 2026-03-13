@@ -23,10 +23,10 @@ class CameraLightsMaterialsBuffer
     ///          values: camera position, FovY, Inverse_viewProj(RayTracing)
     ///          data: from DxCamera because user interaction changes this
     /// 
-    ///  Per Instance Geometry Data (a ton of values, each matrix has different values per instance 
+    ///  Per Instance Geometry Data (a ton of values, each matrix has different values per instance)
     /// e.g. OakTree has 2 nodes, if scene has 10 instances, we need 20 below matrices
-    ///               values: model matrix, normal matrix, MVP Matrix, 
-    ///               data: gltf trs matrix + instance trs from scene description combines with view-projection above
+    ///               values: model matrix, normal matrix, 
+    ///               data: gltf trs matrix + instance trs from scene description
     ///               [data for
     /// 
     /// Material Data (per primitive)
@@ -45,10 +45,56 @@ class CameraLightsMaterialsBuffer
     
 public:
     CameraLightsMaterialsBuffer();
+    VOID Finalize(ID3D12Device *pDevice);
+
+    inline void IncrementPerInstanceDataCount(UINT increment)
+    {
+        m_numPerInstanceDataCount += increment;
+    }
+
+    inline void IncrementMaterialDataCount(UINT increment)
+    {
+        m_numMaterialDataCount += increment;
+    }
+
+    inline UINT GetPerInstanceDataCount()
+    {
+        return m_numPerInstanceDataCount;
+    }
+
 
 protected:
 private:
-    ComPtr<ID3D12Resource> bufferResource;
 
+    inline VOID MapAndInitializeBaseAddress()
+    {
+        CD3DX12_RANGE readRange(0, 0);
+        //@note specifying nullptr as read range indicates CPU can read entire resource
+        VOID* pCpuPtr;
+        m_bufferResource->Map(0, &readRange, &pCpuPtr);
+        m_pBufferResCpuPtr = static_cast<BYTE*>(pCpuPtr);
+        m_pBufferResGpuVa = m_bufferResource->GetGPUVirtualAddress();
+    }
+
+    ComPtr<ID3D12Resource> m_bufferResource;
+    UINT m_sceneDataChunkSize;
+    UINT m_sceneDataAlignedChunkSize;
+
+    UINT m_instanceDataChunkSize;
+    UINT m_instanceDataAlignedChunkSize;
+
+    UINT m_materialDataChunkSize;
+    UINT m_materialDataAlignedChunkSize;
+
+    SIZE_T m_instanceDataTotalAlignedSize;
+    SIZE_T m_materialDataTotalAlignedSize;
+
+    SIZE_T m_totalBufferSize;
+
+    BYTE* m_pBufferResCpuPtr;
+    D3D12_GPU_VIRTUAL_ADDRESS m_pBufferResGpuVa;
+
+    UINT m_numPerInstanceDataCount;
+    UINT m_numMaterialDataCount;
 };
 

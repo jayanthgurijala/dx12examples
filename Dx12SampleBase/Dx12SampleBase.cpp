@@ -47,6 +47,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 
 	m_camera    = std::make_unique<DxCamera>(width, height);
     m_camera->Initialize();
+	m_camLightsMaterialsManager = std::make_unique<CameraLightsMaterialsBuffer>();
 }
 
 Dx12SampleBase::~Dx12SampleBase()
@@ -1194,6 +1195,12 @@ HRESULT Dx12SampleBase::Initialize()
 	LoadSceneDescription(m_sceneDescription);
 	LoadScene();
 
+
+	m_camLightsMaterialsManager->Finalize(m_pDevice.Get());
+	CreateSceneMaterialCb();
+	CreateSceneMVPMatrix();
+
+
 	InitializeImgui();
 
 	return result;
@@ -1419,7 +1426,17 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
 
+	DxCBSceneData       sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
+	DxCBPerInstanceData instanceTransformData; //modelMatrix, normalMatrix
+
+	UINT sceneDataChunkSize, sceneDataAlignedChunkSize;
+	UINT instanceDataChunkSize, instanceDataAlignedChunkSize;
+
+	dxhelper::GetSizeAndAlignedSizeInfo<DxCBSceneData>(sceneDataChunkSize, sceneDataAlignedChunkSize);
+	dxhelper::GetSizeAndAlignedSizeInfo<DxCBPerInstanceData>(instanceDataChunkSize, instanceDataAlignedChunkSize);
+
 	const UINT numNodeTransforms = m_camera->NumModelTransforms();
+	assert(numNodeTransforms == m_camLightsMaterialsManager->GetPerInstanceDataCount());
 
 	assert(numNodeTransforms > 0);
 
@@ -1427,6 +1444,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	const UINT numFloat4 = 2; //camera position, FovY + padding
 	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
 	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
+
 	const UINT64 constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
 		                                     (float4SizeInBytes * numFloat4);
 
@@ -1834,6 +1852,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 						case DxOpaque:
 							break;
 						}
+						IncrementMaterialDataCount(1);
 					}
 					primitiveIndex++;
 				}
@@ -1863,9 +1882,6 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 			primitiveIndex++;
 		}
 	});
-
-   
-	CreateSceneMaterialCb();
 }
 
 /*
@@ -1877,13 +1893,13 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 VOID Dx12SampleBase::LoadScene()
 {
 	const UINT numElementsInSceneDesc = m_sceneDescription.size();
-	m_sceneLoadInfo.clear();
-	m_sceneLoadInfo.resize(numElementsInSceneDesc);
+	m_sceneInfo.sceneLoadInfo.clear();
+	m_sceneInfo.sceneLoadInfo.resize(numElementsInSceneDesc);
 
 	for (UINT idx = 0; idx < numElementsInSceneDesc; idx++)
 	{
 		const auto& currentSceneElementDesc = m_sceneDescription[idx];
-		auto& curElementSceneLoadInfo       = m_sceneLoadInfo[idx];
+		auto& curElementSceneLoadInfo       = m_sceneInfo.sceneLoadInfo[idx];
 		const UINT numInstances             = currentSceneElementDesc.numInstances;
 		const UINT sceneElementIdx          = currentSceneElementDesc.sceneElementIdx;
 		const UINT numNodes                 = NumNodesInScene(sceneElementIdx);
@@ -1892,6 +1908,9 @@ VOID Dx12SampleBase::LoadScene()
 
 		curElementSceneLoadInfo.instanceCameraGpuVa.resize(numNodes * numInstances);
 		auto& sceneElement = m_sceneElements[sceneElementIdx];
+
+
+		IncrementPerInstanceDataCount(numInstances * numNodes);
 		for (UINT instance = 0; instance < numInstances; instance++)
 		{
 			

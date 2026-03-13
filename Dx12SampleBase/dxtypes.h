@@ -307,6 +307,7 @@ struct DxSceneLoadInfo
 
 struct DxCBSceneData
 {
+	XMFLOAT4X4 viewProjMatrix;
 	XMFLOAT4X4 invViewProj;
 	XMFLOAT4   cameraPosition;
 	XMFLOAT4   cameraFovY;
@@ -316,6 +317,11 @@ struct DxCBPerInstanceData
 {
 	XMFLOAT4X4 modelMatrix;
 	XMFLOAT4X4 normalMatrix;
+};
+
+struct DxSceneInfo
+{
+	std::vector<DxSceneLoadInfo> sceneLoadInfo;
 };
 
 

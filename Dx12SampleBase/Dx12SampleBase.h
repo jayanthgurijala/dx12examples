@@ -12,6 +12,7 @@
 #include <d3dx12.h>
 #include "DxCamera.h"
 #include "DxGltfLoader.h"
+#include "CameraLightsMaterialsBuffer.h"
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -318,12 +319,12 @@ protected:
     //<---------------------------- scene load info ----------------------------------->
     inline UINT NumElementsInSceneLoad()
     {
-        return m_sceneLoadInfo.size();
+        return m_sceneInfo.sceneLoadInfo.size();
     }
 
     inline DxSceneLoadInfo& SceneElementInstance(UINT idx)
     {
-        return m_sceneLoadInfo[idx];
+        return m_sceneInfo.sceneLoadInfo[idx];
     }
 
     virtual inline DxCamera* GetCamera() { return m_camera.get(); }
@@ -427,6 +428,16 @@ private:
         m_sceneElements[sceneIdx].numTotalPrimitivesInScene = numPrims;
     }
 
+    inline VOID IncrementPerInstanceDataCount(UINT increment)
+    {
+        m_camLightsMaterialsManager->IncrementPerInstanceDataCount(increment);
+    }
+
+    inline VOID IncrementMaterialDataCount(UINT increment)
+    {
+        m_camLightsMaterialsManager->IncrementMaterialDataCount(increment);
+    }
+
     struct FrameComposition
     {
         ComPtr<ID3D12RootSignature> rootSignature;
@@ -485,6 +496,7 @@ private:
 
     std::unique_ptr<DxCamera>	m_camera;
     std::unique_ptr<FileReader>	m_assetReader;
+    std::unique_ptr<CameraLightsMaterialsBuffer> m_camLightsMaterialsManager;
 
     FrameComposition    m_simpleComposition;
     ComputeGenerateMips m_computeGenerateMips;
@@ -514,8 +526,7 @@ private:
 
     std::vector<DxSceneElementInstance> m_sceneDescription;
 
-    std::vector<DxSceneLoadInfo>        m_sceneLoadInfo;
-
+    DxSceneInfo m_sceneInfo;
 
 };
 
