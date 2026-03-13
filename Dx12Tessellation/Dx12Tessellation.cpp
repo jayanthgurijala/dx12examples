@@ -56,10 +56,10 @@ HRESULT Dx12Tessellation::OnInit()
 	char hullShaderName[64];
 	char domainShaderName[64];
 	char pixelShaderName[64];
-	snprintf(vertexShaderName, 64, "TessFactor%zu_VS.cso", numAttributes);
-	snprintf(hullShaderName, 64, "TessFactor%zu_HS.cso", numAttributes);
-	snprintf(domainShaderName, 64, "TessFactor%zu_DS.cso", numAttributes);
-	snprintf(pixelShaderName, 64, "TessFactor%zu_PS.cso", numAttributes);
+	snprintf(vertexShaderName, 64, "TessFactor%u_VS.cso", numAttributes);
+	snprintf(hullShaderName, 64, "TessFactor%u_HS.cso", numAttributes);
+	snprintf(domainShaderName, 64, "TessFactor%u_DS.cso", numAttributes);
+	snprintf(pixelShaderName, 64, "TessFactor%u_PS.cso", numAttributes);
 
 	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
 	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob(hullShaderName);

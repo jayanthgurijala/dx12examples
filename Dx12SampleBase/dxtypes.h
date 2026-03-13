@@ -10,6 +10,12 @@
 #include <wrl.h>
 #include <d3dx12.h>
 
+#include <DirectXMath.h>
+
+
+using namespace Microsoft::WRL;
+using namespace DirectX;
+
 using namespace Microsoft::WRL;
 
 
@@ -298,6 +304,20 @@ struct DxSceneLoadInfo
 
 	std::vector<D3D12_GPU_VIRTUAL_ADDRESS> instanceCameraGpuVa;
 };
+
+struct DxCBSceneData
+{
+	XMFLOAT4X4 invViewProj;
+	XMFLOAT4   cameraPosition;
+	XMFLOAT4   cameraFovY;
+};
+
+struct DxCBPerInstanceData
+{
+	XMFLOAT4X4 modelMatrix;
+	XMFLOAT4X4 normalMatrix;
+};
+
 
 
 
