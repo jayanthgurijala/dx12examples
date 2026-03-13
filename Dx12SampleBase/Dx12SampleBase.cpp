@@ -1426,9 +1426,6 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
 
-	DxCBSceneData       sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
-	DxCBPerInstanceData instanceTransformData; //modelMatrix, normalMatrix
-
 	UINT sceneDataChunkSize, sceneDataAlignedChunkSize;
 	UINT instanceDataChunkSize, instanceDataAlignedChunkSize;
 
@@ -1440,21 +1437,9 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 
 	assert(numNodeTransforms > 0);
 
-	const UINT numMatrix = 4; //viewProj, model matrix, Inverse_viewProj(RayTracing) and normal matrix
-	const UINT numFloat4 = 2; //camera position, FovY + padding
-	const UINT matrixSizeInBytes = (sizeof(FLOAT) * 16);
-	const UINT float4SizeInBytes = (sizeof(FLOAT) * 4);
-
-	const UINT64 constantBufferSizeInBytes = (matrixSizeInBytes * numMatrix) +
-		                                     (float4SizeInBytes * numFloat4);
-
-	//already hit 288 bytes, might need to split model and vp data
-	//assert(constantBufferSizeInBytes < D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-
-	const UINT64 cbAlignedSizeInBytes = dxhelper::DxAlign(constantBufferSizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
-
-	//@todo seperate mvp matrix into model and vp matrix
-	const UINT totalConstantBufferSize = cbAlignedSizeInBytes * numNodeTransforms;
+	const UINT totalAlignedPerSceneDataSize    = sceneDataAlignedChunkSize;
+	const UINT totalAlignedPerInstanceDataSize = instanceDataAlignedChunkSize * m_camLightsMaterialsManager->GetPerInstanceDataCount();
+	const UINT totalConstantBufferSize         = totalAlignedPerSceneDataSize + totalAlignedPerInstanceDataSize;
 
 	///@todo avoid using static
 	static VOID* pMappedPtr     = nullptr;
@@ -1467,8 +1452,13 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
 		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
 
+
+
 		const D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
-		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVaToWrite = baseGpuVa;
+		const auto sceneDataBaseGpuVa   = baseGpuVa;
+		const auto perInstanceBaseGpuVa = baseGpuVa + sceneDataAlignedChunkSize;
+
+		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVaToWrite = perInstanceBaseGpuVa;
 		const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
 		for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
 		{
@@ -1482,7 +1472,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 				{
 					curSceneLoadElement.instanceCameraGpuVa[linearIdx] = baseGpuVaToWrite;
 					linearIdx++;
-					baseGpuVaToWrite += cbAlignedSizeInBytes;
+					baseGpuVaToWrite += instanceDataAlignedChunkSize;
 				}
 				assert(linearIdx == curSceneLoadElement.instanceCameraGpuVa.size());
 			}
@@ -1495,38 +1485,34 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	assert(pMappedBytePtr == pMappedPtr);
 
 	{
+		
+		BYTE* pWritePtr = pMappedBytePtr;
+		{
+			DxCBSceneData       sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
+			sceneData.viewProjMatrix = m_camera->GetViewProjectionMatrixTranspose();
+			sceneData.invViewProj    = m_camera->GetViewProjectionInverse();
+			sceneData.cameraPosition = m_camera->GetCameraPosition();
+			sceneData.cameraFovY.x   = m_camera->GetFovYInRadians();
+			sceneData.cameraFovY.y   = sceneData.cameraFovY.z = sceneData.cameraFovY.w = 0;
+			memcpy(pWritePtr, &sceneData, sceneDataChunkSize);
+			pWritePtr += sceneDataAlignedChunkSize;
+		}
+
 		UINT linearIndex = 0;
+		DxCBPerInstanceData instanceTransformData; //modelMatrix, normalMatrix
 		for (UINT idx=0; idx < numNodeTransforms; idx++)
 		{
-				BYTE* pWritePtr = pMappedBytePtr + linearIndex * cbAlignedSizeInBytes;
-				XMFLOAT4X4 vpTData = m_camera->GetViewProjectionTranspose();
-				XMFLOAT4X4 mmData = m_camera->GetWorldMatrixTranspose(linearIndex);
-				XMFLOAT4X4 invVpData = m_camera->GetViewProjectionInverse();
+			
+			instanceTransformData.modelMatrix  = m_camera->GetWorldMatrixTranspose(linearIndex);
+			instanceTransformData.normalMatrix = m_camera->GetNormalMatrixData(linearIndex);
 
-				//we are getting the 4x4 matrix but need to ignore translation. That is done in shader by using only 3x3
-				XMFLOAT4X4 normalData = m_camera->GetNormalMatrixData(linearIndex);
-				XMFLOAT4   camPosition = m_camera->GetCameraPosition();
-				FLOAT      fovYInRadians = m_camera->GetFovYInRadians();
+			memcpy(pWritePtr, &instanceTransformData, instanceDataChunkSize);
+			pWritePtr += instanceDataAlignedChunkSize;
 
-				FLOAT fovY[] = { fovYInRadians, 0, 0, 0 };
+			assert(pMappedPtr != nullptr);
+			assert(pMappedBytePtr == pMappedPtr);
 
-				memcpy(pWritePtr, &vpTData, matrixSizeInBytes);
-				pWritePtr += matrixSizeInBytes;
-				memcpy(pWritePtr, &mmData, matrixSizeInBytes);
-				pWritePtr += matrixSizeInBytes;
-				memcpy(pWritePtr, &invVpData, matrixSizeInBytes);
-				pWritePtr += matrixSizeInBytes;
-				memcpy(pWritePtr, &normalData, matrixSizeInBytes);
-				pWritePtr += matrixSizeInBytes;
-				memcpy(pWritePtr, &camPosition, float4SizeInBytes);
-				pWritePtr += float4SizeInBytes;
-				memcpy(pWritePtr, fovY, float4SizeInBytes);
-				pWritePtr += float4SizeInBytes;
-
-				assert(pMappedPtr != nullptr);
-				assert(pMappedBytePtr == pMappedPtr);
-
-				linearIndex++;
+			linearIndex++;
 		}
 
 	}

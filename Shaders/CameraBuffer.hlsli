@@ -1,18 +1,35 @@
-
-
-
 #define PI 3.14159265359
 
-cbuffer MVP : register(b0)
+cbuffer ViewProjection : register(b0)
 {
     float4x4 g_viewProjT;
-    float4x4 g_modelMatrixT;
     float4x4 g_vpInv;
-    float4x4 g_normalMatrix;
     float4   g_cameraPosition;
     float    g_fovInRadians;
     float3   camBufferpadding;
 }
+
+cbuffer WorldMatrix : register(b1)
+{
+    float4x4 g_modelMatrixT;
+    float4x4 g_normalMatrix;
+}
+
+cbuffer MaterialData : register(b2)
+{
+    float4 baseColorFactor;
+    
+    float3 emissiveFactor;
+    float metallicFactor;
+    
+    float roughnessFactor;
+    float normalScale;
+    float occlusionStrength;
+    float alphaCutoff;
+   
+    uint flags;
+    float3 padding;
+};
 
 static const uint HasBaseColorTexture = 1 << 0;
 static const uint HasNormalTexture = 1 << 1;
@@ -28,22 +45,6 @@ float3 FresnelSchlick(float cosTheta, float3 F0)
     return F0 + (1.0 - F0) * pow(1.0f - cosTheta, 5.0f);
 
 }
-
-cbuffer MaterialData : register(b1)
-{
-    float4 baseColorFactor;
-    
-    float3 emissiveFactor;
-    float  metallicFactor;
-    
-    float roughnessFactor;
-    float normalScale;
-    float occlusionStrength;
-    float alphaCutoff;
-   
-    uint flags;
-    float3 padding;
-};
 
 #define COMPUTE_POSITION(inputPos, worldPos, clipPos) \
     worldPos = mul(float4(inputPos, 1.0f), g_modelMatrixT); \

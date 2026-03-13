@@ -26,16 +26,18 @@ HRESULT Dx12HelloForest::OnInit()
     const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
-	auto rootCbv          = dxhelper::GetRootCbv();
+	auto sceneData        = dxhelper::GetRootCbv(0);
+	auto worldData        = dxhelper::GetRootCbv(1);
 	auto descTable        = dxhelper::GetRootDescTable(descRanges);
-    auto materialsRootCbv = dxhelper::GetRootCbv(1);
+    auto materialsRootCbv = dxhelper::GetRootCbv(2);
 
 
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
-			rootCbv,
+			sceneData,
+			worldData,
 			descTable,
 			materialsRootCbv
 		},
@@ -79,9 +81,10 @@ HRESULT Dx12HelloForest::RenderFrame()
 			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
-			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
-			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+			pCmdList->SetGraphicsRootConstantBufferView(1, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
+			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 	});
 
