@@ -176,9 +176,7 @@ VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT
 VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
 	sceneElement.numInstances = 1;
-	sceneElement.addToExtents = FALSE;
-	
-
+	sceneElement.addToExtents = TRUE;
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
