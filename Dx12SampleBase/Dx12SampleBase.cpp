@@ -1441,22 +1441,12 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 	const UINT totalAlignedPerInstanceDataSize = instanceDataAlignedChunkSize * m_camLightsMaterialsManager->GetPerInstanceDataCount();
 	const UINT totalConstantBufferSize         = totalAlignedPerSceneDataSize + totalAlignedPerInstanceDataSize;
 
-	///@todo avoid using static
-	static VOID* pMappedPtr     = nullptr;
-	static BYTE* pMappedBytePtr = nullptr;
-	if (pMappedPtr == nullptr)
+	
+	
 	{
-		m_mvpCameraConstantBuffer = CreateBufferWithData(nullptr, totalConstantBufferSize, "Camera", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
-		CD3DX12_RANGE readRange(0, 0);
-		//@note specifying nullptr as read range indicates CPU can read entire resource
-		m_mvpCameraConstantBuffer->Map(0, &readRange, &pMappedPtr);
-		pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
-
-
-
-		const D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
+		const D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_camLightsMaterialsManager->GetViewProjLightsGpuVa();
 		const auto sceneDataBaseGpuVa   = baseGpuVa;
-		const auto perInstanceBaseGpuVa = baseGpuVa + sceneDataAlignedChunkSize;
+		const auto perInstanceBaseGpuVa = m_camLightsMaterialsManager->GetPerInstanceDataGpuVa(0);
 
 		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVaToWrite = perInstanceBaseGpuVa;
 		const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
@@ -1481,14 +1471,12 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		assert(baseGpuVa + totalConstantBufferSize == baseGpuVaToWrite);
 	}
 
-	assert(pMappedPtr != nullptr);
-	assert(pMappedBytePtr == pMappedPtr);
 
 	{
-		
-		BYTE* pWritePtr = pMappedBytePtr;
+
 		{
-			DxCBSceneData       sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
+			BYTE* pWritePtr = m_camLightsMaterialsManager->GetViewProjLightsCpuPtr();
+			DxCBSceneData sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
 			sceneData.viewProjMatrix = m_camera->GetViewProjectionMatrixTranspose();
 			sceneData.invViewProj    = m_camera->GetViewProjectionInverse();
 			sceneData.cameraPosition = m_camera->GetCameraPosition();
@@ -1502,25 +1490,15 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		DxCBPerInstanceData instanceTransformData; //modelMatrix, normalMatrix
 		for (UINT idx=0; idx < numNodeTransforms; idx++)
 		{
-			
+			BYTE* pWritePtr = m_camLightsMaterialsManager->GetPerInstanceDataCpuVa(linearIndex);
 			instanceTransformData.modelMatrix  = m_camera->GetWorldMatrixTranspose(linearIndex);
 			instanceTransformData.normalMatrix = m_camera->GetNormalMatrixData(linearIndex);
 
 			memcpy(pWritePtr, &instanceTransformData, instanceDataChunkSize);
-			pWritePtr += instanceDataAlignedChunkSize;
-
-			assert(pMappedPtr != nullptr);
-			assert(pMappedBytePtr == pMappedPtr);
-
 			linearIndex++;
 		}
 
 	}
-
-
-	///@note it is critical that we do not want to change this else debugging will be so very difficult
-	assert(pMappedPtr    != nullptr);
-	assert(pMappedBytePtr == pMappedPtr);
 
 	return result;
 }
@@ -1860,6 +1838,7 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 			auto& currentPrim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
 			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
+			primTextureInfo.descriptorHeapOffset = appDescriptorStartIndex;
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 1, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());	//t1
 			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 2, primTextureInfo.normalTexture.textureInfo.Get());			    //t2

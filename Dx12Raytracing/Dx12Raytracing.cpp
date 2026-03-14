@@ -179,8 +179,9 @@ VOID Dx12Raytracing::CreateRtPSO()
     descTableRanges[0] = dxhelper::GetUAVDescRange(numUavsInScene, 0, 0); //output UAV
 
 	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
-    auto rootSrv = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
-    auto rootCbv = dxhelper::GetRootCbv(); //camera buffer at register space 0
+    auto rootSrv             = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
+    auto viewProj            = dxhelper::GetRootCbv(0); //camera buffer at register space 0
+    auto perInstance         = dxhelper::GetRootCbv(1); //camera buffer at register space 0
 
 
 	///@note In Raytracing, root signature needs to be divided into local and global root signature.
@@ -194,7 +195,8 @@ VOID Dx12Raytracing::CreateRtPSO()
 		//camera buffer, texture stv, output uav, AS, vertex buffer, index buffer
 		&m_rootSignature,
 		{
-			rootCbv,
+			viewProj,
+			perInstance,
 			rootDescriptorTable,
 			rootSrv
 		},
@@ -265,7 +267,6 @@ VOID Dx12Raytracing::CreateRtPSO()
 
     m_rootCbvIndex          = 0;
     m_descTableIndex        = 1;
-	m_tlasSrvRootParamIndex = 2;
 
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
@@ -526,9 +527,10 @@ HRESULT Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
-	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetCameraBuffer());
-	m_dxrCommandList->SetComputeRootDescriptorTable(1, GetAppUavGpuHandle(0));
-	m_dxrCommandList->SetComputeRootShaderResourceView(m_tlasSrvRootParamIndex, m_tlasResultBuffer->GetGPUVirtualAddress());
+	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	m_dxrCommandList->SetComputeRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
+	m_dxrCommandList->SetComputeRootDescriptorTable(2, GetAppUavGpuHandle(0));
+	m_dxrCommandList->SetComputeRootShaderResourceView(3, m_tlasResultBuffer->GetGPUVirtualAddress());
 
 
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);

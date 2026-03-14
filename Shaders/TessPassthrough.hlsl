@@ -1,6 +1,10 @@
 #include "SimpleVSPSInterface.hlsli"
 #include "CameraBuffer.hlsli"
 
+//needs a sampler and srv
+Texture2D gTexture : register(t0);
+SamplerState gSampler : register(s0);
+
 
 VSOutput_3_Tess VSMain(VSInput_3 input)
 {
@@ -62,9 +66,7 @@ DSOutput_3 DSMain(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_Domain
     return output;
 }
 
-//needs a sampler and srv
-Texture2D gTexture : register(t0);
-SamplerState gSampler : register(s0);
+
 
 float4 PSMain(DSOutput_3 input) : SV_TARGET
 {

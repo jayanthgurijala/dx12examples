@@ -18,6 +18,81 @@ StructuredBuffer<uint> indexBuffer : register(t1);
 StructuredBuffer<Vertex> posVb : register(t2);
 StructuredBuffer<float2> uvVbBuffer : register(t3, space0);
 
+static const float3 MeshColors[64] =
+{
+    float3(1.0, 0.0, 0.0),
+    float3(0.0, 1.0, 0.0),
+    float3(0.0, 0.0, 1.0),
+    float3(1.0, 1.0, 0.0),
+    float3(1.0, 0.0, 1.0),
+    float3(0.0, 1.0, 1.0),
+    float3(1.0, 0.5, 0.0),
+    float3(0.5, 0.0, 1.0),
+
+    float3(0.5, 1.0, 0.0),
+    float3(0.0, 0.5, 1.0),
+    float3(1.0, 0.0, 0.5),
+    float3(0.0, 1.0, 0.5),
+    float3(0.5, 0.0, 0.0),
+    float3(0.0, 0.5, 0.0),
+    float3(0.0, 0.0, 0.5),
+    float3(0.5, 0.5, 0.0),
+
+    float3(0.5, 0.0, 0.5),
+    float3(0.0, 0.5, 0.5),
+    float3(0.75, 0.25, 0.25),
+    float3(0.25, 0.75, 0.25),
+    float3(0.25, 0.25, 0.75),
+    float3(0.75, 0.75, 0.25),
+    float3(0.75, 0.25, 0.75),
+    float3(0.25, 0.75, 0.75),
+
+    float3(0.9, 0.3, 0.3),
+    float3(0.3, 0.9, 0.3),
+    float3(0.3, 0.3, 0.9),
+    float3(0.9, 0.9, 0.3),
+    float3(0.9, 0.3, 0.9),
+    float3(0.3, 0.9, 0.9),
+    float3(0.7, 0.4, 0.1),
+    float3(0.4, 0.7, 0.1),
+
+    float3(0.1, 0.4, 0.7),
+    float3(0.7, 0.1, 0.4),
+    float3(0.4, 0.1, 0.7),
+    float3(0.1, 0.7, 0.4),
+    float3(0.6, 0.2, 0.2),
+    float3(0.2, 0.6, 0.2),
+    float3(0.2, 0.2, 0.6),
+    float3(0.6, 0.6, 0.2),
+
+    float3(0.6, 0.2, 0.6),
+    float3(0.2, 0.6, 0.6),
+    float3(0.8, 0.4, 0.2),
+    float3(0.4, 0.8, 0.2),
+    float3(0.2, 0.4, 0.8),
+    float3(0.8, 0.2, 0.4),
+    float3(0.4, 0.2, 0.8),
+    float3(0.2, 0.8, 0.4),
+
+    float3(0.95, 0.6, 0.2),
+    float3(0.2, 0.95, 0.6),
+    float3(0.6, 0.2, 0.95),
+    float3(0.95, 0.2, 0.6),
+    float3(0.6, 0.95, 0.2),
+    float3(0.2, 0.6, 0.95),
+    float3(0.85, 0.45, 0.65),
+    float3(0.65, 0.85, 0.45),
+
+    float3(0.45, 0.65, 0.85),
+    float3(0.85, 0.65, 0.45),
+    float3(0.65, 0.45, 0.85),
+    float3(0.45, 0.85, 0.65),
+    float3(0.95, 0.5, 0.5),
+    float3(0.5, 0.95, 0.5),
+    float3(0.5, 0.5, 0.95),
+    float3(0.95, 0.95, 0.5)
+};
+
 
 [NumThreads(64, 1, 1)]
 [OutputTopology("triangle")]
@@ -97,6 +172,10 @@ void MSMain(uint3 gid       : SV_GroupID,
         vertices[vertexIndex.x].uv = uvVbBuffer[indexData.x];
         vertices[vertexIndex.y].uv = uvVbBuffer[indexData.y];
         vertices[vertexIndex.z].uv = uvVbBuffer[indexData.z];
+        
+        vertices[vertexIndex.x].color = float4(MeshColors[gid.x % 64], 1.0f);
+        vertices[vertexIndex.y].color = float4(MeshColors[gid.x % 64], 1.0f);
+        vertices[vertexIndex.z].color = float4(MeshColors[gid.x % 64], 1.0f);
 
     }
 }
@@ -111,7 +190,8 @@ float4 PSMain(VSOutput input) : SV_TARGET
  
     
     float4 sampledColor = float4(gTexture.Sample(gSampler, input.uv).xyz, 1.0f);
-    return sampledColor;
+    float4 color = sampledColor * 0.4f + input.color * 0.6f;
+    return color;
 
 }
 

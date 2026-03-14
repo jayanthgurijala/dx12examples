@@ -62,7 +62,6 @@ private:
 
 	UINT m_rootCbvIndex;
 	UINT m_descTableIndex;
-	UINT m_tlasSrvRootParamIndex;
 };
 
 

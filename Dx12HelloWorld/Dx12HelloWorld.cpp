@@ -26,16 +26,18 @@ HRESULT Dx12HelloWorld::OnInit()
     const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
-	auto rootCbv          = dxhelper::GetRootCbv();
+	auto viewProj         = dxhelper::GetRootCbv(0);
+	auto perInstance      = dxhelper::GetRootCbv(1);
 	auto descTable        = dxhelper::GetRootDescTable(descRanges);
-    auto materialsRootCbv = dxhelper::GetRootCbv(1);
+    auto materialsRootCbv = dxhelper::GetRootCbv(2);
 
 
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
-			rootCbv,
+			viewProj,
+			perInstance,
 			descTable,
 			materialsRootCbv
 		},
@@ -75,14 +77,15 @@ HRESULT Dx12HelloWorld::RenderFrame()
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
 
 
-	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT primIdxInObject, UINT sceneElementIdx)
+	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
 		{
 			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
-			pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
-			pCmdList->SetGraphicsRootConstantBufferView(2, curPrimitive.materialTextures.meterialCb);
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+			pCmdList->SetGraphicsRootConstantBufferView(1, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
+			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 		});
 

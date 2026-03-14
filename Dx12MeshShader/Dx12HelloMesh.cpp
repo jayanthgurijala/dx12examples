@@ -49,16 +49,18 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
-	auto rootCbv = dxhelper::GetRootCbv();
-	auto descTable = dxhelper::GetRootDescTable(descRanges);
-	auto materialsRootCbv = dxhelper::GetRootCbv(1);
+	auto viewProj         = dxhelper::GetRootCbv(0);
+	auto perInstance      = dxhelper::GetRootCbv(1);
+	auto descTable        = dxhelper::GetRootDescTable(descRanges);
+	auto materialsRootCbv = dxhelper::GetRootCbv(2);
 
 
 	dxhelper::DxCreateRootSignature(
 		GetDevice(),
 		&m_pRootSignature,
 		{
-			rootCbv,
+			viewProj,
+			perInstance,
 			descTable,
 			materialsRootCbv
 		},
@@ -137,8 +139,9 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	m_meshCommandList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
-	m_meshCommandList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	m_meshCommandList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
+	m_meshCommandList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(0));
 
 	m_meshCommandList->DispatchMesh(64, 1, 1);
 

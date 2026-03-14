@@ -62,9 +62,44 @@ public:
         return m_numPerInstanceDataCount;
     }
 
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa()
+    {
+        return GetBaseGpuVa() + ViewProjLightsDataOffset();
+    }
+
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetPerInstanceDataGpuVa(UINT linearIdx)
+    {
+        return GetBaseGpuVa() + PerInstanceDataOffset(linearIdx);
+    }
+
+    inline BYTE* GetViewProjLightsCpuPtr()
+    {
+        return m_pBufferResCpuPtr;
+    }
+
+    inline BYTE* GetPerInstanceDataCpuVa(UINT linearIdx)
+    {
+        return m_pBufferResCpuPtr + PerInstanceDataOffset(linearIdx);
+    }
+
 
 protected:
 private:
+
+    inline UINT64 ViewProjLightsDataOffset()
+    {
+        return 0;
+    }
+
+    inline UINT64 PerInstanceDataOffset(UINT linearIdx)
+    {
+        return m_sceneDataAlignedChunkSize + linearIdx * m_instanceDataAlignedChunkSize;
+    }
+
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetBaseGpuVa()
+    {
+        return m_bufferResource->GetGPUVirtualAddress();
+    }
 
     inline VOID MapAndInitializeBaseAddress()
     {
@@ -73,7 +108,6 @@ private:
         VOID* pCpuPtr;
         m_bufferResource->Map(0, &readRange, &pCpuPtr);
         m_pBufferResCpuPtr = static_cast<BYTE*>(pCpuPtr);
-        m_pBufferResGpuVa = m_bufferResource->GetGPUVirtualAddress();
     }
 
     ComPtr<ID3D12Resource> m_bufferResource;
@@ -92,7 +126,6 @@ private:
     SIZE_T m_totalBufferSize;
 
     BYTE* m_pBufferResCpuPtr;
-    D3D12_GPU_VIRTUAL_ADDRESS m_pBufferResGpuVa;
 
     UINT m_numPerInstanceDataCount;
     UINT m_numMaterialDataCount;

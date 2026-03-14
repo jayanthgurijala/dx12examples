@@ -31,15 +31,17 @@ HRESULT Dx12Tessellation::OnInit()
 	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
-	auto rootCbv = dxhelper::GetRootCbv();
+	auto viewProj = dxhelper::GetRootCbv(0);
+	auto perInstance = dxhelper::GetRootCbv(1);
 	auto descTable = dxhelper::GetRootDescTable(descRanges);
-	auto rootConstant = dxhelper::GetRootConstants(1, 1);
+	auto rootConstant = dxhelper::GetRootConstants(1, 2);
 
 	dxhelper::DxCreateRootSignature(
 		pDevice,
 		&m_pRootSignature,
 		{
-			rootCbv,
+			viewProj,
+			perInstance,
 			descTable,
 			rootConstant
 		},
@@ -126,15 +128,13 @@ HRESULT Dx12Tessellation::RenderFrame()
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
 
-	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
-
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,
 		FALSE,                   //RTsSingleHandleToDescriptorRange
 		&dsvHandle);
 
 	pCmdList->ClearRenderTargetView(rtvHandle,
-		clearColor,
+		RenderTargetClearColor().data(),
 		0,
 		nullptr);
 
@@ -147,11 +147,12 @@ HRESULT Dx12Tessellation::RenderFrame()
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
-	pCmdList->SetGraphicsRootDescriptorTable(1, GetAppSrvGpuHandle(0));
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
+	pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(0));
 
 	UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
-	pCmdList->SetGraphicsRoot32BitConstant(2, bits, 0);
+	pCmdList->SetGraphicsRoot32BitConstant(3, bits, 0);
 
 	RenderModel(pCmdList, 0, 0, 0);
 

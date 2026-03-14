@@ -1,7 +1,7 @@
 #include "CameraBuffer.hlsli"
 #include "SimpleVSPSInterface.hlsli"
 
-cbuffer RootConstant : register(b1)
+cbuffer RootConstant : register(b2)
 {
     float tessLevel;
 };

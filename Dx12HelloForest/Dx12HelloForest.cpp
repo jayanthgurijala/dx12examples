@@ -76,14 +76,14 @@ HRESULT Dx12HelloForest::RenderFrame()
 	const UINT numSrvsPerPrim         = NumSRVsPerPrimitive();
 	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
 
-	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT primIdxInObject, UINT sceneElementIdx)
+	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
 	{
 			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetCameraBuffer());
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
 			pCmdList->SetGraphicsRootConstantBufferView(1, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
-			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(primIdxInObject * numSrvsPerPrim));
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
 			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 	});
@@ -103,8 +103,10 @@ HRESULT Dx12HelloForest::RenderFrame()
 
 VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
 {
+
+
 	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
-	const UINT numSceneElements = NumSceneElementsLoaded() + 1;
+	const UINT numSceneElements = NumSceneElementsLoaded();
 	sceneDescription.resize(numSceneElements);
 
 	UINT terrainIdx = 0;
@@ -114,8 +116,6 @@ VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& 
 	for (UINT idx = 0; idx < numSceneElements; idx++)
 	{
 		auto& currentSceneElement = sceneDescription[idx];
-		currentSceneElement.sceneElementIdx = (idx < numSceneElementsLoaded) ? idx : numSceneElementsLoaded - 1 ;
-
 		if (idx == 0)
 		{
 			InitTerrain(currentSceneElement, terrainIdx);
@@ -126,7 +126,11 @@ VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& 
 			InitAnimalsDeer(currentSceneElement, deerIdx);
 			deerIdx++;
 		}
-		else if (idx == 2 || idx == 3)
+		else if (idx == 2)
+		{
+			//InitChineseDragon(currentSceneElement, 0);
+		} 
+		else
 		{
 			InitOakTrees(currentSceneElement, oakTreeIdx);
 			oakTreeIdx++;
@@ -134,8 +138,33 @@ VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& 
 	}
 }
 
+VOID Dx12HelloForest::InitChineseDragon(DxSceneElementInstance& sceneElement, UINT localIdx)
+{
+	sceneElement.sceneElementIdx = 2;
+
+	sceneElement.addToExtents = FALSE;
+	sceneElement.numInstances = 1;
+	sceneElement.trsMatrix.resize(sceneElement.numInstances);
+
+	auto& trsMatrix = sceneElement.trsMatrix[0];
+
+	trsMatrix.translation[0] = 0.0f;
+	trsMatrix.translation[1] = 0.0f;
+	trsMatrix.translation[2] = 0.0f;
+
+	trsMatrix.rotationInDegrees[0] = 0.0f;
+	trsMatrix.rotationInDegrees[1] = 0.0f;
+	trsMatrix.rotationInDegrees[2] = 0.0f;
+
+	trsMatrix.scale[0] = 0.3f;
+	trsMatrix.scale[1] = 0.3f;
+	trsMatrix.scale[2] = 0.3f;
+}
+
 VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
+	sceneElement.sceneElementIdx = 0;
+
 	sceneElement.numInstances = 1;
 	sceneElement.addToExtents = FALSE;
 
@@ -146,7 +175,14 @@ VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT loc
 	trsMatrix.translation[1] = -.04f;
 	trsMatrix.translation[2] = 0.0f;
 
-	trsMatrix.rotationInDegrees[0] = 0.0f;
+	if (localIdx == 0)
+	{
+		trsMatrix.rotationInDegrees[0] = 0.0f;
+	} 
+	else
+	{
+		trsMatrix.rotationInDegrees[0] = 90.0f;
+	}
 	trsMatrix.rotationInDegrees[1] = 0.0f;
 	trsMatrix.rotationInDegrees[2] = 0.0f;
 
@@ -157,6 +193,7 @@ VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT loc
 
 VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
+	sceneElement.sceneElementIdx = 1;
 	sceneElement.addToExtents = TRUE;
 	sceneElement.numInstances = 1;
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
@@ -178,6 +215,7 @@ VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT
 
 VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
 {
+	sceneElement.sceneElementIdx = 3;
 	sceneElement.numInstances = 1;
 	sceneElement.addToExtents = TRUE;
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);

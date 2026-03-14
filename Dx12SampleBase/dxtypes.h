@@ -216,6 +216,13 @@ struct DxMaterialResourceInfo
 
 	//@note Resource holds data for all the primitives and it is chunked per primitive
 	D3D12_GPU_VIRTUAL_ADDRESS meterialCb;
+
+	//Descriptor heap is organized as numSrvsPerPrim per Primitive in the order of scene elements loaded.
+	//e.g. 1) terrain_gridlines, 2) deer, 3) chinesedragon, 4) oaktree
+	//     [ 5 SRVs for (1) | 5 SRVs for (2) | 5 + 5 SRVs for (3) | 5 + 5 SRVs for oaktree ]
+	//     0                5                10                  20
+	//Base index is needed in scene load element as each loaded element can have N prims and M nodes
+	UINT descriptorHeapOffset;
 };
 
 enum MaterialFlags
@@ -252,7 +259,7 @@ struct DxPrimitiveInfo
 	DxPrimIndexData			      indexBufferInfo;
 								  
 	ComPtr<ID3D12PipelineState>   pipelineState;
-	CD3DX12_ROOT_PARAMETER        descriptorTable;
+	//CD3DX12_ROOT_PARAMETER        descriptorTable;
 								  
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;

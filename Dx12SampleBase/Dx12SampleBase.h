@@ -144,11 +144,6 @@ protected:
         return handle;
     }
 
-    inline D3D12_GPU_VIRTUAL_ADDRESS GetCameraBuffer()
-    {
-        return m_mvpCameraConstantBuffer->GetGPUVirtualAddress();
-    }
-
     inline ComPtr<ID3DBlob> GetCompiledShaderBlob(const std::string& shaderName)
     {
         ComPtr<ID3DBlob> shaderBlob;
@@ -381,14 +376,12 @@ protected:
 
             for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
             {
-                UINT primIdxInScene = sceneElementIdx;
                 for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
                 {
                     const UINT numPrims = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
                     for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
                     {
-                        func(idx, instanceIdx, nodeIdx, primIdx, flatInstanceNodeIdx, primIdxInScene, sceneElementIdx);
-                        primIdxInScene++;
+                        func(idx, instanceIdx, nodeIdx, primIdx, flatInstanceNodeIdx, sceneElementIdx);
 
                     }
                     flatInstanceNodeIdx++;
@@ -418,6 +411,16 @@ protected:
     VOID CreateSceneMaterialCb();
 
     UINT CreateInputElementDesc(const std::vector<DxPrimVertexData>& inData, std::vector<D3D12_INPUT_ELEMENT_DESC>& outData);
+
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa()
+    {
+        return m_camLightsMaterialsManager->GetViewProjLightsGpuVa();
+    }
+
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetPerInstanceDataGpuVa(UINT linearIdx)
+    {
+        return m_camLightsMaterialsManager->GetPerInstanceDataGpuVa(linearIdx);
+    }
 
 private:
 
@@ -501,7 +504,6 @@ private:
     FrameComposition    m_simpleComposition;
     ComputeGenerateMips m_computeGenerateMips;
 
-    ComPtr<ID3D12Resource>      m_mvpCameraConstantBuffer;
     ComPtr<ID3D12Resource>      m_materialConstantBuffer;
 
     ///@todo associate fences with command queues?
