@@ -308,8 +308,6 @@ struct DxSceneLoadInfo
 	//e.g. A oaktree has 2 nodes and say 100 instances
 	//Need to store 200 GPUVAs organized as gpuVA_1_node1, gpuVA_1_node2 .... gpuVA_100_node1, gpuVA_100_node2
 	UINT numInstances;
-
-	std::vector<D3D12_GPU_VIRTUAL_ADDRESS> instanceCameraGpuVa;
 };
 
 struct DxCBSceneData
@@ -329,6 +327,20 @@ struct DxCBPerInstanceData
 struct DxSceneInfo
 {
 	std::vector<DxSceneLoadInfo> sceneLoadInfo;
+};
+
+struct DxSizeAlignedSize
+{
+	UINT   count;
+	UINT64 size;
+	UINT64 alignedSize;
+	UINT64 totalAlignedSize;
+
+public:
+	inline VOID CalcTotalSize()
+	{
+		totalAlignedSize = alignedSize * count;
+	}
 };
 
 

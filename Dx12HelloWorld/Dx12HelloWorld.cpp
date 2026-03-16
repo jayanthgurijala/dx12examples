@@ -48,7 +48,7 @@ HRESULT Dx12HelloWorld::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12HelloWorld::RenderFrame()
+HRESULT Dx12HelloWorld::RenderFrameGfxDraw()
 {
 	ImGui::Text("Hello World");
 
@@ -83,7 +83,7 @@ HRESULT Dx12HelloWorld::RenderFrame()
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
 			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
-			pCmdList->SetGraphicsRootConstantBufferView(1, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
 			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
 			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);

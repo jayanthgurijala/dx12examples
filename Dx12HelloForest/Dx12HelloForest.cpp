@@ -48,43 +48,47 @@ HRESULT Dx12HelloForest::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12HelloForest::RenderFrame()
+HRESULT Dx12HelloForest::RenderFrameGfxDraw()
 {
 	ImGui::Text("Hello World");
 
 	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
-
-	pCmdList->OMSetRenderTargets(1,
-		&rtvHandle,
-		FALSE,                   //RTsSingleHandleToDescriptorRange
-		&dsvHandle);
-
-	pCmdList->ClearRenderTargetView(rtvHandle,
-		RenderTargetClearColor().data(),
-		0,
-		nullptr);
-
-	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
 
 
-	const UINT numSrvsPerPrim         = NumSRVsPerPrimitive();
-	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
+	pCmdList->OMSetRenderTargets(1,
+		&rtvHandle,
+		FALSE,                   //RTsSingleHandleToDescriptorRange
+		&dsvHandle);
+	pCmdList->ClearRenderTargetView(rtvHandle,
+		RenderTargetClearColor().data(),
+		0,
+		nullptr);
+	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
+	
+
+	ProcessSceneInstancesNodesPrims([this, pCmdList](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
 	{
 			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
-			pCmdList->SetGraphicsRootConstantBufferView(1, sceneLoadElement.instanceCameraGpuVa[flatInstanceNodeIdx]);
+
+			//World matrix
+			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
+
+			//SRVs
 			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
+
+			//Material props
 			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
+
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 	});
 

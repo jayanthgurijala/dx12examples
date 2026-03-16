@@ -13,7 +13,7 @@ class Dx12HelloWorld : public Dx12SampleBase
 {
 public:
 	Dx12HelloWorld(UINT width, UINT height);
-	virtual HRESULT RenderFrame() override;
+	virtual HRESULT RenderFrameGfxDraw() override;
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
@@ -22,6 +22,7 @@ protected:
 	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
 	virtual HRESULT OnInit() override;
+	virtual inline HRESULT RenderFrame() override { return RenderFrameGfxDraw(); }
 
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;

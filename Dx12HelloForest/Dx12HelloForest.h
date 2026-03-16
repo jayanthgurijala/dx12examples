@@ -13,7 +13,7 @@ class Dx12HelloForest : public Dx12SampleBase
 {
 public:
 	Dx12HelloForest(UINT width, UINT height);
-	virtual HRESULT RenderFrame() override;
+	virtual HRESULT RenderFrameGfxDraw() override;
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
@@ -24,6 +24,9 @@ protected:
 	virtual HRESULT OnInit() override;
 	virtual VOID LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription) override;
 	virtual inline std::array<FLOAT, 4> RenderTargetClearColor() { return{ 0.2f, 0.2f, 0.3f, 1.0f }; }
+	virtual inline HRESULT RenderFrame() {
+		return RenderFrameGfxDraw(); 
+	}
 
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;

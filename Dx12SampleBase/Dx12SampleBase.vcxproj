@@ -163,6 +163,7 @@
     <ClInclude Include="CameraLightsMaterialsBuffer.h" />
     <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
+    <ClInclude Include="DxGfxDrawRenderObject.h" />
     <ClInclude Include="DxGltfLoader.h" />
     <ClInclude Include="dxhelper.h" />
     <ClInclude Include="DxPrintUtils.h" />
@@ -220,6 +221,7 @@
     <ClCompile Include="CameraLightsMaterialsBuffer.cpp" />
     <ClCompile Include="Dx12SampleBase.cpp" />
     <ClCompile Include="DxCamera.cpp" />
+    <ClCompile Include="DxGfxDrawRenderObject.cpp" />
     <ClCompile Include="DxGltfLoader.cpp" />
     <ClCompile Include="dxhelper.cpp" />
     <ClCompile Include="DxPrintUtils.cpp" />

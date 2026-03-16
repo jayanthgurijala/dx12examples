@@ -1425,79 +1425,32 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
-
-	UINT sceneDataChunkSize, sceneDataAlignedChunkSize;
-	UINT instanceDataChunkSize, instanceDataAlignedChunkSize;
-
-	dxhelper::GetSizeAndAlignedSizeInfo<DxCBSceneData>(sceneDataChunkSize, sceneDataAlignedChunkSize);
-	dxhelper::GetSizeAndAlignedSizeInfo<DxCBPerInstanceData>(instanceDataChunkSize, instanceDataAlignedChunkSize);
-
-	const UINT numNodeTransforms = m_camera->NumModelTransforms();
-	assert(numNodeTransforms == m_camLightsMaterialsManager->GetPerInstanceDataCount());
-
-	assert(numNodeTransforms > 0);
-
-	const UINT totalAlignedPerSceneDataSize    = sceneDataAlignedChunkSize;
-	const UINT totalAlignedPerInstanceDataSize = instanceDataAlignedChunkSize * m_camLightsMaterialsManager->GetPerInstanceDataCount();
-	const UINT totalConstantBufferSize         = totalAlignedPerSceneDataSize + totalAlignedPerInstanceDataSize;
-
-	
 	
 	{
-		const D3D12_GPU_VIRTUAL_ADDRESS baseGpuVa = m_camLightsMaterialsManager->GetViewProjLightsGpuVa();
-		const auto sceneDataBaseGpuVa   = baseGpuVa;
-		const auto perInstanceBaseGpuVa = m_camLightsMaterialsManager->GetPerInstanceDataGpuVa(0);
-
-		D3D12_GPU_VIRTUAL_ADDRESS baseGpuVaToWrite = perInstanceBaseGpuVa;
-		const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
-		for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
-		{
-			auto& curSceneLoadElement = SceneElementInstance(idx);
-			const UINT numNodesInCurScene = NumNodesInScene(curSceneLoadElement.sceneElementIdx);
-			const UINT numInstances       = curSceneLoadElement.numInstances;
-			UINT linearIdx = 0;
-			for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
-			{
-				for (int nodeIdx = 0; nodeIdx < numNodesInCurScene; nodeIdx++)
-				{
-					curSceneLoadElement.instanceCameraGpuVa[linearIdx] = baseGpuVaToWrite;
-					linearIdx++;
-					baseGpuVaToWrite += instanceDataAlignedChunkSize;
-				}
-				assert(linearIdx == curSceneLoadElement.instanceCameraGpuVa.size());
-			}
-		}
-		//@note increasing afrer writing
-		assert(baseGpuVa + totalConstantBufferSize == baseGpuVaToWrite);
+		DxCBSceneData sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
+		sceneData.viewProjMatrix = m_camera->GetViewProjectionMatrixTranspose();
+		sceneData.invViewProj    = m_camera->GetViewProjectionInverse();
+		sceneData.cameraPosition = m_camera->GetCameraPosition();
+		sceneData.cameraFovY.x   = m_camera->GetFovYInRadians();
+		sceneData.cameraFovY.y   = sceneData.cameraFovY.z = sceneData.cameraFovY.w = 0;
+	
+		m_camLightsMaterialsManager->WriteViewProjDataAtIndex(0, sceneData);
 	}
 
-
 	{
-
-		{
-			BYTE* pWritePtr = m_camLightsMaterialsManager->GetViewProjLightsCpuPtr();
-			DxCBSceneData sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding
-			sceneData.viewProjMatrix = m_camera->GetViewProjectionMatrixTranspose();
-			sceneData.invViewProj    = m_camera->GetViewProjectionInverse();
-			sceneData.cameraPosition = m_camera->GetCameraPosition();
-			sceneData.cameraFovY.x   = m_camera->GetFovYInRadians();
-			sceneData.cameraFovY.y   = sceneData.cameraFovY.z = sceneData.cameraFovY.w = 0;
-			memcpy(pWritePtr, &sceneData, sceneDataChunkSize);
-			pWritePtr += sceneDataAlignedChunkSize;
-		}
+		const UINT numNodeTransforms = m_camera->NumModelTransforms();
 
 		UINT linearIndex = 0;
-		DxCBPerInstanceData instanceTransformData; //modelMatrix, normalMatrix
-		for (UINT idx=0; idx < numNodeTransforms; idx++)
+		DxCBPerInstanceData instanceTransformData;
+		for (UINT idx = 0; idx < numNodeTransforms; idx++)
 		{
 			BYTE* pWritePtr = m_camLightsMaterialsManager->GetPerInstanceDataCpuVa(linearIndex);
-			instanceTransformData.modelMatrix  = m_camera->GetWorldMatrixTranspose(linearIndex);
+			instanceTransformData.modelMatrix = m_camera->GetWorldMatrixTranspose(linearIndex);
 			instanceTransformData.normalMatrix = m_camera->GetNormalMatrixData(linearIndex);
 
-			memcpy(pWritePtr, &instanceTransformData, instanceDataChunkSize);
+			m_camLightsMaterialsManager->WritePerInstanceWorldMatrixData(linearIndex, instanceTransformData);
 			linearIndex++;
 		}
-
 	}
 
 	return result;
@@ -1870,8 +1823,6 @@ VOID Dx12SampleBase::LoadScene()
 		const UINT numNodes                 = NumNodesInScene(sceneElementIdx);
 		curElementSceneLoadInfo.sceneElementIdx = sceneElementIdx;
 		curElementSceneLoadInfo.numInstances = numInstances;
-
-		curElementSceneLoadInfo.instanceCameraGpuVa.resize(numNodes * numInstances);
 		auto& sceneElement = m_sceneElements[sceneElementIdx];
 
 

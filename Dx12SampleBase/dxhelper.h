@@ -7,6 +7,7 @@
 #include <d3d12.h>
 #include <d3dx12.h>
 #include "DxPrintUtils.h"
+#include "dxtypes.h"
 
 using namespace Microsoft::WRL;
 
@@ -267,10 +268,10 @@ namespace dxhelper
 	}
 
 	template<typename T>
-	inline VOID GetSizeAndAlignedSizeInfo(UINT& size, UINT& alignedSize)
+	inline VOID GetSizeAndAlignedSizeInfo(DxSizeAlignedSize& info)
 	{
-		size = sizeof(T);
-		alignedSize = dxhelper::DxAlign(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+		info.size = sizeof(T);
+		info.alignedSize = dxhelper::DxAlign(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	}
 
 }

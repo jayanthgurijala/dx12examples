@@ -100,7 +100,7 @@ HRESULT Dx12Tessellation::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12Tessellation::RenderFrame()
+HRESULT Dx12Tessellation::RenderFrameGfxDraw()
 {
 	SetFrameInfo(nullptr, 0);
 

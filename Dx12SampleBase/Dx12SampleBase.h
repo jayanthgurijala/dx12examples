@@ -33,6 +33,7 @@ public:
     virtual HRESULT OnInit() { return S_OK; };
 
     HRESULT NextFrame(FLOAT frameDeltaTime);
+    virtual HRESULT RenderFrameGfxDraw() { return S_OK; };
     virtual HRESULT RenderFrame() { return S_OK; };
     virtual HRESULT PostRun() { return S_OK; };
     HRESULT RenderRtvContentsOnScreen();
@@ -366,13 +367,13 @@ protected:
     void ProcessSceneInstancesNodesPrims(Func&& func)
     {
         const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
+        UINT flatInstanceNodeIdx = 0;
         for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
         {
             auto& sceneLoadElement     = SceneElementInstance(idx);
             const UINT sceneElementIdx = sceneLoadElement.sceneElementIdx;
             const UINT numNodes        = NumNodesInScene(sceneElementIdx);
             const UINT numInstances    = sceneLoadElement.numInstances;
-            UINT flatInstanceNodeIdx   = 0;
 
             for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
             {

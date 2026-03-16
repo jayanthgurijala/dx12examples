@@ -49,17 +49,17 @@ public:
 
     inline void IncrementPerInstanceDataCount(UINT increment)
     {
-        m_numPerInstanceDataCount += increment;
+        m_worldMatrixData.count += increment;
     }
 
     inline void IncrementMaterialDataCount(UINT increment)
     {
-        m_numMaterialDataCount += increment;
+        m_materialData.count += increment;
     }
 
     inline UINT GetPerInstanceDataCount()
     {
-        return m_numPerInstanceDataCount;
+        return m_worldMatrixData.count;
     }
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa()
@@ -72,19 +72,41 @@ public:
         return GetBaseGpuVa() + PerInstanceDataOffset(linearIdx);
     }
 
-    inline BYTE* GetViewProjLightsCpuPtr()
-    {
-        return m_pBufferResCpuPtr;
-    }
-
     inline BYTE* GetPerInstanceDataCpuVa(UINT linearIdx)
     {
         return m_pBufferResCpuPtr + PerInstanceDataOffset(linearIdx);
     }
 
+    inline VOID WriteViewProjDataAtIndex(UINT index, DxCBSceneData& sceneData)
+    {
+        BYTE* pWritePtr = m_pBufferResCpuPtr + index * m_viewProjData.alignedSize;
+
+        assert(sizeof(DxCBSceneData) == m_viewProjData.size);
+        memcpy(pWritePtr, &sceneData, m_viewProjData.size);
+    }
+
+    inline VOID WritePerInstanceWorldMatrixData(UINT index, DxCBPerInstanceData& perInstanceData)
+    {
+        BYTE* pWritePtr = m_pBufferResCpuPtr + PerInstanceDataOffset(index);
+
+        assert(sizeof(DxCBPerInstanceData) == m_worldMatrixData.size);
+        memcpy(pWritePtr, &perInstanceData, m_viewProjData.size);
+    }
+
 
 protected:
 private:
+
+    inline VOID FinalizeCalcTotalSize()
+    {
+        m_viewProjData.CalcTotalSize();
+        m_worldMatrixData.CalcTotalSize();
+        m_materialData.CalcTotalSize();
+        m_totalBufferSize = m_viewProjData.totalAlignedSize    +
+                            m_worldMatrixData.totalAlignedSize +
+                            m_materialData.totalAlignedSize;
+                             
+    }
 
     inline UINT64 ViewProjLightsDataOffset()
     {
@@ -93,7 +115,7 @@ private:
 
     inline UINT64 PerInstanceDataOffset(UINT linearIdx)
     {
-        return m_sceneDataAlignedChunkSize + linearIdx * m_instanceDataAlignedChunkSize;
+        return m_viewProjData.totalAlignedSize + linearIdx * m_worldMatrixData.alignedSize;
     }
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetBaseGpuVa()
@@ -111,23 +133,13 @@ private:
     }
 
     ComPtr<ID3D12Resource> m_bufferResource;
-    UINT m_sceneDataChunkSize;
-    UINT m_sceneDataAlignedChunkSize;
 
-    UINT m_instanceDataChunkSize;
-    UINT m_instanceDataAlignedChunkSize;
-
-    UINT m_materialDataChunkSize;
-    UINT m_materialDataAlignedChunkSize;
-
-    SIZE_T m_instanceDataTotalAlignedSize;
-    SIZE_T m_materialDataTotalAlignedSize;
+    DxSizeAlignedSize m_viewProjData;
+    DxSizeAlignedSize m_worldMatrixData;
+    DxSizeAlignedSize m_materialData;
 
     SIZE_T m_totalBufferSize;
 
     BYTE* m_pBufferResCpuPtr;
-
-    UINT m_numPerInstanceDataCount;
-    UINT m_numMaterialDataCount;
 };
 
