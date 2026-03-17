@@ -62,7 +62,7 @@ public:
         return m_worldMatrixData.count;
     }
 
-    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa()
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa(UINT index)
     {
         return GetBaseGpuVa() + ViewProjLightsDataOffset();
     }

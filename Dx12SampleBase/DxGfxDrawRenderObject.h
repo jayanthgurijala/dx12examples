@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d12.h>
+#include "Dx12SampleBase.h"
 
 class DxGfxDrawRenderObject
 {
@@ -51,12 +52,29 @@ class DxGfxDrawRenderObject
      */
 
 public:
-    DxGfxDrawRenderObject(UINT numRtvs, UINT numDsvs, UINT numSRVs);
+    DxGfxDrawRenderObject(UINT viewProjOffset, UINT numRtvs, UINT rtvHeapStartOffset, BOOL needsDsv, UINT dsvHeapStartOffset);
+    inline UINT NumRTVs()
+    {
+        return m_numRtvs;
+    }
+
+    inline UINT NumDSVs()
+    {
+        return (m_needsDsv == TRUE) ? 1 : 0;
+    }
+
+    VOID RenderInitViewProjRtvDsv();
+    VOID Render();
+
 protected:
 private:
+    Dx12SampleBase* m_sampleBase;
     UINT m_numRtvs = 0;
-    UINT m_numDsvs = 0;
-    UINT m_numSrvs = 0;
+    UINT m_rtvHeapStartOffset = 0;
 
+    BOOL m_needsDsv = FALSE;
+    UINT m_dsvHeapStartOffset = 0;
+
+    UINT m_viewProjOffset;
 };
 

@@ -48,13 +48,13 @@ HRESULT Dx12HelloWorld::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12HelloWorld::RenderFrameGfxDraw()
+VOID Dx12HelloWorld::RenderFrameGfxDraw()
 {
 	ImGui::Text("Hello World");
 
 	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRtvCpuHandle(0);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHandle(0);
 
 	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
@@ -82,16 +82,15 @@ HRESULT Dx12HelloWorld::RenderFrameGfxDraw()
 			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa(0));
 			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
-			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(curPrimitive.primLinearIdxInSceneElements));
 			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 		});
 
-	SetFrameInfo(nullptr, 0);
+	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
 
-	return S_OK;
 }
 
 DX_ENTRY_POINT(Dx12HelloWorld);

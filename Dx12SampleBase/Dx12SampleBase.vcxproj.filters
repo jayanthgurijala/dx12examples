@@ -105,6 +105,9 @@
     <ClInclude Include="DxGfxDrawRenderObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DxDescriptorHeapManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dx12SampleBase.cpp">
@@ -162,6 +165,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DxGfxDrawRenderObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DxDescriptorHeapManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -88,7 +88,7 @@ HRESULT Dx12Tessellation::OnInit()
 	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
 	pipelineStateDesc.NumRenderTargets = 1;
 	pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
-	pipelineStateDesc.DSVFormat = GetDepthStencilFormat();
+	pipelineStateDesc.DSVFormat = GetDepthStencilDsvFormat();
 
 	///@todo experiment with flags
 	pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
@@ -100,10 +100,8 @@ HRESULT Dx12Tessellation::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12Tessellation::RenderFrameGfxDraw()
+VOID Dx12Tessellation::RenderFrameGfxDraw()
 {
-	SetFrameInfo(nullptr, 0);
-
 	ImGui::Text("Tessellation");
 	ImGui::SameLine();
 
@@ -125,8 +123,8 @@ HRESULT Dx12Tessellation::RenderFrameGfxDraw()
 	m_tesstriTessLevel = m_tesstriTessLevel;
 
 	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRtvCpuHandle(0);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHandle(0);
 
 	pCmdList->OMSetRenderTargets(1,
 		&rtvHandle,
@@ -147,16 +145,15 @@ HRESULT Dx12Tessellation::RenderFrameGfxDraw()
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa(0));
 	pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
-	pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(0));
+	pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(0));
 
 	UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
 	pCmdList->SetGraphicsRoot32BitConstant(3, bits, 0);
 
 	RenderModel(pCmdList, 0, 0, 0);
-
-	return S_OK;
+	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
 }
 
 DX_ENTRY_POINT(Dx12Tessellation);

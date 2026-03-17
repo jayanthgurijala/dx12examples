@@ -33,6 +33,7 @@ HRESULT Dx12HelloMesh::OnInit()
 	assert(m_meshCommandList != nullptr);
 
 	CreateMeshPSO();
+	CreatePerPrimSRVs();
 
 	return S_OK;
 }
@@ -93,31 +94,37 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	m_meshDevice->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&m_meshPipelineState));
 }
 
-HRESULT Dx12HelloMesh::RenderFrame()
+VOID Dx12HelloMesh::CreatePerPrimSRVs()
 {
-	ImGui::Text("Hello Mesh Shaders!");
-
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
-
-	assert(rtvHandle.ptr != 0);
-	assert(dsvHandle.ptr != 0);
+	const UINT numSRVsForMaterials = AppSrvOffsetForPrim();
 
 	auto indexBufferRes = GetModelIndexBufferResource(0, 0, 0);
 	auto indexBufferView = GetModelIndexBufferView(0, 0, 0);
-	CreateAppBufferSrvDescriptorAtIndex(1, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
+
+	///@todo 5 is magic number, need to avoid it
+	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 0, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
 
 	auto vertexBufferRes = GetModelPositionVertexBufferResource(0, 0, 0);
 	auto vertexBufferView = GetModelPositionVertexBufferView(0, 0, 0);
-	CreateAppBufferSrvDescriptorAtIndex(2, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
+	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 1, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
 
 	auto uvVbBufferRes = GetModelUvVertexBufferResource(0, 0, 0, 0);
 	auto uvVbView = GetModelUvBufferView(0, 0, 0, 0);
 
 	const UINT uvVbElementSizeInBytes = 4;
 	const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;
-	CreateAppBufferSrvDescriptorAtIndex(3, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 2, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+}
 
+VOID Dx12HelloMesh::RenderFrame()
+{
+	ImGui::Text("Hello Mesh Shaders!");
+
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRtvCpuHandle(0); // GetRenderTargetView(0, FALSE);
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHandle(0);
+
+	assert(rtvHandle.ptr != 0);
+	assert(dsvHandle.ptr != 0);
 
 	FLOAT clearColor[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
 
@@ -139,15 +146,14 @@ HRESULT Dx12HelloMesh::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	m_meshCommandList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa(0));
 	m_meshCommandList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
-	m_meshCommandList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(0));
+	m_meshCommandList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(0));
 
 	m_meshCommandList->DispatchMesh(64, 1, 1);
 
-	SetFrameInfo(nullptr, 0);
+	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
 
-	return S_OK;
 }
 
 DX_ENTRY_POINT(Dx12HelloMesh);

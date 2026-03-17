@@ -13,6 +13,9 @@
 #include "DxCamera.h"
 #include "DxGltfLoader.h"
 #include "CameraLightsMaterialsBuffer.h"
+#include "DxDescriptorHeapManager.h"
+#include "dxhelper.h"
+
 
 using namespace DirectX;
 using namespace Microsoft::WRL;
@@ -26,15 +29,22 @@ public:
     ~Dx12SampleBase();
     HRESULT Initialize();
     VOID InitlializeDeviceCmdQueueAndCmdList();
-    VOID InitializeRtvDsvDescHeaps();
-    VOID InitializeSrvCbvUavDescHeaps();
+    VOID InitializeDescriptorHeapManagerResourcesAndDescriptors();
     VOID InitializeImgui();
 
     virtual HRESULT OnInit() { return S_OK; };
 
     HRESULT NextFrame(FLOAT frameDeltaTime);
-    virtual HRESULT RenderFrameGfxDraw() { return S_OK; };
-    virtual HRESULT RenderFrame() { return S_OK; };
+
+    virtual VOID RenderFrameGfxDraw();
+
+    /******************************************************/
+    VOID RenderGfxDrawInit(ID3D12RootSignature* rootSignature, UINT viewProjIndex);
+    //virtual VOID RenderGfxDrawSetupRtvDsv() = 0;
+    VOID RenderSceneGfxDraw();
+    /*****************************************************/
+
+    virtual VOID RenderFrame() { };
     virtual HRESULT PostRun() { return S_OK; };
     HRESULT RenderRtvContentsOnScreen();
     
@@ -52,11 +62,10 @@ public:
 
 
 protected:
-    HRESULT CreateRenderTargetResources(UINT numResources);
-    VOID CreateRenderTargetSRVs(UINT numSrvs);
-    HRESULT CreateRenderTargetViews(UINT numRTVs, BOOL isInternal);
-    HRESULT CreateDsvResources(UINT numResources, BOOL createViews = TRUE);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetRenderTargetView(UINT rtvIndex, BOOL isInternal);
+    VOID CreateRenderTargetResources();
+    VOID CreateRenderTargetViews();
+    VOID CreateDsvResourcesAndViews();
+
     ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
                                                                const std::string& pixelShaderName,
                                                                ID3D12RootSignature* signature,
@@ -91,59 +100,29 @@ protected:
 
     inline ID3D12DescriptorHeap* GetSrvDescriptorHeap()
     {
-        return m_srvUavCbvDescHeap.Get();
+        return m_descriptorHeapManager->GetSrvUavCbvDescriptorHeap();
     }
 
-    template<typename HandleType>
-    inline VOID	OffsetHandle(HandleType& handle, UINT index, UINT descriptorSize)
+    inline D3D12_CPU_DESCRIPTOR_HANDLE GetRtvCpuHandle(UINT appHeapOffset)
     {
-        assert(descriptorSize != 0);
-        handle.Offset(index, descriptorSize);
+        return m_descriptorHeapManager->GetRtvHeapHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(appHeapOffset);
     }
 
-    inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetSrvUavCBvCpuHeapHandle(UINT index)
+    inline D3D12_CPU_DESCRIPTOR_HANDLE GetDsvCpuHandle(UINT appHeapOffset)
     {
-        auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_srvUavCbvDescHeap->GetCPUDescriptorHandleForHeapStart());
-        OffsetHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(handle, index, m_srvUavCbvDescriptorSize);
-
-        return handle;
+        return m_descriptorHeapManager->GetDsvHeapHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(appHeapOffset);
     }
 
-    inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetSrvGpuHeapHandle(UINT index)
+    inline D3D12_GPU_DESCRIPTOR_HANDLE GetPerPrimSrvGpuHandle(UINT linearPrimIdx)
     {
-        auto handle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvUavCbvDescHeap->GetGPUDescriptorHandleForHeapStart());
-        OffsetHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(handle, index, m_srvUavCbvDescriptorSize);
-        return handle;
+        return m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(linearPrimIdx, 0);
     }
 
-    inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetAppUavGpuHandle(UINT index)
+    inline D3D12_GPU_DESCRIPTOR_HANDLE GetUavGpuHandle(UINT appUavIndex)
     {
-        ///@todo make this more explicit
-        UINT appSrvStartIndex = NumRTVsNeededForApp();
-        return GetSrvGpuHeapHandle(appSrvStartIndex + index);
+        return m_descriptorHeapManager->GetUavHeapHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(appUavIndex);
     }
 
-    inline CD3DX12_GPU_DESCRIPTOR_HANDLE GetAppSrvGpuHandle(UINT index)
-    {
-        ///@todo make this more explicit
-        UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();
-        return GetSrvGpuHeapHandle(appSrvStartIndex + index);
-    }
-
-    ///@todo remove this duplication by using arrays or something
-    inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetRtvCpuHeapHandle(UINT index)
-    {
-        auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_rtvDescHeap->GetCPUDescriptorHandleForHeapStart());
-        OffsetHandle< CD3DX12_CPU_DESCRIPTOR_HANDLE>(handle, index, m_rtvDescriptorSize);
-        return handle;
-    }
-
-    inline CD3DX12_CPU_DESCRIPTOR_HANDLE GetDsvCpuHeapHandle(UINT index)
-    {
-        auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_dsvDescHeap->GetCPUDescriptorHandleForHeapStart());
-        OffsetHandle< CD3DX12_CPU_DESCRIPTOR_HANDLE>(handle, index, m_dsvDescriptorSize);
-        return handle;
-    }
 
     inline ComPtr<ID3DBlob> GetCompiledShaderBlob(const std::string& shaderName)
     {
@@ -264,12 +243,10 @@ protected:
         return vertexAttribute.format;
     }
 
-    inline VOID SetFrameInfo(ID3D12Resource* frameResource = nullptr, UINT rtvIndex = UINT_MAX, D3D12_RESOURCE_STATES resState = D3D12_RESOURCE_STATE_RENDER_TARGET)
+    inline VOID SetFrameInfo(UINT heapOffset, DxDescriptorType type)
     {
-        m_appFrameInfo.pResState = resState;
-        m_appFrameInfo.pFrameResource = frameResource;
-        m_appFrameInfo.rtvIndex = rtvIndex;
-        m_appFrameInfo.type = (frameResource != nullptr) ? DxAppFrameType::DxFrameResource : DxAppFrameType::DxFrameRTVIndex;
+        m_appFrameInfo.descriptorType = type;
+        m_appFrameInfo.heapOffset     = heapOffset;
     }
 
     inline UINT NumNodesInScene(UINT sceneIdx)
@@ -325,7 +302,9 @@ protected:
 
     virtual inline DxCamera* GetCamera() { return m_camera.get(); }
     virtual inline DXGI_FORMAT GetBackBufferFormat() { return DXGI_FORMAT_R8G8B8A8_UNORM; }
-    virtual inline DXGI_FORMAT GetDepthStencilFormat() { return DXGI_FORMAT_D32_FLOAT; }
+    virtual inline DXGI_FORMAT GetDepthStencilResourceFormat() { return DXGI_FORMAT_R32_TYPELESS; }
+    virtual inline DXGI_FORMAT GetDepthStencilDsvFormat() { return DXGI_FORMAT_D32_FLOAT; }
+    virtual inline DXGI_FORMAT GetDepthStencilSrvFormat() { return DXGI_FORMAT_R32_FLOAT; }
 
     virtual inline UINT NumRTVsNeededForApp()         { return 0; }
     virtual inline UINT NumSRVsPerPrimNeededForApp()  { return 0; }
@@ -348,7 +327,7 @@ protected:
     }
 
     template<typename Func>
-    void ForEachSceneNode(Func&& func)
+    void ForEachSceneElementLoadedSceneNode(Func&& func)
     {
         const UINT numSceneElements = NumSceneElementsLoaded();
 
@@ -359,6 +338,26 @@ protected:
             for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
             {
                 func(idx, nodeIdx);
+            }
+        }
+    }
+
+    template<typename Func>
+    void ForEachSceneElementLoadedSceneNodePrim(Func&& func)
+    {
+        const UINT numSceneElements = NumSceneElementsLoaded();
+
+        for (UINT idx = 0; idx < numSceneElements; idx++)
+        {
+            const UINT numNodesInScene = NumNodesInScene(idx);
+
+            for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+            {
+                const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(idx, nodeIdx);
+                for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
+                {
+                    func(idx, nodeIdx, primIdx);
+                }
             }
         }
     }
@@ -394,9 +393,9 @@ protected:
     virtual VOID LoadSceneDescription(std::vector< DxSceneElementInstance>& sceneDescription);
 
 
-    VOID CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource);
+    VOID CreateAppSrvDescriptorAtIndex(UINT linearPrimIdx, UINT offsetInPrim, ID3D12Resource* srvResource);
     VOID CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource);
-    VOID CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize);
+    VOID CreateAppBufferSrvDescriptorAtIndex(UINT linearPrimIdx, UINT offsetInPrim, ID3D12Resource* srvResource, UINT numElements, UINT elementSize);
 
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -413,9 +412,9 @@ protected:
 
     UINT CreateInputElementDesc(const std::vector<DxPrimVertexData>& inData, std::vector<D3D12_INPUT_ELEMENT_DESC>& outData);
 
-    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa()
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa(UINT index)
     {
-        return m_camLightsMaterialsManager->GetViewProjLightsGpuVa();
+        return m_camLightsMaterialsManager->GetViewProjLightsGpuVa(index);
     }
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetPerInstanceDataGpuVa(UINT linearIdx)
@@ -423,8 +422,13 @@ protected:
         return m_camLightsMaterialsManager->GetPerInstanceDataGpuVa(linearIdx);
     }
 
-private:
+    inline static  Dx12SampleBase* GetInstance()
+    {
+        return s_sampleBase;
+    }
 
+private:
+    friend class DxGfxDrawRenderObject;
     inline ID3D12CommandQueue* GetCommandQueue() { return m_pCmdQueue.Get(); }
 
     inline VOID SetNumTotalPrimitivesInScene(UINT numPrims, UINT sceneIdx)
@@ -468,10 +472,7 @@ private:
     VOID GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT height);
     HRESULT CreateFence();
 
-    ///@todo refactor this, maybe use single function
-    HRESULT CreateRenderTargetDescriptorHeap(UINT numDescriptors);
-    HRESULT CreateSrvUavCbvDescriptorHeap(UINT numDescriptors);
-    HRESULT CreateDepthStencilViewDescriptorHeap(UINT numDescriptors);
+
     VOID Imgui_CreateDescriptorHeap();
     UINT    GetBackBufferCount();
 
@@ -484,9 +485,6 @@ private:
     ComPtr<ID3D12CommandQueue> m_pComputeCmdQueue;
     ComPtr<IDXGISwapChain4>    m_swapChain4;
 
-    ComPtr<ID3D12DescriptorHeap>        m_rtvDescHeap;
-    ComPtr<ID3D12DescriptorHeap>        m_dsvDescHeap;
-    ComPtr<ID3D12DescriptorHeap>        m_srvUavCbvDescHeap;
     ComPtr<ID3D12CommandAllocator>      m_pCommandAllocator;
     ComPtr<ID3D12GraphicsCommandList>   m_pCmdList;
 
@@ -501,6 +499,7 @@ private:
     std::unique_ptr<DxCamera>	m_camera;
     std::unique_ptr<FileReader>	m_assetReader;
     std::unique_ptr<CameraLightsMaterialsBuffer> m_camLightsMaterialsManager;
+    std::unique_ptr<DxDescriptorHeapManager> m_descriptorHeapManager;
 
     FrameComposition    m_simpleComposition;
     ComputeGenerateMips m_computeGenerateMips;
@@ -513,7 +512,6 @@ private:
     HANDLE              m_fenceEvent;
     FLOAT               m_frameDeltaTime;
 
-    UINT m_srvUavCbvDescriptorSize;
     UINT m_samplerDescriptorSize;
     UINT m_rtvDescriptorSize;
     UINT m_dsvDescriptorSize;

@@ -13,7 +13,7 @@ class Dx12HelloMesh : public Dx12SampleBase
 {
 public:
 	Dx12HelloMesh(UINT width, UINT height);
-	virtual HRESULT RenderFrame() override;
+	virtual VOID RenderFrame() override;
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
@@ -29,6 +29,7 @@ protected:
 private:
 
 	VOID CreateMeshPSO();
+	VOID CreatePerPrimSRVs();
 
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
 	ComPtr<ID3D12Device6>              m_meshDevice;

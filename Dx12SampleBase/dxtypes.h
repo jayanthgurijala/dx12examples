@@ -63,22 +63,6 @@ struct DxDrawPrimitive
 	BOOL isIndexedDraw = FALSE;
 };
 
-enum DxAppFrameType
-{
-	DxFrameRTVIndex = 0,
-	DxFrameResource = 1,
-	DxFrameInvalid  = 2
-};
-
-struct DxAppFrameInfo
-{
-	UINT rtvIndex;
-	ID3D12Resource* pFrameResource;
-	D3D12_RESOURCE_STATES pResState;
-	DxAppFrameType type;
-};
-
-
 
 struct DxGltfBuffer
 {
@@ -216,13 +200,6 @@ struct DxMaterialResourceInfo
 
 	//@note Resource holds data for all the primitives and it is chunked per primitive
 	D3D12_GPU_VIRTUAL_ADDRESS meterialCb;
-
-	//Descriptor heap is organized as numSrvsPerPrim per Primitive in the order of scene elements loaded.
-	//e.g. 1) terrain_gridlines, 2) deer, 3) chinesedragon, 4) oaktree
-	//     [ 5 SRVs for (1) | 5 SRVs for (2) | 5 + 5 SRVs for (3) | 5 + 5 SRVs for oaktree ]
-	//     0                5                10                  20
-	//Base index is needed in scene load element as each loaded element can have N prims and M nodes
-	UINT descriptorHeapOffset;
 };
 
 enum MaterialFlags
@@ -253,17 +230,16 @@ struct DxPrimIndexData
 struct DxPrimitiveInfo
 {
 	DxDrawPrimitive               modelDrawPrimitive;
-								  
 	std::string                   name;
 	std::vector<DxPrimVertexData> vertexBufferInfo;
-	DxPrimIndexData			      indexBufferInfo;
-								  
-	ComPtr<ID3D12PipelineState>   pipelineState;
-	//CD3DX12_ROOT_PARAMETER        descriptorTable;
-								  
+	DxPrimIndexData			      indexBufferInfo;	  
+	ComPtr<ID3D12PipelineState>   pipelineState; 
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;
 	DxExtents                     meshExtents;
+
+	///@note this is required to index into descriptor heap
+	UINT                          primLinearIdxInSceneElements;
 };
 
 struct DxMeshInfo
@@ -343,9 +319,55 @@ public:
 	}
 };
 
+enum DxRangeTypeSrvUavCbv
+{
+	DxRangeTypeRtvAsSrv = 0,
+	DxRangeTypeDsvAsSrv,
+	DxRangeTypeUav,
+	DxRangeTypeUavAsSrv,
+	DxRangeTypePerPrimSrv,
+	DxRangeTypeMax
+};
+
+enum DxDescriptorType
+{
+	DxDescriptorTypeRtvSrv = 0,
+	DxDescriptorTypeDsvSrv = 1,
+	DxDescriptorTypeUavSrv = 2,
+	DxDescriptorTypeMax
+};
 
 
 
+struct DxResourceDescriptorInfo
+{
+	ID3D12Resource* pResource;
+	BOOL isActive;
+};
 
+struct DxDescriptorHeap
+{
+	ComPtr<ID3D12DescriptorHeap> descriptorHeap = nullptr;
+	UINT descriptorSize = 0;
+	UINT descriptorCount = 0;
+	std::vector<DxResourceDescriptorInfo> resourceDescInfo;
+};
 
+struct DxSrvUavCbvOffsetsInfo
+{
+	UINT srvForRtvStartOffset     = 0;
+	UINT srvForDsvStartOffset     = 0;
+	UINT uavStartOffset           = 0;
+	UINT srvForUavStartOffset     = 0;
+	UINT perPrimitiveSrvOffset    = 0;
+	UINT appSrvOffsetInPerPrimSrv = 0;
 
+	UINT numPerPrimSrvs           = 0;
+	UINT numSrvsForPbrPerPrim     = 5;
+};
+
+struct DxAppFrameInfo
+{
+	DxDescriptorType descriptorType;
+	UINT             heapOffset;
+};

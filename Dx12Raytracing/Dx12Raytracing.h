@@ -13,7 +13,7 @@ class Dx12Raytracing : public Dx12SampleBase
 {
 public:
 	Dx12Raytracing(UINT width, UINT height);
-	virtual HRESULT RenderFrame() override;
+	virtual VOID RenderFrame() override;
 
 	virtual HRESULT OnInit() override;
 
@@ -28,7 +28,7 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return { "oaktree.gltf" }; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
 
 private:
 	VOID BuildBlasAndTlas();

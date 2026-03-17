@@ -14,9 +14,13 @@ struct Vertex
     float3 position;
 };
 
-StructuredBuffer<uint> indexBuffer : register(t1);
-StructuredBuffer<Vertex> posVb : register(t2);
-StructuredBuffer<float2> uvVbBuffer : register(t3, space0);
+
+Texture2D gTexture : register(t0); //t0 to t4
+SamplerState gSampler : register(s0);
+
+StructuredBuffer<uint> indexBuffer : register(t5);
+StructuredBuffer<Vertex> posVb : register(t6);
+StructuredBuffer<float2> uvVbBuffer : register(t7, space0);
 
 static const float3 MeshColors[64] =
 {
@@ -179,11 +183,6 @@ void MSMain(uint3 gid       : SV_GroupID,
 
     }
 }
-
-
-
-Texture2D gTexture : register(t0);
-SamplerState gSampler : register(s0);
 
 float4 PSMain(VSOutput input) : SV_TARGET
 {

@@ -274,6 +274,43 @@ namespace dxhelper
 		info.alignedSize = dxhelper::DxAlign(sizeof(T), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	}
 
+	template<typename HandleType>
+	inline VOID	OffsetHandle(HandleType& handle, UINT index, UINT descriptorSize)
+	{
+		assert(descriptorSize != 0);
+		handle.Offset(index, descriptorSize);
+	}
+
+	inline ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(ID3D12Device* pDevice, UINT numTotalDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE descHeapType)
+	{
+		ComPtr<ID3D12DescriptorHeap> outDescriptorHeap;
+		D3D12_DESCRIPTOR_HEAP_FLAGS flags = (descHeapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+		descHeapDesc.NumDescriptors = numTotalDescriptors;
+		descHeapDesc.Type           = descHeapType;
+		descHeapDesc.Flags          = flags;
+
+		pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&outDescriptorHeap));
+		return outDescriptorHeap;
+	}
+
+	inline D3D12_RESOURCE_STATES ResourceStateFromType(DxDescriptorType descriptorType)
+	{
+		if (descriptorType == DxDescriptorTypeRtvSrv)
+		{
+			return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		}
+		else if (descriptorType == DxDescriptorTypeUavSrv)
+		{
+			return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+		}
+		else if (descriptorType == DxDescriptorTypeDsvSrv)
+		{
+			return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		}
+	}
+
 }
 
 

@@ -13,7 +13,7 @@ class Dx12Tessellation : public Dx12SampleBase
 {
 public:
 	Dx12Tessellation(UINT width, UINT height);
-	virtual HRESULT RenderFrameGfxDraw() override;
+	virtual VOID RenderFrameGfxDraw() override;
 
 protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
@@ -25,7 +25,7 @@ protected:
 
 	virtual inline UINT NumRootConstantsForApp() override { return 1; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
-	virtual inline HRESULT RenderFrame() override { return RenderFrameGfxDraw(); }
+	virtual inline VOID RenderFrame() override { RenderFrameGfxDraw(); }
 
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;

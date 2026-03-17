@@ -14,6 +14,11 @@
 Dx12HelloForest::Dx12HelloForest(UINT width, UINT height) :
 	Dx12SampleBase(width, height)
 {
+	m_finalDraw = std::make_unique<DxGfxDrawRenderObject>(0, 1, 0, TRUE, 0);
+	m_shadowPass = std::make_unique<DxGfxDrawRenderObject>(0, 1, 1, TRUE, 1);
+
+	m_numRTVs = m_finalDraw->NumRTVs() + m_shadowPass->NumRTVs();
+	m_numDSVs = m_finalDraw->NumDSVs() + m_shadowPass->NumDSVs();
 }
 
 HRESULT Dx12HelloForest::OnInit()
@@ -48,54 +53,20 @@ HRESULT Dx12HelloForest::OnInit()
 	return S_OK;
 }
 
-HRESULT Dx12HelloForest::RenderFrameGfxDraw()
+VOID Dx12HelloForest::RenderFrameGfxDraw()
 {
-	ImGui::Text("Hello World");
+	ImGui::Text("Hello Forest");
 
-	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
-	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());
-	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
-	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	RenderGfxDrawInit(m_pRootSignature.Get(), 0);
 
+	m_shadowPass->RenderInitViewProjRtvDsv();
+	m_shadowPass->Render();
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(0, FALSE);
-	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHeapHandle(0);
-	pCmdList->OMSetRenderTargets(1,
-		&rtvHandle,
-		FALSE,                   //RTsSingleHandleToDescriptorRange
-		&dsvHandle);
-	pCmdList->ClearRenderTargetView(rtvHandle,
-		RenderTargetClearColor().data(),
-		0,
-		nullptr);
-	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	m_finalDraw->RenderInitViewProjRtvDsv();
+	m_finalDraw->Render();
 
-	
-
-	ProcessSceneInstancesNodesPrims([this, pCmdList](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
-	{
-			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
-			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
-
-			//World matrix
-			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
-
-			//SRVs
-			pCmdList->SetGraphicsRootDescriptorTable(2, GetAppSrvGpuHandle(curPrimitive.materialTextures.descriptorHeapOffset));
-
-			//Material props
-			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
-
-			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
-	});
-
-
-	SetFrameInfo(nullptr, 0);
-
-	return S_OK;
+	//final composition, SRV is create on the RTV resource
+	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
 }
 
 

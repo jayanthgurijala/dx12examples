@@ -30,10 +30,6 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_fenceValue(0),
 	m_fenceEvent(0),
 	m_frameDeltaTime(0),
-	m_dsvDescHeap(nullptr),
-	m_srvUavCbvDescHeap(nullptr),
-	m_rtvDescHeap(nullptr),
-	m_srvUavCbvDescriptorSize(0),
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
@@ -41,13 +37,15 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_sceneElements({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
-	m_gltfLoader(nullptr)
+	m_gltfLoader(nullptr),
+	m_descriptorHeapManager(nullptr)
 {
 	s_sampleBase = this;
 
-	m_camera    = std::make_unique<DxCamera>(width, height);
-    m_camera->Initialize();
+	
 	m_camLightsMaterialsManager = std::make_unique<CameraLightsMaterialsBuffer>();
+	m_camera = std::make_unique<DxCamera>(width, height);
+	m_camera->Initialize();
 }
 
 Dx12SampleBase::~Dx12SampleBase()
@@ -257,7 +255,6 @@ HRESULT Dx12SampleBase::CreateDevice()
 		IID_PPV_ARGS(&m_pDevice)
 	);
 
-	m_srvUavCbvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	m_samplerDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 	m_dsvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	m_rtvDescriptorSize = m_pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -365,80 +362,29 @@ HRESULT Dx12SampleBase::CreateFence()
 	return S_OK;
 }
 
-HRESULT Dx12SampleBase::CreateRenderTargetDescriptorHeap(UINT numDescriptors)
+
+VOID Dx12SampleBase::CreateRenderTargetViews()
 {
-	HRESULT result = S_OK;
 
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.NumDescriptors = numDescriptors;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	///@note ORDERING is very important!
+	///      RTV Desc heap Layout: [App Specific RTVs | Swap Chain RTVs]
 
-	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_rtvDescHeap));
-
-	return result;
-}
-
-HRESULT Dx12SampleBase::CreateSrvUavCbvDescriptorHeap(UINT numDescriptors)
-{
-	HRESULT result = S_OK;
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.NumDescriptors = numDescriptors;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_srvUavCbvDescHeap));
-	return result;
-}
-
-HRESULT Dx12SampleBase::CreateDepthStencilViewDescriptorHeap(UINT numDescriptors)
-{
-	HRESULT result = S_OK;
-
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	descHeapDesc.NumDescriptors = numDescriptors;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-	result = m_pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_dsvDescHeap));
-
-	return result;
-}
-
-HRESULT Dx12SampleBase::CreateRenderTargetViews(UINT numRTVs, BOOL isInternal)
-{
-	HRESULT    result = S_OK;
-	const UINT start = (isInternal == TRUE) ? 0 : GetBackBufferCount();
-	UINT	   rtvOffset = 0;
-
-	for (UINT i = start; i < start + numRTVs; i++)
+	const UINT numRTVsForApp = m_rtvResources.size();
+	assert(numRTVsForApp == NumRTVsNeededForApp());
+	assert(m_descriptorHeapManager != nullptr);
+	
+	for (UINT idx = 0; idx < numRTVsForApp; idx++)
 	{
-		auto rtvHandle = GetRtvCpuHeapHandle(start + rtvOffset);
-		ID3D12Resource* rtvResource = nullptr;
-		if (isInternal)
-		{
-			rtvResource = m_swapChainBuffers[i].Get();
-		}
-		else
-		{
-			///@note RTV heap layout is swapchain RT vews first, then app specific RTVs
-			rtvResource = m_rtvResources[i - start].Get();
-		}
-
-		m_pDevice->CreateRenderTargetView(rtvResource, nullptr, rtvHandle);
-		rtvOffset++;
-
+		m_descriptorHeapManager->CreateRtvDescriptor(idx, nullptr, m_rtvResources[idx].Get(), TRUE, TRUE);
 	}
 
-	return result;
+	const UINT numBackBuffers = m_swapChainBuffers.size();
+	for (UINT idx = 0; idx < numBackBuffers; idx++)
+	{
+		m_descriptorHeapManager->CreateRtvDescriptor(numRTVsForApp + idx, nullptr, m_swapChainBuffers[idx].Get(), TRUE, FALSE);
+	}
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE Dx12SampleBase::GetRenderTargetView(UINT rtvIndex, BOOL isInternal)
-{
-	const UINT rtvOffset = (isInternal == TRUE) ? 0 : GetBackBufferCount();
-	auto rtvHandle = GetRtvCpuHeapHandle(rtvIndex + rtvOffset);
-
-	return rtvHandle;
-}
 
 HRESULT Dx12SampleBase::CreateCommandList()
 {
@@ -466,49 +412,52 @@ HRESULT Dx12SampleBase::CreateCommandList()
 	return result;
 }
 
-HRESULT Dx12SampleBase::CreateDsvResources(UINT numResources, BOOL createViews)
+VOID Dx12SampleBase::CreateDsvResourcesAndViews()
 {
 	HRESULT result = S_OK;
+	const UINT numDSVsForApp = NumDSVsNeededForApp();
 
 	m_dsvResources.clear();
-	m_dsvResources.resize(numResources);
+	m_dsvResources.resize(numDSVsForApp);
 
-	DXGI_FORMAT depthFormat = GetDepthStencilFormat();
+	const DXGI_FORMAT dsvResFormat = GetDepthStencilResourceFormat();
 
-	D3D12_CLEAR_VALUE clearValue = {};
-	clearValue.Format = depthFormat;
-	clearValue.DepthStencil.Depth = 1.0f;
-	clearValue.DepthStencil.Stencil = 0;
-
-	for (UINT i = 0; i < numResources; i++)
+	for (UINT i = 0; i < numDSVsForApp; i++)
 	{
 		dxhelper::AllocateTexture2DResource(m_pDevice.Get(),
 			                                &m_dsvResources[i],
 			                                m_width,
 			                                m_height,
-			                                depthFormat,
+			                                dsvResFormat,
 			                                L"SampleBaseDepthResN",
 			                                D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			                                &clearValue,
+			                                nullptr,
 			                                D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
-		if (createViews == TRUE)
-		{
-			assert(m_dsvDescHeap != nullptr && m_dsvDescHeap->GetDesc().NumDescriptors == numResources);
-			auto dsvHeapHandle = GetDsvCpuHeapHandle(i);
-			m_pDevice->CreateDepthStencilView(m_dsvResources[i].Get(), nullptr, dsvHeapHandle);
-		}
-	}
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+		dsvDesc.Format                        = DXGI_FORMAT_D32_FLOAT;
+		dsvDesc.ViewDimension                 = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.Flags                         = D3D12_DSV_FLAG_NONE;
 
-	return result;
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format                          = DXGI_FORMAT_R32_FLOAT;
+		srvDesc.ViewDimension                   = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Shader4ComponentMapping         = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+		srvDesc.Texture2D.MipLevels       = 1;
+		srvDesc.Texture2D.MostDetailedMip = 0;
+
+		m_descriptorHeapManager->CreateDsvDescriptor(i, &dsvDesc, &srvDesc, m_dsvResources[i].Get(), TRUE);
+	}
 }
 
 
-HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
+VOID Dx12SampleBase::CreateRenderTargetResources()
 {
-	HRESULT result = S_OK;
+
+	const UINT numRTVsForApp = NumRTVsNeededForApp();
 
 	m_rtvResources.clear();
-	m_rtvResources.resize(numResources);
+	m_rtvResources.resize(numRTVsForApp);
 
 	FLOAT* clearColor4 = RenderTargetClearColor().data();
 
@@ -522,7 +471,7 @@ HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
 
 	auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-	for (UINT i = 0; i < numResources; i++)
+	for (UINT i = 0; i < numRTVsForApp; i++)
 	{
 		
 		dxhelper::AllocateTexture2DResource(m_pDevice.Get(),
@@ -534,19 +483,6 @@ HRESULT Dx12SampleBase::CreateRenderTargetResources(UINT numResources)
 			                                D3D12_RESOURCE_STATE_RENDER_TARGET,
 			                                &clearValue,
 			                                D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
-	}
-
-	return result;
-}
-
-VOID Dx12SampleBase::CreateRenderTargetSRVs(UINT numSrvs)
-{
-	for (UINT i = 0; i < numSrvs; i++)
-	{
-		auto srvHandle = GetSrvUavCBvCpuHeapHandle(i);
-		m_pDevice->CreateShaderResourceView(m_rtvResources[i].Get(),
-			nullptr,
-			srvHandle);
 	}
 }
 
@@ -580,48 +516,32 @@ VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& s
 	}
 }
 
-/*
-*
-* SRV Heap Layout is
-*
-* 1. N SRV descriptors for RTV composition NumRTVsNeededForApp()
-*		- These are created when app creates RTV resources CreateRenderTargetResourceAndSRVs
-*
-* 2. M SRV descriptors requested by application NumSRVsNeededForApp()
-* 3. P UAV descriptors
-*
-*/
-VOID Dx12SampleBase::CreateAppSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource)
+
+VOID Dx12SampleBase::CreateAppSrvDescriptorAtIndex(UINT linearPrimIdx, UINT offsetInPrim, ID3D12Resource* srvResource)
 {
 	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
 	desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	desc.Texture2D.MipLevels = 1;
+	desc.Texture2D.MipLevels = 0;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC* descPtr = nullptr;
 	if (srvResource == nullptr)
 	{
 		descPtr = &desc;
 	}
-	//@todo common code refactor. Had bit me once
-	const UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();	//see comment above
-	auto srvHandle = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+	auto srvHandle = m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(linearPrimIdx, offsetInPrim);
 	m_pDevice->CreateShaderResourceView(srvResource, descPtr, srvHandle);
-
 }
 
 VOID Dx12SampleBase::CreateAppUavDescriptorAtIndex(UINT appUavIndex, ID3D12Resource* uavResource)
 {
-	const UINT uavStartIndexInDescriptorHeap = NumRTVsNeededForApp();
-	auto uavHandle = GetSrvUavCBvCpuHeapHandle(uavStartIndexInDescriptorHeap + appUavIndex);
-	m_pDevice->CreateUnorderedAccessView(uavResource, nullptr, nullptr, uavHandle);
+	m_descriptorHeapManager->CreateUavDescriptor(appUavIndex, nullptr, uavResource, nullptr, TRUE);
 }
 
-VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D12Resource* srvResource, UINT numElements, UINT elementSize)
+VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT linearPrimIdx, UINT offsetInPrim, ID3D12Resource* srvResource, UINT numElements, UINT elementSize)
 {
-	const UINT appSrvStartIndex = NumRTVsNeededForApp() + NumUAVsNeededForApp();
-	auto srvHandle              = GetSrvUavCBvCpuHeapHandle(appSrvStartIndex + appSrvIndex);
+	auto srvHandle = m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(linearPrimIdx, offsetInPrim);
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	if (elementSize == 0)
@@ -643,8 +563,6 @@ VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT appSrvIndex, ID3D1
 	
 	m_pDevice->CreateShaderResourceView(srvResource, &srvDesc, srvHandle);
 }
-
-//VOID Dx12SampleBase::Create
 
 ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
 																		   const std::string& pixelShaderName,
@@ -684,7 +602,7 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	pipelineStateDesc.NumRenderTargets = 1;
 	pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
-	pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilFormat() : DXGI_FORMAT_UNKNOWN;
+	pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilDsvFormat() : DXGI_FORMAT_UNKNOWN;
 	
 	///@todo experiment with flags
 	pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
@@ -788,11 +706,10 @@ VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT h
 
 	ComPtr<ID3D12DescriptorHeap> csMipHeap;
 	m_pDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&csMipHeap));
+	const UINT handleIncrement = m_pDevice->GetDescriptorHandleIncrementSize(heapDesc.Type);
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE cpuDescHandleBase(csMipHeap->GetCPUDescriptorHandleForHeapStart());
 	CD3DX12_GPU_DESCRIPTOR_HANDLE gpuDescHandleBase(csMipHeap->GetGPUDescriptorHandleForHeapStart());
-
-	const UINT heapIncrementSize = m_srvUavCbvDescriptorSize;
 
 	for (UINT mipLevel = 1; mipLevel < numMipLevels; mipLevel++)
 	{
@@ -801,11 +718,11 @@ VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT h
 		assert(tex2D->GetDesc().Format == DXGI_FORMAT_R8G8B8A8_UNORM || tex2D->GetDesc().Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
 		CD3DX12_UNORDERED_ACCESS_VIEW_DESC uavMip = CD3DX12_UNORDERED_ACCESS_VIEW_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, mipLevel);
 
-
+	
 		m_pDevice->CreateShaderResourceView(tex2D, &srvMip, cpuDescHandleBase);
-		cpuDescHandleBase.Offset(1, m_srvUavCbvDescriptorSize);
+		cpuDescHandleBase.Offset(1, handleIncrement);
 		m_pDevice->CreateUnorderedAccessView(tex2D, nullptr, &uavMip, cpuDescHandleBase);
-		cpuDescHandleBase.Offset(1, m_srvUavCbvDescriptorSize);
+		cpuDescHandleBase.Offset(1, handleIncrement);
 	}
 
 	UINT mipLevelWidth = width;
@@ -837,7 +754,7 @@ VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT h
 		m_pComputeCommandList->SetComputeRoot32BitConstants(1, 1, &mipLevelWidth, 0);
 		m_pComputeCommandList->SetComputeRoot32BitConstants(1, 1, &mipLevelWidth, 1);
 		m_pComputeCommandList->Dispatch(dispatchX, dispatchY, 1);
-		gpuDescHandleBase.Offset(2, m_srvUavCbvDescriptorSize);
+		gpuDescHandleBase.Offset(2, handleIncrement);
 
 		// After dispatch for a mip level
 		CD3DX12_RESOURCE_BARRIER uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
@@ -1063,7 +980,7 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 {
 	HRESULT result = S_OK;
 
-	m_appFrameInfo.type = DxFrameInvalid;
+	m_appFrameInfo.heapOffset = UINT_MAX;
 
 	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
@@ -1092,10 +1009,10 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
-	result = RenderFrame();
+	RenderFrame();
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
-	assert(m_appFrameInfo.type != DxFrameInvalid);
+	assert(m_appFrameInfo.heapOffset != UINT_MAX);
 
 	ImGui::End();
 	RenderRtvContentsOnScreen();
@@ -1103,17 +1020,64 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	return result;
 }
 
+VOID Dx12SampleBase::RenderFrameGfxDraw()
+{
+	//Needs to be overridden always
+	//1. Call RenderGfxDrawInit
+	assert(0);
+}
+
+VOID Dx12SampleBase::RenderGfxDrawInit(ID3D12RootSignature* rootSignature, UINT viewProjIndex)
+{
+	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_pCmdList->SetGraphicsRootSignature(rootSignature);
+	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
+	m_pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
+}
+
+VOID Dx12SampleBase::RenderSceneGfxDraw()
+{
+	ProcessSceneInstancesNodesPrims([this](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
+		{
+			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
+			auto  srvGpuHandle = m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(curPrimitive.primLinearIdxInSceneElements, 0);
+			m_pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+
+			//World matrix
+			m_pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
+
+			//SRVs
+			m_pCmdList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
+
+			//Material props
+			m_pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
+
+			RenderModel(m_pCmdList.Get(), sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+		});
+}
+
+///@note 
 HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 {
+	
 	HRESULT result = S_OK;
 	FLOAT clearColor[4] = { 0.4f, 0.4f, 0.8f, 1.0f };
 
 	const UINT      currentFrameIndex = m_swapChain4->GetCurrentBackBufferIndex();
 	ID3D12Resource* pCurrentBackBuffer = m_swapChainBuffers[currentFrameIndex].Get();
-	ID3D12Resource* pFrameResource = (m_appFrameInfo.type == DxAppFrameType::DxFrameResource) ? m_appFrameInfo.pFrameResource : 
-																	m_rtvResources[m_appFrameInfo.rtvIndex].Get();
 
-	m_pDevice->CreateShaderResourceView(pFrameResource, nullptr, GetSrvUavCBvCpuHeapHandle(0));
+	assert(m_appFrameInfo.heapOffset != UINT_MAX);
+	
+	ID3D12Resource* pFrameResource = m_descriptorHeapManager->GetResourceForDescriptorTypeInOffset(
+		m_appFrameInfo.descriptorType,
+		m_appFrameInfo.heapOffset);
+
+	D3D12_RESOURCE_STATES initialState = dxhelper::ResourceStateFromType(m_appFrameInfo.descriptorType);
+	auto srvGpuHandle = m_descriptorHeapManager->GetSrvHandleForDescriptor(m_appFrameInfo.descriptorType, m_appFrameInfo.heapOffset);
+
+	assert(pFrameResource != nullptr);
+
 
 	D3D12_RESOURCE_BARRIER preResourceBarriers[2];
 
@@ -1121,13 +1085,15 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 	preResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
-		m_appFrameInfo.pResState,
+		initialState,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-
 
 	m_pCmdList->ResourceBarrier(2, preResourceBarriers);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRenderTargetView(currentFrameIndex, TRUE);
+	///@todo refactor
+	const UINT numRTVsForApp = NumRTVsNeededForApp();
+	auto       rtvHandle = m_descriptorHeapManager->GetRtvHeapHandle<CD3DX12_CPU_DESCRIPTOR_HANDLE>(numRTVsForApp + currentFrameIndex);
+	
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 
 	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
@@ -1140,7 +1106,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 	m_pCmdList->SetPipelineState(m_simpleComposition.pipelineState.Get());
 	m_pCmdList->SetGraphicsRootSignature(m_simpleComposition.rootSignature.Get());
 	m_pCmdList->SetDescriptorHeaps(1, descHeaps);
-	m_pCmdList->SetGraphicsRootDescriptorTable(0, GetSrvGpuHeapHandle(0));
+	m_pCmdList->SetGraphicsRootDescriptorTable(0, srvGpuHandle);
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pCmdList->DrawInstanced(3, 1, 0, 0);
@@ -1161,7 +1127,7 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 		D3D12_RESOURCE_STATE_PRESENT);
 	postResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
 		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		m_appFrameInfo.pResState);
+		initialState);
 	m_pCmdList->ResourceBarrier(2, postResourceBarriers);
 	m_pCmdList->Close();
 
@@ -1188,8 +1154,10 @@ HRESULT Dx12SampleBase::Initialize()
 
 	InitlializeDeviceCmdQueueAndCmdList();
 	LoadGltfFiles();
-	InitializeRtvDsvDescHeaps();
-	InitializeSrvCbvUavDescHeaps();
+
+	InitializeDescriptorHeapManagerResourcesAndDescriptors();
+
+
 	LoadSceneMaterialInfo();
 
 	LoadSceneDescription(m_sceneDescription);
@@ -1217,28 +1185,14 @@ VOID Dx12SampleBase::InitlializeDeviceCmdQueueAndCmdList()
 	InitializeMipGenerationPipeline();
 }
 
-VOID Dx12SampleBase::InitializeRtvDsvDescHeaps()
-{
-	const UINT numRTVsForComposition = GetBackBufferCount();
-	const UINT numRTVsForApp         = NumRTVsNeededForApp();
-
-	CreateRenderTargetResources(numRTVsForApp);
-	CreateRenderTargetDescriptorHeap(numRTVsForComposition + numRTVsForApp);
-
-	const UINT numDSVsForApp = NumDSVsNeededForApp();
-	CreateDepthStencilViewDescriptorHeap(numDSVsForApp);
-	CreateDsvResources(numDSVsForApp);
-
-
-	CreateRenderTargetViews(numRTVsForComposition, TRUE);
-	CreateRenderTargetViews(numRTVsForApp, FALSE);
-}
-
-VOID Dx12SampleBase::InitializeSrvCbvUavDescHeaps()
+VOID Dx12SampleBase::InitializeDescriptorHeapManagerResourcesAndDescriptors()
 {
 	
 	const UINT numUAVsForApp = NumUAVsNeededForApp();
-	const UINT numRTVsForApp = NumRTVsNeededForApp();
+	const UINT numRTVs = NumRTVsNeededForApp() + GetBackBufferCount();
+	const UINT numDSvsForApp = NumDSVsNeededForApp();
+
+	//@todo store this on scene elements load?
 	UINT numSRVsForApp = 0;
 	const UINT numSceneElements = NumSceneElementsLoaded();
 	for (UINT idx = 0; idx < numSceneElements; idx++)
@@ -1247,9 +1201,17 @@ VOID Dx12SampleBase::InitializeSrvCbvUavDescHeaps()
 		numSRVsForApp += numSRVsForAppInSceneElement;
 	}
 
-	//@note numRTVsForApp is for creating SRVs for the RTVs.
-	CreateSrvUavCbvDescriptorHeap(numRTVsForApp + numSRVsForApp + numUAVsForApp);
-	CreateRenderTargetSRVs(numRTVsForApp);
+	m_descriptorHeapManager = std::make_unique<DxDescriptorHeapManager>(m_pDevice.Get(),
+		                                                                numRTVs,
+		                                                                numDSvsForApp,
+		                                                                numUAVsForApp,
+		                                                                numSRVsForApp,
+		                                                                NumSRVsPerPrimitive());
+
+	CreateRenderTargetResources();
+	CreateDsvResourcesAndViews();
+	CreateRenderTargetViews();
+	
 }
 
 VOID Dx12SampleBase::InitializeImgui()
@@ -1346,77 +1308,37 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 {
 	HRESULT result = S_OK;
 
-	ForEachSceneNode([this](UINT sceneIdx, UINT nodeIdx)
+	ForEachSceneElementLoadedSceneNodePrim([this](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 	{
-			const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
-			for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
-			{
-				auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
-				ID3D12RootSignature* pRootSignature = GetRootSignature();
 
-				assert(GetRootSignature() != nullptr);
+		auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+		ID3D12RootSignature* pRootSignature = GetRootSignature();
 
-				std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
-				const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
-				assert(numAttributes == modelIaSemantics.size());
+		assert(GetRootSignature() != nullptr);
 
-				char vertexShaderName[64];
-				char pixelShaderName[64];
-				GetVertexShaderName(vertexShaderName, numAttributes);
-				GetPixelShaderName(pixelShaderName, numAttributes);
+		std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
+		const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
+		assert(numAttributes == modelIaSemantics.size());
 
-				D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes, };
+		char vertexShaderName[64];
+		char pixelShaderName[64];
+		GetVertexShaderName(vertexShaderName, numAttributes);
+		GetPixelShaderName(pixelShaderName, numAttributes);
 
-				const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
-				const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes, };
 
-				curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
-					pixelShaderName,
-					pRootSignature,
-					inputLayoutDesc,
-					FALSE,                  //wireframe
-					doubleSied,				//doubleSided
-					TRUE,				    //depth enable?
-					blendEnabled);
-			}
+		const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
+		const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+
+		curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
+			pixelShaderName,
+			pRootSignature,
+			inputLayoutDesc,
+			FALSE,                  //wireframe
+			doubleSied,				//doubleSided
+			TRUE,				    //depth enable?
+			blendEnabled);
 	});
-
-
-	//const UINT numNodesInScene = NumNodesInScene(0);
-	//for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
-	//{
-	//	const UINT numPrimitivesInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
-	//	for (UINT primIdx = 0; primIdx < numPrimitivesInNodeMesh; primIdx++)
-	//	{
-	//		auto& curPrimitive = GetPrimitiveInfo(0, nodeIdx, primIdx);
-	//		ID3D12RootSignature* pRootSignature = GetRootSignature();
-	//
-	//		assert(GetRootSignature() != nullptr);
-	//
-	//		std::vector<D3D12_INPUT_ELEMENT_DESC> modelIaSemantics;
-	//		const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
-	//		assert(numAttributes == modelIaSemantics.size());
-	//		
-	//		char vertexShaderName[64];
-	//		char pixelShaderName[64];
-	//		GetVertexShaderName(vertexShaderName, numAttributes);
-	//		GetPixelShaderName(pixelShaderName, numAttributes);
-	//
-	//		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes,  };
-	//
-	//		const BOOL doubleSied   = ((curPrimitive.materialCbData.flags & DoubleSided)    == 0) ? FALSE : TRUE;
-    //        const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
-	//
-	//		curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
-	//			                                                        pixelShaderName,
-	//			                                                        pRootSignature,
-	//			                                                        inputLayoutDesc,
-	//																	FALSE,                  //wireframe
-	//																    doubleSied,				//doubleSided
-	//																    TRUE,				    //depth enable?
-	//			                                                         blendEnabled);				    
-	//	}
-	//}
 	
 	return result;
 }
@@ -1480,7 +1402,7 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	const UINT alignedMaterialSize = dxhelper::DxAlign(materialSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
 	UINT totalPrimitivesInScene    = 0;
 
-	ForEachSceneNode([&totalPrimitivesInScene, this](UINT sceneIdx, UINT nodeIdx)
+	ForEachSceneElementLoadedSceneNode([&totalPrimitivesInScene, this](UINT sceneIdx, UINT nodeIdx)
 	{
 			totalPrimitivesInScene += NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
 	});
@@ -1508,10 +1430,8 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		DxPrimitiveInfo* lastPrim = nullptr;
 		UINT absolutePrimIndex = 0;
 		D3D12_GPU_VIRTUAL_ADDRESS lastAddressWritten = 0;
-		ForEachSceneNode([this, baseGpuVa, alignedMaterialSize, alignedTotalMaterialBufferSize, &firstPrim, &lastPrim, &absolutePrimIndex, &lastAddressWritten](UINT sceneIdx, UINT nodeIdx)
+		ForEachSceneElementLoadedSceneNodePrim([this, baseGpuVa, alignedMaterialSize, alignedTotalMaterialBufferSize, &firstPrim, &lastPrim, &absolutePrimIndex, &lastAddressWritten](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 		{
-			const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
-			for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 			{
 				auto& prim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
 				BYTE* pWritePtr = pMappedBytePtr + absolutePrimIndex * alignedMaterialSize;
@@ -1527,8 +1447,6 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 				absolutePrimIndex++;
 
 			}
-
-			
 		});
 
 		assert(firstPrim != nullptr && firstPrim->materialTextures.meterialCb == baseGpuVa);
@@ -1571,6 +1489,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 	m_sceneElements.clear();
 	m_sceneElements.resize(numgltfFiles);
 
+	UINT globalPrimitiveIndex = 0;
 	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
 		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx]);
@@ -1612,8 +1531,10 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 					currentPrim.vertexBufferInfo.clear();
 
-					currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
-					currentPrim.meshExtents        = gltfPrimInfo.extents;
+					currentPrim.modelDrawPrimitive           = gltfPrimInfo.drawInfo;
+					currentPrim.meshExtents                  = gltfPrimInfo.extents;
+					currentPrim.primLinearIdxInSceneElements = globalPrimitiveIndex;
+					globalPrimitiveIndex++;
 
 					///@Fill in vertex buffer info for each vertex buffer view in the primitive.
 					{
@@ -1783,20 +1704,18 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 {
     UINT primitiveIndex = 0;
 
-	ForEachSceneNode([this, &primitiveIndex](UINT sceneIdx, UINT nodeIdx)
+	ForEachSceneElementLoadedSceneNodePrim([this, &primitiveIndex](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 	{
-		const UINT numPrims = NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
-		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
 			auto& currentPrim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
-			UINT appDescriptorStartIndex = primitiveIndex * NumSRVsPerPrimitive();
-			primTextureInfo.descriptorHeapOffset = appDescriptorStartIndex;
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 1, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());	//t1
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 2, primTextureInfo.normalTexture.textureInfo.Get());			    //t2
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 3, primTextureInfo.occlusionTexture.textureInfo.Get());				//t3	
-			CreateAppSrvDescriptorAtIndex(appDescriptorStartIndex + 4, primTextureInfo.emissiveTexture.textureInfo.Get());				//t4
+
+			CreateAppSrvDescriptorAtIndex(primitiveIndex, 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
+			CreateAppSrvDescriptorAtIndex(primitiveIndex, 1, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());	//t1
+			CreateAppSrvDescriptorAtIndex(primitiveIndex, 2, primTextureInfo.normalTexture.textureInfo.Get());			    //t2
+			CreateAppSrvDescriptorAtIndex(primitiveIndex, 3, primTextureInfo.occlusionTexture.textureInfo.Get());				//t3	
+			CreateAppSrvDescriptorAtIndex(primitiveIndex, 4, primTextureInfo.emissiveTexture.textureInfo.Get());				//t4
+
 			primitiveIndex++;
 		}
 	});

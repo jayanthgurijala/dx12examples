@@ -226,44 +226,33 @@ VOID Dx12Raytracing::CreateRtPSO()
 
 	assert(m_localRootSignature != nullptr);
 
+	const UINT numTotalSrvsPerPrim = NumSRVsPerPrimitive();
+	const UINT appSrvOffset = AppSrvOffsetForPrim();
 	///create the extra two SRV descriptors for raytracing
-	const UINT numNodesInScene = NumNodesInScene(0);
-	UINT totalPrimIdx = 0;
-	for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
-	{
-		const UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(0, nodeIdx);
-		for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
+	ForEachSceneElementLoadedSceneNodePrim([this, appSrvOffset](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 		{
-			const UINT numTotalSrvsPerPrim = NumSRVsPerPrimitive();
-			const UINT primSrvDescriptorBase = numTotalSrvsPerPrim * totalPrimIdx;
-			const UINT appSrvOffset          = AppSrvOffsetForPrim();
-			const UINT appSrvOffsetForPrim = primSrvDescriptorBase + appSrvOffset;
-			assert(appSrvOffsetForPrim >= 0);
-
-			auto uvVbBufferRes = GetModelUvVertexBufferResource(0, nodeIdx, primIdx, 0);
-			auto uvVbView      = GetModelUvBufferView(0, nodeIdx, primIdx, 0);
+			auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+			auto uvVbBufferRes = GetModelUvVertexBufferResource(sceneIdx, nodeIdx, primIdx, 0);
+			auto uvVbView = GetModelUvBufferView(0, nodeIdx, primIdx, 0);
 
 			const UINT uvVbElementSizeInBytes = 8;
 			const UINT uvVbNumElements = uvVbView.SizeInBytes / 8;
-			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 0, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
 
-			auto posVbBufferRes = GetModelPositionVertexBufferResource(0,nodeIdx, primIdx);
-			auto posVbView      = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
+			auto posVbBufferRes = GetModelPositionVertexBufferResource(0, nodeIdx, primIdx);
+			auto posVbView = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
 			const UINT posVbElementSizeInBytes = 12;
 			const UINT numPosElements = posVbView.SizeInBytes / 12;
-			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
+			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
 
 			auto indexBufferRes = GetModelIndexBufferResource(0, nodeIdx, primIdx);
 			auto indexBufferView = GetModelIndexBufferView(0, nodeIdx, primIdx);
 
 			const UINT ibElementSizeInBytes = 4;
 			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
-			CreateAppBufferSrvDescriptorAtIndex(appSrvOffsetForPrim + 2, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 2, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+		});
 
-
-			totalPrimIdx++;
-		}
-	}
 
     m_rootCbvIndex          = 0;
     m_descTableIndex        = 1;
@@ -431,7 +420,7 @@ VOID Dx12Raytracing::BuildShaderTables()
 				auto& curPrimitive    = GetPrimitiveInfo(0, nodeIdx, primIdx);
 				BOOL needsAnyHit      = IsPrimitiveTransparent(0, nodeIdx, primIdx);
 				auto gpuVAMaterialsCB = curPrimitive.materialTextures.meterialCb;
-				auto gpuVAMatTex      = GetAppSrvGpuHandle(totalPrimIdx * numSrvsPerPrim);
+				auto gpuVAMatTex      = GetPerPrimSrvGpuHandle(curPrimitive.primLinearIdxInSceneElements);
 				void* curHitGroupID   = (needsAnyHit == TRUE) ? hitgroupMaskID : hitgroupOpaqueID;
 
 				memcpy(sbtDataWritePtr, curHitGroupID, hitGroupTableSize);
@@ -484,7 +473,7 @@ VOID Dx12Raytracing::CreateUAVOutput()
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
-HRESULT Dx12Raytracing::RenderFrame()
+VOID Dx12Raytracing::RenderFrame()
 {
 	static BOOL vbIbTransitioned = FALSE;
 
@@ -495,7 +484,7 @@ HRESULT Dx12Raytracing::RenderFrame()
 
 	ImGui::Text("Ray Tracing");
 
-	SetFrameInfo(m_uavOutputResource.Get(), UINT_MAX, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	SetFrameInfo(0, DxDescriptorTypeUavSrv);
 
 	//if (vbIbTransitioned == FALSE)
 	{
@@ -527,9 +516,9 @@ HRESULT Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
-	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjLightsGpuVa());
+	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjLightsGpuVa(0)); //GetUavGpuHandle
 	m_dxrCommandList->SetComputeRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
-	m_dxrCommandList->SetComputeRootDescriptorTable(2, GetAppUavGpuHandle(0));
+	m_dxrCommandList->SetComputeRootDescriptorTable(2, GetUavGpuHandle(0));
 	m_dxrCommandList->SetComputeRootShaderResourceView(3, m_tlasResultBuffer->GetGPUVirtualAddress());
 
 
@@ -550,8 +539,6 @@ HRESULT Dx12Raytracing::RenderFrame()
 		vbIbTransitioned = TRUE;
 		m_dxrCommandList->ResourceBarrier(3, resourceBarrier);
 	}
-
-	return S_OK;
 }
 
 DX_ENTRY_POINT(Dx12Raytracing);
