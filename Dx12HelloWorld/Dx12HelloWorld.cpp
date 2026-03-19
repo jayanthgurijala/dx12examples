@@ -89,7 +89,8 @@ VOID Dx12HelloWorld::RenderFrameGfxDraw()
 			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
 		});
 
-	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 
 }
 

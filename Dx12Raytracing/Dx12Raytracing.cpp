@@ -484,7 +484,7 @@ VOID Dx12Raytracing::RenderFrame()
 
 	ImGui::Text("Ray Tracing");
 
-	SetFrameInfo(0, DxDescriptorTypeUavSrv);
+	AddFrameInfo(0, DxDescriptorTypeUavSrv);
 
 	//if (vbIbTransitioned == FALSE)
 	{

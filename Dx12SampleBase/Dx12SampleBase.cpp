@@ -980,7 +980,7 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 {
 	HRESULT result = S_OK;
 
-	m_appFrameInfo.heapOffset = UINT_MAX;
+	m_appFrameInfo.clear();
 
 	s_frameDeltaTime = frameDeltaTime;
 	m_camera->Update(frameDeltaTime);
@@ -1012,7 +1012,7 @@ HRESULT Dx12SampleBase::NextFrame(FLOAT frameDeltaTime)
 	RenderFrame();
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
-	assert(m_appFrameInfo.heapOffset != UINT_MAX);
+	assert(m_appFrameInfo.size() > 0);
 
 	ImGui::End();
 	RenderRtvContentsOnScreen();
@@ -1091,9 +1091,19 @@ VOID Dx12SampleBase::RenderRtvContentsOnScreen()
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	ComposeSrvContents(0, 0, m_width * 0.5f, m_height, m_appFrameInfo);
-	m_appFrameInfo.descriptorType = DxDescriptorTypeDsvSrv;
-	ComposeSrvContents(m_width * 0.5f, 0, m_width * 0.5f, m_height, m_appFrameInfo);
+	const UINT numCompositionElements = m_appFrameInfo.size();
+	const FLOAT fractionForEachElement = 1.0 / numCompositionElements;
+
+	FLOAT compX   = 0;
+	FLOAT compY   = 0;
+	FLOAT compWidth  = m_width * fractionForEachElement;
+	FLOAT fullHeight = m_height;
+
+	for (UINT i = 0; i < numCompositionElements; i++)
+	{
+		ComposeSrvContents(compX, compY, compWidth, fullHeight, m_appFrameInfo[i]);
+		compX += compWidth;
+	}
 	
 
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
@@ -1134,16 +1144,16 @@ VOID Dx12SampleBase::ComposeSrvContents(FLOAT x, FLOAT y, FLOAT width, FLOAT hei
 	m_pCmdList->RSSetViewports(1, &viewPort);
 
 
-	assert(m_appFrameInfo.heapOffset != UINT_MAX);
+	assert(appFrameInfo.heapOffset != UINT_MAX);
 	
 	ID3D12Resource* pFrameResource = m_descriptorHeapManager->GetResourceForDescriptorTypeInOffset(
-		m_appFrameInfo.descriptorType,
-		m_appFrameInfo.heapOffset);
+		appFrameInfo.descriptorType,
+		appFrameInfo.heapOffset);
 
 	assert(pFrameResource != nullptr);
 
-	D3D12_RESOURCE_STATES initialState = dxhelper::ResourceStateFromType(m_appFrameInfo.descriptorType);
-	auto srvGpuHandle = m_descriptorHeapManager->GetSrvHandleForDescriptor(m_appFrameInfo.descriptorType, m_appFrameInfo.heapOffset);
+	D3D12_RESOURCE_STATES initialState = dxhelper::ResourceStateFromType(appFrameInfo.descriptorType);
+	auto srvGpuHandle = m_descriptorHeapManager->GetSrvHandleForDescriptor(appFrameInfo.descriptorType, appFrameInfo.heapOffset);
 
 	m_pCmdList->SetGraphicsRootDescriptorTable(0, srvGpuHandle);
 

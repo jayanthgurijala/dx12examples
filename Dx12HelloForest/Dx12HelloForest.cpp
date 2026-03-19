@@ -65,8 +65,8 @@ VOID Dx12HelloForest::RenderFrameGfxDraw()
 	m_finalDraw->RenderInitViewProjRtvDsv();
 	m_finalDraw->Render();
 
-	//final composition, SRV is create on the RTV resource
-	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 }
 
 

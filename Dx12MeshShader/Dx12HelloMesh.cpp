@@ -152,7 +152,8 @@ VOID Dx12HelloMesh::RenderFrame()
 
 	m_meshCommandList->DispatchMesh(64, 1, 1);
 
-	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 
 }
 

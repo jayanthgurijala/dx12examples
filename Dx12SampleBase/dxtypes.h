@@ -368,6 +368,11 @@ struct DxSrvUavCbvOffsetsInfo
 
 struct DxAppFrameInfo
 {
+	DxAppFrameInfo(DxDescriptorType type, UINT heapOffset)
+	{
+		this->descriptorType = type;
+		this->heapOffset     = heapOffset;
+	}
 	DxDescriptorType descriptorType;
 	UINT             heapOffset;
 };

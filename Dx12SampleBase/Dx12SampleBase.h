@@ -244,10 +244,9 @@ protected:
         return vertexAttribute.format;
     }
 
-    inline VOID SetFrameInfo(UINT heapOffset, DxDescriptorType type)
+    inline VOID AddFrameInfo(UINT heapOffset, DxDescriptorType type)
     {
-        m_appFrameInfo.descriptorType = type;
-        m_appFrameInfo.heapOffset     = heapOffset;
+        m_appFrameInfo.emplace_back(type, heapOffset);
     }
 
     inline UINT NumNodesInScene(UINT sceneIdx)
@@ -520,7 +519,7 @@ private:
     HWND m_hwnd;
 
     ComPtr<ID3D12DescriptorHeap>   m_imguiDescHeap;
-    DxAppFrameInfo                 m_appFrameInfo;
+    std::vector<DxAppFrameInfo>    m_appFrameInfo;
     std::unique_ptr<DxGltfLoader>  m_gltfLoader;
 
     std::vector<DxSceneElements>	    m_sceneElements;

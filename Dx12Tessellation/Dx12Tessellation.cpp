@@ -153,7 +153,8 @@ VOID Dx12Tessellation::RenderFrameGfxDraw()
 	pCmdList->SetGraphicsRoot32BitConstant(3, bits, 0);
 
 	RenderModel(pCmdList, 0, 0, 0);
-	SetFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
+	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 }
 
 DX_ENTRY_POINT(Dx12Tessellation);
