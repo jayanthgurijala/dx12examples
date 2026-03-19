@@ -1058,37 +1058,20 @@ VOID Dx12SampleBase::RenderSceneGfxDraw()
 }
 
 ///@note 
-HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
+VOID Dx12SampleBase::RenderRtvContentsOnScreen()
 {
-	
-	HRESULT result = S_OK;
 	FLOAT clearColor[4] = { 0.4f, 0.4f, 0.8f, 1.0f };
-
-	const UINT      currentFrameIndex = m_swapChain4->GetCurrentBackBufferIndex();
+	const UINT      currentFrameIndex  = m_swapChain4->GetCurrentBackBufferIndex();
 	ID3D12Resource* pCurrentBackBuffer = m_swapChainBuffers[currentFrameIndex].Get();
 
-	assert(m_appFrameInfo.heapOffset != UINT_MAX);
-	
-	ID3D12Resource* pFrameResource = m_descriptorHeapManager->GetResourceForDescriptorTypeInOffset(
-		m_appFrameInfo.descriptorType,
-		m_appFrameInfo.heapOffset);
-
-	D3D12_RESOURCE_STATES initialState = dxhelper::ResourceStateFromType(m_appFrameInfo.descriptorType);
-	auto srvGpuHandle = m_descriptorHeapManager->GetSrvHandleForDescriptor(m_appFrameInfo.descriptorType, m_appFrameInfo.heapOffset);
-
-	assert(pFrameResource != nullptr);
-
-
-	D3D12_RESOURCE_BARRIER preResourceBarriers[2];
+	D3D12_RESOURCE_BARRIER preResourceBarriers[1];
 
 	preResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pCurrentBackBuffer,
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
-	preResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
-		initialState,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	m_pCmdList->ResourceBarrier(1, preResourceBarriers);
 
-	m_pCmdList->ResourceBarrier(2, preResourceBarriers);
+	
 
 	///@todo refactor
 	const UINT numRTVsForApp = NumRTVsNeededForApp();
@@ -1096,20 +1079,20 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 	
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 
-	CD3DX12_VIEWPORT viewPort(0.0f, 0.0f, FLOAT(m_width), FLOAT(m_height));
 	CD3DX12_RECT     rect(0, 0, LONG(m_width), LONG(m_height));
-	m_pCmdList->RSSetViewports(1, &viewPort);
 	m_pCmdList->RSSetScissorRects(1, &rect);
+	
 
 	m_pCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	m_pCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_pCmdList->SetPipelineState(m_simpleComposition.pipelineState.Get());
 	m_pCmdList->SetGraphicsRootSignature(m_simpleComposition.rootSignature.Get());
 	m_pCmdList->SetDescriptorHeaps(1, descHeaps);
-	m_pCmdList->SetGraphicsRootDescriptorTable(0, srvGpuHandle);
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_pCmdList->DrawInstanced(3, 1, 0, 0);
+
+	ComposeSrvContents(0, 0, m_width * 0.7f, m_height, m_appFrameInfo);
+	
 
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
 	m_pCmdList->SetDescriptorHeaps(1, heaps);
@@ -1120,31 +1103,63 @@ HRESULT Dx12SampleBase::RenderRtvContentsOnScreen()
 		m_pCmdList.Get()
 	);
 
-	D3D12_RESOURCE_BARRIER postResourceBarriers[2];
+	D3D12_RESOURCE_BARRIER postResourceBarriers[1];
 
 	postResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pCurrentBackBuffer,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
-	postResourceBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		initialState);
-	m_pCmdList->ResourceBarrier(2, postResourceBarriers);
+	m_pCmdList->ResourceBarrier(1, postResourceBarriers);
+
+	
+	
 	m_pCmdList->Close();
 
 	ID3D12CommandList* pCmdLists[] = { m_pCmdList.Get() };
 	m_pCmdQueue->ExecuteCommandLists(_countof(pCmdLists), pCmdLists);
 	
-
-
 	m_swapChain4->Present(1, 0);
 
 	WaitForFenceCompletion(m_pCmdQueue.Get());
 
 	m_pCommandAllocator->Reset();
 	m_pCmdList->Reset(m_pCommandAllocator.Get(), nullptr);
+}
 
-	return result;
+VOID Dx12SampleBase::ComposeSrvContents(FLOAT x, FLOAT y, FLOAT width, FLOAT height, DxAppFrameInfo& appFrameInfo)
+{
+	CD3DX12_VIEWPORT viewPort(x, y, width, height);
 
+	m_pCmdList->RSSetViewports(1, &viewPort);
+
+
+	assert(m_appFrameInfo.heapOffset != UINT_MAX);
+	
+	ID3D12Resource* pFrameResource = m_descriptorHeapManager->GetResourceForDescriptorTypeInOffset(
+		m_appFrameInfo.descriptorType,
+		m_appFrameInfo.heapOffset);
+
+	assert(pFrameResource != nullptr);
+
+	D3D12_RESOURCE_STATES initialState = dxhelper::ResourceStateFromType(m_appFrameInfo.descriptorType);
+	auto srvGpuHandle = m_descriptorHeapManager->GetSrvHandleForDescriptor(m_appFrameInfo.descriptorType, m_appFrameInfo.heapOffset);
+
+	m_pCmdList->SetGraphicsRootDescriptorTable(0, srvGpuHandle);
+
+	D3D12_RESOURCE_BARRIER preResourceBarriers[1];
+	preResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
+		initialState,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+	m_pCmdList->ResourceBarrier(1, preResourceBarriers);
+
+
+	m_pCmdList->DrawInstanced(3, 1, 0, 0);
+
+	D3D12_RESOURCE_BARRIER postResourceBarriers[1];
+	postResourceBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(pFrameResource,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		initialState);
+	m_pCmdList->ResourceBarrier(1, postResourceBarriers);
 }
 
 

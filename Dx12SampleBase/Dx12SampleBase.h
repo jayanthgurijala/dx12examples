@@ -46,7 +46,8 @@ public:
 
     virtual VOID RenderFrame() { };
     virtual HRESULT PostRun() { return S_OK; };
-    HRESULT RenderRtvContentsOnScreen();
+    VOID RenderRtvContentsOnScreen();
+    VOID ComposeSrvContents(FLOAT x, FLOAT y, FLOAT width, FLOAT height, DxAppFrameInfo& appFrameInfo);
     
     FLOAT inline GetFrameDeltaTime() { return m_frameDeltaTime; }
 
