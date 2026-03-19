@@ -182,8 +182,8 @@ VOID DxCamera::CreateProjectionMatrix()
 {
     m_projectionMatrix = XMMatrixPerspectiveFovLH(m_fovYInRadians,
                                                   m_viewportAspectRatio,
-                                                  0.01f,
-                                                  1000.0f);
+                                                  1.0f,
+                                                  80.0f);
 
 }
 

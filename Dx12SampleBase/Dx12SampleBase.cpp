@@ -1091,7 +1091,9 @@ VOID Dx12SampleBase::RenderRtvContentsOnScreen()
 	m_pCmdList->IASetVertexBuffers(0, 1, &m_simpleComposition.vertexBufferView);
 	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	ComposeSrvContents(0, 0, m_width * 0.7f, m_height, m_appFrameInfo);
+	ComposeSrvContents(0, 0, m_width * 0.5f, m_height, m_appFrameInfo);
+	m_appFrameInfo.descriptorType = DxDescriptorTypeDsvSrv;
+	ComposeSrvContents(m_width * 0.5f, 0, m_width * 0.5f, m_height, m_appFrameInfo);
 	
 
 	ID3D12DescriptorHeap* heaps[] = { m_imguiDescHeap.Get() };
