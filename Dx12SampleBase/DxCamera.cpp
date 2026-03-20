@@ -25,7 +25,7 @@ DxCamera::DxCamera(UINT width, UINT height)
 	m_lookAt = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	m_up = XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f);
 
-    m_fovYInRadians = XMConvertToRadians(45);
+    m_fovYInRadians = XMConvertToRadians(60);
 }
 
 XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
@@ -182,7 +182,7 @@ VOID DxCamera::CreateProjectionMatrix()
 {
     m_projectionMatrix = XMMatrixPerspectiveFovLH(m_fovYInRadians,
                                                   m_viewportAspectRatio,
-                                                  1.0f,
+                                                  0.010f,
                                                   80.0f);
 
 }

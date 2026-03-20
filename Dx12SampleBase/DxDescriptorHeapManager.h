@@ -44,7 +44,7 @@ public:
     template <typename HandleType>
     inline HandleType GetPerPrimSrvHeapHandle(UINT linearPrimIndex, UINT offsetInPrim)
     {
-        const UINT finalOffset = GetOffset(DxRangeTypePerPrimSrv) + linearPrimIndex * m_srvUavCbvOffsetsInfo.numPerPrimSrvs + offsetInPrim;
+        const UINT finalOffset = GetOffset(DxRangeTypePerPrimSrv) + GetPerPrimSrvHeapOffset(linearPrimIndex, offsetInPrim);
         return GetHeapHandle<HandleType>(DxHeapTypeSrvUavCbv, finalOffset);
     }
 
@@ -99,6 +99,10 @@ public:
         {
             srvuavCbvHeapOffset = GetSrvHeapOffsetForUavHeapOffset(appBasedHeapOffset);
         }
+        else if (descriptorType == DxDescriptorTypeSrvSrv)
+        {
+            srvuavCbvHeapOffset = GetPerPrimSrvHeapOffset(appBasedHeapOffset, 0);
+        }
         else
         {
             assert(0);
@@ -115,6 +119,7 @@ public:
         static_assert(DxHeapType::DxHeapTypeDsv == DxDescriptorType::DxDescriptorTypeDsvSrv, "Error: Dsv Descriptor");
         static_assert(DxHeapType::DxHeapTypeSrvUavCbv == DxDescriptorType::DxDescriptorTypeUavSrv, "ERROR: Srv Descriptor");
 
+        //@note resource is only populated in RTV, DSV and UAV
         return m_descriptorHeap[descriptorType].resourceDescInfo[heapOffset].pResource;
     }
 
@@ -153,6 +158,11 @@ private:
     inline UINT GetSrvHeapOffsetForUavHeapOffset(UINT appBasedHeapOffset)
     {
         return m_srvUavCbvOffsetsInfo.srvForUavStartOffset + appBasedHeapOffset;
+    }
+
+    inline UINT GetPerPrimSrvHeapOffset(UINT linearPrimIndex, UINT offsetInPrim)
+    {
+        return linearPrimIndex * m_srvUavCbvOffsetsInfo.numPerPrimSrvs + offsetInPrim;
     }
 
     VOID CreateDescriptorHeap(DxDescriptorHeap& outCreatedInfo, D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors);

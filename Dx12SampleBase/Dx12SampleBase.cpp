@@ -1102,7 +1102,7 @@ VOID Dx12SampleBase::RenderRtvContentsOnScreen()
 	for (UINT i = 0; i < numCompositionElements; i++)
 	{
 		ComposeSrvContents(compX, compY, compWidth, fullHeight, m_appFrameInfo[i]);
-		compX += compWidth;
+		compX += (compWidth + 2);
 	}
 	
 
