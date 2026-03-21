@@ -28,15 +28,6 @@ DxCamera::DxCamera(UINT width, UINT height)
     m_fovYInRadians = XMConvertToRadians(60);
 }
 
-XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
-{
-	XMFLOAT4X4 xmFloat4x4;
-	XMMATRIX mmModelMatrix    = XMMatrixTranspose(m_transformInfoList[index].modelMatrix);
-	XMStoreFloat4x4(&xmFloat4x4, mmModelMatrix);
-
-	return xmFloat4x4;
-}
-
 VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, XMVECTOR up )
 {
 	m_viewMatrix = XMMatrixLookAtLH(cameraPosition,
@@ -184,7 +175,6 @@ VOID DxCamera::CreateProjectionMatrix()
                                                   m_viewportAspectRatio,
                                                   0.010f,
                                                   80.0f);
-
 }
 
 XMMATRIX DxCamera::CreateModelMatrix(const DxNodeTransformInfo& transformInfo)
@@ -248,6 +238,15 @@ XMFLOAT4X4 GetDataFromMatrix(XMMATRIX matrix)
 XMFLOAT4X4 DxCamera::GetViewProjectionMatrixTranspose()
 {
 	return GetDataFromMatrix(XMMatrixTranspose(m_viewMatrix * m_projectionMatrix));
+}
+
+XMFLOAT4X4 DxCamera::GetDxrModelTransposeMatrix(UINT index)
+{
+	XMFLOAT4X4 xmFloat4x4;
+	XMMATRIX mmModelMatrix = XMMatrixTranspose(m_transformInfoList[index].modelMatrix);
+	XMStoreFloat4x4(&xmFloat4x4, mmModelMatrix);
+
+	return xmFloat4x4;
 }
 
 

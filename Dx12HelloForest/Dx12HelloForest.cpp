@@ -66,7 +66,6 @@ VOID Dx12HelloForest::RenderFrameGfxDraw()
 	m_finalDraw->Render();
 
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
-	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 }
 
 

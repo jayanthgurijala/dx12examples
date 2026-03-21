@@ -247,5 +247,5 @@ void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(0.5f, 0.5f, 0.5f, 1.0f);
+    payload.color = float4(0.1f, 0.1f, 0.1f, 1.0f);
 }

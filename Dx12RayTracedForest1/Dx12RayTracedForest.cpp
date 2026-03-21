@@ -6,7 +6,7 @@
 //
 
 #include <d3d12.h>
-#include "Dx12Raytracing.h"
+#include "Dx12RayTracedForest.h"
 #include "ExampleEntryPoint.h"
 #include "framework.h"
 #include <d3dx12.h>
@@ -28,12 +28,12 @@ struct RayPayload
 	float color[4];
 };
 
-Dx12Raytracing::Dx12Raytracing(UINT width, UINT height) :
+Dx12RayTracedForest::Dx12RayTracedForest(UINT width, UINT height) :
 	Dx12SampleBase(width, height)
 {
 }
 
-HRESULT Dx12Raytracing::OnInit()
+HRESULT Dx12RayTracedForest::OnInit()
 {
 	Dx12SampleBase::OnInit();
 
@@ -58,7 +58,7 @@ HRESULT Dx12Raytracing::OnInit()
 }
 
 
-VOID Dx12Raytracing::BuildBlasAndTlas()
+VOID Dx12RayTracedForest::BuildBlasAndTlas()
 {
 	StartBuildingAccelerationStructures();
 
@@ -82,8 +82,8 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 			{
 				auto& geomDesc = geomDescs[primIdx];
-				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetModelIndexBufferView(0, nodeIdx, primIdx);
-				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
+				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetModelIndexBufferView(sceneElemIdx, nodeIdx, primIdx);
+				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(sceneElemIdx, nodeIdx, primIdx);
 				const DxDrawPrimitive         drawInfo = GetDrawInfo(sceneElemIdx, nodeIdx, primIdx);
 				const BOOL isPrimTransparent = IsPrimitiveTransparent(sceneElemIdx, nodeIdx, primIdx);
 				geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -93,7 +93,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 
 				geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
 				geomDesc.Triangles.VertexCount = drawInfo.numVertices;
-				geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(0, nodeIdx, primIdx);
+				geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(sceneElemIdx, nodeIdx, primIdx);
 
 				//Object space -> new object space
 				geomDesc.Triangles.Transform3x4 = 0;
@@ -184,7 +184,7 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 }
 
 
-VOID Dx12Raytracing::CreateRtPSO()
+VOID Dx12RayTracedForest::CreateRtPSO()
 {
 	//@todo gltf description has sampler info for each texture
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
@@ -251,20 +251,20 @@ VOID Dx12Raytracing::CreateRtPSO()
 		{
 			auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
 			auto uvVbBufferRes = GetModelUvVertexBufferResource(sceneIdx, nodeIdx, primIdx, 0);
-			auto uvVbView = GetModelUvBufferView(0, nodeIdx, primIdx, 0);
+			auto uvVbView = GetModelUvBufferView(sceneIdx, nodeIdx, primIdx, 0);
 
 			const UINT uvVbElementSizeInBytes = 8;
 			const UINT uvVbNumElements = uvVbView.SizeInBytes / 8;
 			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 0, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
 
-			auto posVbBufferRes = GetModelPositionVertexBufferResource(0, nodeIdx, primIdx);
-			auto posVbView = GetModelPositionVertexBufferView(0, nodeIdx, primIdx);
+			auto posVbBufferRes = GetModelPositionVertexBufferResource(sceneIdx, nodeIdx, primIdx);
+			auto posVbView = GetModelPositionVertexBufferView(sceneIdx, nodeIdx, primIdx);
 			const UINT posVbElementSizeInBytes = 12;
 			const UINT numPosElements = posVbView.SizeInBytes / 12;
 			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
 
-			auto indexBufferRes = GetModelIndexBufferResource(0, nodeIdx, primIdx);
-			auto indexBufferView = GetModelIndexBufferView(0, nodeIdx, primIdx);
+			auto indexBufferRes = GetModelIndexBufferResource(sceneIdx, nodeIdx, primIdx);
+			auto indexBufferView = GetModelIndexBufferView(sceneIdx, nodeIdx, primIdx);
 
 			const UINT ibElementSizeInBytes = 4;
 			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
@@ -376,7 +376,7 @@ VOID Dx12Raytracing::CreateRtPSO()
 	assert(m_rtpso != nullptr);
 }
 
-VOID Dx12Raytracing::BuildShaderTables()
+VOID Dx12RayTracedForest::BuildShaderTables()
 {
 
 
@@ -489,7 +489,7 @@ VOID Dx12Raytracing::BuildShaderTables()
 	free(sbtDataStart);
 }
 
-VOID Dx12Raytracing::CreateUAVOutput()
+VOID Dx12RayTracedForest::CreateUAVOutput()
 {
 	dxhelper::AllocateTexture2DResource(m_dxrDevice.Get(),
 		                                &m_uavOutputResource,
@@ -506,7 +506,7 @@ VOID Dx12Raytracing::CreateUAVOutput()
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
-VOID Dx12Raytracing::RenderFrame()
+VOID Dx12RayTracedForest::RenderFrame()
 {
 	static BOOL vbIbTransitioned = FALSE;
 
@@ -574,4 +574,117 @@ VOID Dx12Raytracing::RenderFrame()
 	}
 }
 
-DX_ENTRY_POINT(Dx12Raytracing);
+/*
+*
+* Order of SceneElements  Terrain, Deer, OakTree (foliage transparency last)
+*
+*/
+
+VOID Dx12RayTracedForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
+{
+
+
+	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
+	const UINT numSceneElements = NumSceneElementsLoaded();
+	sceneDescription.resize(numSceneElements);
+
+	UINT terrainIdx = 0;
+	UINT deerIdx = 0;
+	UINT oakTreeIdx = 0;
+
+	for (UINT idx = 0; idx < numSceneElements; idx++)
+	{
+		auto& currentSceneElement = sceneDescription[idx];
+		if (idx == 0)
+		{
+			InitTerrain(currentSceneElement, terrainIdx);
+			terrainIdx++;
+		}
+		else if (idx == 1)
+		{
+			InitAnimalsDeer(currentSceneElement, deerIdx);
+			deerIdx++;
+		}
+		else
+		{
+			InitOakTrees(currentSceneElement, oakTreeIdx);
+			oakTreeIdx++;
+		}
+	}
+}
+
+
+VOID Dx12RayTracedForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx)
+{
+	sceneElement.sceneElementIdx = 0;
+
+	sceneElement.numInstances = 1;
+	sceneElement.addToExtents = FALSE;
+
+	sceneElement.trsMatrix.resize(sceneElement.numInstances);
+	auto& trsMatrix = sceneElement.trsMatrix[0];
+
+	trsMatrix.translation[0] = 0.0f;
+	trsMatrix.translation[1] = -.04f;
+	trsMatrix.translation[2] = 0.0f;
+
+	if (localIdx == 0)
+	{
+		trsMatrix.rotationInDegrees[0] = 0.0f;
+	}
+	else
+	{
+		trsMatrix.rotationInDegrees[0] = 90.0f;
+	}
+	trsMatrix.rotationInDegrees[1] = 0.0f;
+	trsMatrix.rotationInDegrees[2] = 0.0f;
+
+	trsMatrix.scale[0] = 1.0f;
+	trsMatrix.scale[1] = 1.0f;
+	trsMatrix.scale[2] = 1.0f;
+}
+
+VOID Dx12RayTracedForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx)
+{
+	sceneElement.sceneElementIdx = 1;
+	sceneElement.addToExtents = TRUE;
+	sceneElement.numInstances = 1;
+	sceneElement.trsMatrix.resize(sceneElement.numInstances);
+
+	auto& trsMatrix = sceneElement.trsMatrix[0];
+
+	trsMatrix.translation[0] = 0.0f;
+	trsMatrix.translation[1] = 0.0f;
+	trsMatrix.translation[2] = 0.0f;
+
+	trsMatrix.rotationInDegrees[0] = 0.0f;
+	trsMatrix.rotationInDegrees[1] = 0.0f;
+	trsMatrix.rotationInDegrees[2] = 0.0f;
+
+	trsMatrix.scale[0] = 1.0f;
+	trsMatrix.scale[1] = 1.0f;
+	trsMatrix.scale[2] = 1.0f;
+}
+
+VOID Dx12RayTracedForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
+{
+	sceneElement.sceneElementIdx = 2;
+	sceneElement.numInstances = 1;
+	sceneElement.addToExtents = TRUE;
+	sceneElement.trsMatrix.resize(sceneElement.numInstances);
+
+	auto& trsMatrix = sceneElement.trsMatrix[0];
+	trsMatrix.translation[0] = 0.8f + localIdx * 0.8f; //looking from rear of Deer moving right
+	trsMatrix.translation[1] = 0.0f; //moving forward towards Deer nose
+	trsMatrix.translation[2] = 0.8; //moving down
+
+	trsMatrix.rotationInDegrees[0] = 0.0f;
+	trsMatrix.rotationInDegrees[1] = 0.0f;
+	trsMatrix.rotationInDegrees[2] = 0.0f;
+
+	trsMatrix.scale[0] = 3.0f;
+	trsMatrix.scale[1] = 3.0f;
+	trsMatrix.scale[2] = 3.0f;
+}
+
+DX_ENTRY_POINT(Dx12RayTracedForest);

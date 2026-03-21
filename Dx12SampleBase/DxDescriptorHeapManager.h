@@ -99,10 +99,6 @@ public:
         {
             srvuavCbvHeapOffset = GetSrvHeapOffsetForUavHeapOffset(appBasedHeapOffset);
         }
-        else if (descriptorType == DxDescriptorTypeSrvSrv)
-        {
-            srvuavCbvHeapOffset = GetPerPrimSrvHeapOffset(appBasedHeapOffset, 0);
-        }
         else
         {
             assert(0);

@@ -376,3 +376,24 @@ struct DxAppFrameInfo
 	DxDescriptorType descriptorType;
 	UINT             heapOffset;
 };
+
+struct DxASDesc
+{
+	ComPtr<ID3D12Resource> resultBuffer;
+	ComPtr<ID3D12Resource> scratchBuffer;
+};
+
+///@note Every gltf primitive needs a D3D12_RAYTRACING_GEOMETRY_DESC e.g. (1) Just the deer (2) Oak Tree - bark and leaves
+///      Each gltf mesh needs a BLAS, containing multiple geometries.
+/// 
+struct DxSceneBlasDesc
+{
+	//Complete objects like Deer, OakTree terrain etc
+	std::vector<DxASDesc> sceneElementsBlas;
+};
+
+
+struct DxSceneTlasDesc
+{
+	DxASDesc sceneTlas;
+};
