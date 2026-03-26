@@ -32,7 +32,13 @@ protected:
 
 private:
 	VOID BuildBlasAndTlas();
-	VOID CreateRtPSO();
+
+	// CreateGlobalRootSignature + CreateLocalRootSignature + CreatePerPrimSrvs + CreateRtStateObject
+	VOID CreateGlobalRootSignature();
+	VOID CreateLocalRootSignature();
+	VOID CreatePerPrimSrvs();
+	VOID CreateRayTracingStateObject();
+
 	VOID BuildShaderTables();
 	VOID CreateUAVOutput();
 
@@ -53,9 +59,6 @@ private:
 	ComPtr<ID3D12Resource>      m_uavOutputResource;
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 	ComPtr<ID3D12RootSignature> m_localRootSignature;
-
-	UINT m_rootCbvIndex;
-	UINT m_descTableIndex;
 
 	//@note e.g consider loading (1) Deer (2) OakTree (3) Terrain
 	//      1) Deer    - has one primitive in one blas

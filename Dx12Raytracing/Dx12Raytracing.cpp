@@ -49,7 +49,12 @@ HRESULT Dx12Raytracing::OnInit()
 	pCmdList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList));
 	assert(m_dxrCommandList != nullptr);
 
-	CreateRtPSO();
+
+	CreateGlobalRootSignature();
+	CreateLocalRootSignature();
+	CreatePerPrimSrvs();
+	CreateRayTracingStateObject();
+
 	BuildBlasAndTlas();
 	BuildShaderTables();
 	CreateUAVOutput();
@@ -184,28 +189,40 @@ VOID Dx12Raytracing::BuildBlasAndTlas()
 }
 
 
-VOID Dx12Raytracing::CreateRtPSO()
+/*
+* Simply put, global root signature has everything needed by ray gen shader
+* 
+* @todo Sampler state is used by closest hit, check if this needs to be moved.
+* 
+*/
+VOID Dx12Raytracing::CreateGlobalRootSignature()
 {
 	//@todo gltf description has sampler info for each texture
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
-    const UINT numUavsInScene            = NumUAVsNeededForApp();
+	const UINT numUavsInScene = NumUAVsNeededForApp();
 
-    ///@note One range for model meterial SRVs(space = 0), one range for vertex buffer SRV and index buffer srv (space = 1), and one for UAV
+	///@note One range for model meterial SRVs(space = 0), one range for vertex buffer SRV and index buffer srv (space = 1), and one for UAV
 	const UINT numDescTableRanges = 1;
-    std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
-    descTableRanges[0] = dxhelper::GetUAVDescRange(numUavsInScene, 0, 0); //output UAV
-
-	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
-    auto rootSrv             = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
-    auto viewProj            = dxhelper::GetRootCbv(0); //camera buffer at register space 0
-    auto perInstance         = dxhelper::GetRootCbv(1); //camera buffer at register space 0
-
+	std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
 
 	///@note In Raytracing, root signature needs to be divided into local and global root signature.
-	// Camera Data, TLAS, UAV Output and sampler (for now) - part of global root sig
-	// Prim Textures and Material Data - move to local root signature
-	// Local root sig? - Root CBV with material info and DescTable with "5" textures 
+    ///      Camera Data, TLAS, UAV Output and sampler (for now) - part of global root sig
+
+	//output UAV
+	descTableRanges[0]       = dxhelper::GetUAVDescRange(numUavsInScene, 0, 0); 
+	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
+
+	//scene tlas
+	auto rootSrv             = dxhelper::GetRootSrv(0, 2); //tlas srv at register space 2
+
+	//View Projection Matrix
+	auto viewProj            = dxhelper::GetRootCbv(0);    //camera buffer at register space 0
+
+	//World Matrices
+	auto perInstance         = dxhelper::GetRootCbv(1);    //camera buffer at register space 0
+
+
 	dxhelper::DxCreateRootSignature
 	(
 		m_dxrDevice.Get(),
@@ -218,34 +235,58 @@ VOID Dx12Raytracing::CreateRtPSO()
 			rootDescriptorTable,
 			rootSrv
 		},
-		{staticSampler}
+		{ staticSampler }
 	);
+}
 
-	{
-		const UINT numDescTableRanges = 1;
-		std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
-		const UINT numSRVsPerPrim = NumSRVsPerPrimitive();
-		const UINT registerSpace  = 3;
-		descTableRanges[0]        = dxhelper::GetSRVDescRange(numSRVsPerPrim, 0, registerSpace);
-		auto rootDescriptorTable  = dxhelper::GetRootDescTable(descTableRanges);
-		auto rootCbv              = dxhelper::GetRootCbv(0, registerSpace);
-		dxhelper::DxCreateRootSignature
-		(
-			m_dxrDevice.Get(),
-			&m_localRootSignature,
-			{
-				rootCbv,
-				rootDescriptorTable
-			},
-			{},
-			D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE
-		);
-	}
 
+/*
+* 
+* PerPrim Srvs
+* @todo need to add material buffer
+* 
+*/
+VOID Dx12Raytracing::CreateLocalRootSignature()
+{
+	const UINT numDescTableRanges = 1;
+	const UINT numSRVsPerPrim     = NumSRVsPerPrimitive(); 
+	const UINT registerSpace      = 3;
+
+	//one SRV descriptor table with numSRVsPerPrim primitives
+	std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
+
+	descTableRanges[0]       = dxhelper::GetSRVDescRange(numSRVsPerPrim, 0, registerSpace);
+	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
+	auto rootCbv             = dxhelper::GetRootCbv(0, registerSpace);
+
+	dxhelper::DxCreateRootSignature
+	(
+		m_dxrDevice.Get(),
+		&m_localRootSignature,
+		{
+			rootCbv,
+			rootDescriptorTable
+		},
+		{},
+		D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE
+	);
+}
+
+/*
+* 
+* SRVs needed for shading - PBR, Emission, etc textures and SRVs are created at earlier.
+* RayTracing needs additional information for e.g. mip level selection
+*  - Index Buffer
+*  - Vertex Buffer
+*  - UV BUffer
+*/
+VOID Dx12Raytracing::CreatePerPrimSrvs()
+{
 	assert(m_localRootSignature != nullptr);
 
 	const UINT numTotalSrvsPerPrim = NumSRVsPerPrimitive();
 	const UINT appSrvOffset = AppSrvOffsetForPrim();
+
 	///create the extra two SRV descriptors for raytracing
 	ForEachSceneElementLoadedSceneNodePrim([this, appSrvOffset](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 		{
@@ -270,10 +311,11 @@ VOID Dx12Raytracing::CreateRtPSO()
 			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
 			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 2, indexBufferRes, ibNumElements, ibElementSizeInBytes);
 		});
+}
 
 
-    m_rootCbvIndex          = 0;
-    m_descTableIndex        = 1;
+VOID Dx12Raytracing::CreateRayTracingStateObject()
+{
 
 	//@todo Simplify and use CD3DX12
 	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
@@ -345,6 +387,8 @@ VOID Dx12Raytracing::CreateRtPSO()
 	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigToHitGroup;
 	localRootSigToHitGroup.NumExports = _countof(s_hitGroups);
 	localRootSigToHitGroup.pExports = s_hitGroups;
+
+	//$%@#$@#$!@#!@#$@#$@#$ nonsense
 	localRootSigToHitGroup.pSubobjectToAssociate = &localRootSigSubObject;
 
 	D3D12_STATE_SUBOBJECT localSigAssociationSubObj;
@@ -366,15 +410,16 @@ VOID Dx12Raytracing::CreateRtPSO()
 	localRootSigToHitGroup.pSubobjectToAssociate = &subobjects[3];
 
 	D3D12_STATE_OBJECT_DESC stateObjectDesc = {};
-	stateObjectDesc.Type                    = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	stateObjectDesc.NumSubobjects           = _countof(subobjects);
-	stateObjectDesc.pSubobjects             = subobjects;
+	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+	stateObjectDesc.NumSubobjects = _countof(subobjects);
+	stateObjectDesc.pSubobjects = subobjects;
 
 	m_dxrDevice->CreateStateObject(&stateObjectDesc,
-								   IID_PPV_ARGS(&m_rtpso));
+		IID_PPV_ARGS(&m_rtpso));
 
 	assert(m_rtpso != nullptr);
 }
+
 
 VOID Dx12Raytracing::BuildShaderTables()
 {
