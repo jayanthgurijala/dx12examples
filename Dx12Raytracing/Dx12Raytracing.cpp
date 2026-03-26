@@ -16,12 +16,15 @@
 
 using namespace DirectX;
 
-static LPCWSTR s_hitGroups[] =
-{
-	L"HitGroup_opaque",
-	L"HitGroup_mask"
-};
-
+static const wchar_t* const c_pSimpleRGShader   = L"MyRaygenShader";
+static const wchar_t* const c_pSimpleMissShader = L"MyMissShader";
+static const wchar_t* const c_pCHSTexColShader  = L"CHSBaseColorTexturing";
+static const wchar_t* const c_pCHSNormalMap     = L"CHSNormalMapping";
+static const wchar_t* const c_pAHSAlphaCutOff   = L"AHSAlphaCutOff";
+					  const 
+static const wchar_t* const c_pHitGroupOpaque      = L"hitgroup_opaque";
+static const wchar_t* const c_pHitGroupNormalMap   = L"hitgroup_normalmap";
+static const wchar_t* const c_pHitGroupAlphaCutOff = L"hitgroup_alphacutoff";
 
 struct RayPayload
 {
@@ -53,6 +56,7 @@ HRESULT Dx12Raytracing::OnInit()
 	CreateGlobalRootSignature();
 	CreateLocalRootSignature();
 	CreatePerPrimSrvs();
+
 	CreateRayTracingStateObject();
 
 	BuildBlasAndTlas();
@@ -316,106 +320,62 @@ VOID Dx12Raytracing::CreatePerPrimSrvs()
 
 VOID Dx12Raytracing::CreateRayTracingStateObject()
 {
+	ComPtr<ID3DBlob> compiledShaders   = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
 
-	//@todo Simplify and use CD3DX12
-	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
+	CD3DX12_STATE_OBJECT_DESC rayTracingPipelineDesc{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
-	D3D12_EXPORT_DESC exports[] = {
-		{ L"MyRaygenShader", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"MyMissShader", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"CHSBaseColorTexturing", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"CHSNormalMapping", nullptr, D3D12_EXPORT_FLAG_NONE },
-		{ L"AHSAlphaCutOff", nullptr, D3D12_EXPORT_FLAG_NONE}
-	};
+	auto libSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE(compiledShaders->GetBufferPointer(), compiledShaders->GetBufferSize());
+	libSubObject->SetDXILLibrary(&libdxil);
 
-	D3D12_DXIL_LIBRARY_DESC dxilLibDesc = {};
-	dxilLibDesc.DXILLibrary.BytecodeLength = compiledShaders->GetBufferSize();
-	dxilLibDesc.DXILLibrary.pShaderBytecode = compiledShaders->GetBufferPointer();
-	dxilLibDesc.NumExports = _countof(exports);
-	dxilLibDesc.pExports = exports;
+	auto AddExport = [&libSubObject](const wchar_t* name)
+		{
+			libSubObject->DefineExport(name, nullptr, D3D12_EXPORT_FLAG_NONE);
+		};
 
-	D3D12_STATE_SUBOBJECT dxilLibSubobject = {};
-	dxilLibSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
-	dxilLibSubobject.pDesc = &dxilLibDesc;
+	AddExport(c_pSimpleRGShader);
+	AddExport(c_pSimpleMissShader);
+	AddExport(c_pCHSTexColShader);
+	AddExport(c_pCHSNormalMap);
+	AddExport(c_pAHSAlphaCutOff);
 
-	D3D12_HIT_GROUP_DESC hitGroupOpaqueDesc = {};
-	hitGroupOpaqueDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-	hitGroupOpaqueDesc.HitGroupExport = s_hitGroups[0];
-	hitGroupOpaqueDesc.ClosestHitShaderImport = exports[2].Name;
-	D3D12_STATE_SUBOBJECT hitGroup_1SubObject = {};
-	hitGroup_1SubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-	hitGroup_1SubObject.pDesc = &hitGroupOpaqueDesc;
+	auto AddHitGroupSubObject = [&rayTracingPipelineDesc](const wchar_t* hitgroupExportName, const wchar_t* intersectionShaderName, const wchar_t* chsName, const wchar_t* ahsName)
+		{
+			assert(hitgroupExportName != nullptr);
+			auto hitGroupSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+			hitGroupSubObject->SetIntersectionShaderImport(intersectionShaderName);
+			hitGroupSubObject->SetClosestHitShaderImport(chsName);
+			hitGroupSubObject->SetAnyHitShaderImport(ahsName);
+			hitGroupSubObject->SetHitGroupExport(hitgroupExportName);
+		};
 
-	D3D12_HIT_GROUP_DESC hitGroupMaskDesc = {};
-	hitGroupMaskDesc.Type = D3D12_HIT_GROUP_TYPE_TRIANGLES;
-	hitGroupMaskDesc.HitGroupExport = s_hitGroups[1];
-	hitGroupMaskDesc.ClosestHitShaderImport = exports[2].Name;
-	hitGroupMaskDesc.AnyHitShaderImport = exports[4].Name;
-	D3D12_STATE_SUBOBJECT hitgroupMaskSubObj = {};
-	hitgroupMaskSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
-	hitgroupMaskSubObj.pDesc = &hitGroupMaskDesc;
+	AddHitGroupSubObject(c_pHitGroupOpaque, nullptr, c_pCHSTexColShader, nullptr);
+	AddHitGroupSubObject(c_pHitGroupNormalMap, nullptr, c_pCHSNormalMap, nullptr);
+	AddHitGroupSubObject(c_pHitGroupAlphaCutOff, nullptr, c_pCHSTexColShader, c_pAHSAlphaCutOff);
+	
+	auto shaderConfigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+	const UINT payloadSize   = sizeof(RayPayload); //ray payload
+	const UINT attributeSize = sizeof(FLOAT) * 2; //bary centrics
+	shaderConfigSubObject->Config(payloadSize, attributeSize);
 
+	auto globalRootSigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	globalRootSigSubObject->SetRootSignature(m_rootSignature.Get());
 
-	D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
-	shaderConfig.MaxAttributeSizeInBytes = D3D12_RAYTRACING_MAX_ATTRIBUTE_SIZE_IN_BYTES;
-	shaderConfig.MaxPayloadSizeInBytes = sizeof(RayPayload);
+	auto pipelineConfigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+	const UINT maxRecursionDepth = 1;
+	pipelineConfigSubObject->Config(maxRecursionDepth);
 
-	D3D12_STATE_SUBOBJECT shaderConfigSubObject;
-	shaderConfigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
-	shaderConfigSubObject.pDesc = &shaderConfig;
+	auto localRootSigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+	localRootSigSubObject->SetRootSignature(m_localRootSignature.Get());
 
-	D3D12_GLOBAL_ROOT_SIGNATURE globalRootSigDesc = {};
-	globalRootSigDesc.pGlobalRootSignature = m_rootSignature.Get();
-	D3D12_STATE_SUBOBJECT globalRootSigSubObject = {};
-	globalRootSigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
-	globalRootSigSubObject.pDesc = &globalRootSigDesc;
+	auto localRootSigAssociationSubObj = rayTracingPipelineDesc.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+	localRootSigAssociationSubObj->AddExport(c_pHitGroupAlphaCutOff);
+	localRootSigAssociationSubObj->AddExport(c_pHitGroupOpaque);
+	localRootSigAssociationSubObj->AddExport(c_pHitGroupNormalMap);
+	localRootSigAssociationSubObj->SetSubobjectToAssociate(*localRootSigSubObject);
 
-
-	D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-	pipelineConfig.MaxTraceRecursionDepth = 1;
-
-	D3D12_STATE_SUBOBJECT pipelineConfigSubobject = {};
-	pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
-	pipelineConfigSubobject.pDesc = &pipelineConfig;
-
-	D3D12_LOCAL_ROOT_SIGNATURE localRootSigDesc = {};
-	localRootSigDesc.pLocalRootSignature = m_localRootSignature.Get();
-	D3D12_STATE_SUBOBJECT localRootSigSubObject = {};
-	localRootSigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_LOCAL_ROOT_SIGNATURE;
-	localRootSigSubObject.pDesc = &localRootSigDesc;
-
-	D3D12_SUBOBJECT_TO_EXPORTS_ASSOCIATION localRootSigToHitGroup;
-	localRootSigToHitGroup.NumExports = _countof(s_hitGroups);
-	localRootSigToHitGroup.pExports = s_hitGroups;
-
-	//$%@#$@#$!@#!@#$@#$@#$ nonsense
-	localRootSigToHitGroup.pSubobjectToAssociate = &localRootSigSubObject;
-
-	D3D12_STATE_SUBOBJECT localSigAssociationSubObj;
-	localSigAssociationSubObj.Type = D3D12_STATE_SUBOBJECT_TYPE_SUBOBJECT_TO_EXPORTS_ASSOCIATION;
-	localSigAssociationSubObj.pDesc = &localRootSigToHitGroup;
-
-	D3D12_STATE_SUBOBJECT subobjects[] = {
-				dxilLibSubobject,
-				hitGroup_1SubObject,
-				hitgroupMaskSubObj,
-				localRootSigSubObject,
-				localSigAssociationSubObj,
-				shaderConfigSubObject,
-				pipelineConfigSubobject,
-				globalRootSigSubObject
-	};
-
-	//$%@#$@#$!@#!@#$@#$@#$ nonsense
-	localRootSigToHitGroup.pSubobjectToAssociate = &subobjects[3];
-
-	D3D12_STATE_OBJECT_DESC stateObjectDesc = {};
-	stateObjectDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
-	stateObjectDesc.NumSubobjects = _countof(subobjects);
-	stateObjectDesc.pSubobjects = subobjects;
-
-	m_dxrDevice->CreateStateObject(&stateObjectDesc,
-		IID_PPV_ARGS(&m_rtpso));
+	
+	m_dxrDevice->CreateStateObject(rayTracingPipelineDesc, IID_PPV_ARGS(&m_rtpso));
 
 	assert(m_rtpso != nullptr);
 }
@@ -423,8 +383,6 @@ VOID Dx12Raytracing::CreateRayTracingStateObject()
 
 VOID Dx12Raytracing::BuildShaderTables()
 {
-
-
 	/// -Scene Load Elements (1)Deer (2)OakTree (3)Terrain
 	/// -Scene can be composed or X Deers, Y OakTrees and Z Terrains
 	/// How many SBTs should hit groups have?
@@ -457,10 +415,10 @@ VOID Dx12Raytracing::BuildShaderTables()
 	ComPtr<ID3D12StateObjectProperties> props;
 	m_rtpso->QueryInterface(IID_PPV_ARGS(&props));
 
-	void* raygenShaderID   = props->GetShaderIdentifier(L"MyRaygenShader");
-	void* missShaderID     = props->GetShaderIdentifier(L"MyMissShader");
-	void* hitgroupOpaqueID = props->GetShaderIdentifier(s_hitGroups[0]);
-	void* hitgroupMaskID   = props->GetShaderIdentifier(s_hitGroups[1]);
+	void* raygenShaderID   = props->GetShaderIdentifier(c_pSimpleRGShader);
+	void* missShaderID     = props->GetShaderIdentifier(c_pSimpleMissShader);
+	void* hitgroupOpaqueID = props->GetShaderIdentifier(c_pHitGroupOpaque);
+	void* hitgroupMaskID   = props->GetShaderIdentifier(c_pHitGroupAlphaCutOff);
 
 	assert(raygenShaderID != nullptr && missShaderID != nullptr && hitgroupOpaqueID != nullptr && hitgroupMaskID != nullptr);
 
@@ -481,16 +439,16 @@ VOID Dx12Raytracing::BuildShaderTables()
 	BYTE* const sbtDataStart       = static_cast<BYTE*>(malloc(sbtTableTotalSize));
 	BYTE* sbtDataWritePtr          = sbtDataStart;
 
+	//Raygen shader
 	{
 		memcpy(sbtDataWritePtr, raygenShaderID, rayGenTableSize);
 		sbtDataWritePtr += rayGenAlignedSize;
 	}
 
+	//Hitgroup shader
 	assert((sbtDataWritePtr - sbtDataStart) == rayGenAlignedSize);
 	BYTE* const pHitGroupStartWritePtr = sbtDataWritePtr;
 	{
-		
-
 		for (UINT primIdx = 0; primIdx < totalPrimsInScene; primIdx++)
 		{
 			auto* curPrimitive     = primitiveInfo[primIdx];
