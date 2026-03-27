@@ -21,7 +21,7 @@ protected:
 	virtual inline UINT NumSRVsPerPrimNeededForApp() override { return 0; }
 	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
 
-	virtual HRESULT OnInit() override;
+	virtual VOID OnInit() override;
 
 	virtual inline UINT NumRootConstantsForApp() override { return 1; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }

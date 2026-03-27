@@ -19,7 +19,7 @@ Dx12Tessellation::Dx12Tessellation(UINT width, UINT height) :
 }
 
 
-HRESULT Dx12Tessellation::OnInit()
+VOID Dx12Tessellation::OnInit()
 {
 	auto pDevice = GetDevice();
 
@@ -96,8 +96,6 @@ HRESULT Dx12Tessellation::OnInit()
 	pipelineStateDesc.SampleDesc.Count = 1;
 
 	pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&m_modelPipelineState));
-
-	return S_OK;
 }
 
 VOID Dx12Tessellation::RenderFrameGfxDraw()
@@ -154,7 +152,6 @@ VOID Dx12Tessellation::RenderFrameGfxDraw()
 
 	RenderModel(pCmdList, 0, 0, 0);
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
-	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 }
 
 DX_ENTRY_POINT(Dx12Tessellation);

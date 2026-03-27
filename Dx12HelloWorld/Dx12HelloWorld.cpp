@@ -16,7 +16,7 @@ Dx12HelloWorld::Dx12HelloWorld(UINT width, UINT height) :
 {
 }
 
-HRESULT Dx12HelloWorld::OnInit()
+VOID Dx12HelloWorld::OnInit()
 {
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
 
@@ -45,7 +45,6 @@ HRESULT Dx12HelloWorld::OnInit()
 
 	CreateVSPSPipelineStateFromModel();
 
-	return S_OK;
 }
 
 VOID Dx12HelloWorld::RenderFrameGfxDraw()
@@ -90,7 +89,6 @@ VOID Dx12HelloWorld::RenderFrameGfxDraw()
 		});
 
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
-	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
 
 }
 

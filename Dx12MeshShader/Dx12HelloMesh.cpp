@@ -16,7 +16,7 @@ Dx12HelloMesh::Dx12HelloMesh(UINT width, UINT height) :
 {
 }
 
-HRESULT Dx12HelloMesh::OnInit()
+VOID Dx12HelloMesh::OnInit()
 {
 	Dx12SampleBase::OnInit();
 
@@ -34,8 +34,6 @@ HRESULT Dx12HelloMesh::OnInit()
 
 	CreateMeshPSO();
 	CreatePerPrimSRVs();
-
-	return S_OK;
 }
 
 VOID Dx12HelloMesh::CreateMeshPSO()
@@ -153,8 +151,6 @@ VOID Dx12HelloMesh::RenderFrame()
 	m_meshCommandList->DispatchMesh(64, 1, 1);
 
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
-	AddFrameInfo(0, DxDescriptorTypeDsvSrv);
-
 }
 
 DX_ENTRY_POINT(Dx12HelloMesh);

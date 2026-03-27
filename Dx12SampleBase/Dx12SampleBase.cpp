@@ -1181,21 +1181,13 @@ HRESULT Dx12SampleBase::Initialize()
 
 	InitlializeDeviceCmdQueueAndCmdList();
 	LoadGltfFiles();
-
 	InitializeDescriptorHeapManagerResourcesAndDescriptors();
-
-
 	LoadSceneMaterialInfo();
 
 	LoadSceneDescription(m_sceneDescription);
 	LoadScene();
-
-
-	m_camLightsMaterialsManager->Finalize(m_pDevice.Get());
 	CreateSceneMaterialCb();
 	CreateSceneMVPMatrix();
-
-
 	InitializeImgui();
 
 	return result;
@@ -1374,6 +1366,8 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 {
 	HRESULT result = S_OK;
+
+	m_camLightsMaterialsManager->Finalize(m_pDevice.Get());
 	
 	{
 		DxCBSceneData sceneData; //viewProj, invviewProj, cameraPosition, FovY and padding

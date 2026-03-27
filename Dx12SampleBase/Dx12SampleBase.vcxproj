@@ -161,6 +161,7 @@
     <ClInclude Include="..\third_party\imgui\imgui.h" />
     <ClInclude Include="..\third_party\imgui\imgui_internal.h" />
     <ClInclude Include="CameraLightsMaterialsBuffer.h" />
+    <ClInclude Include="Dx12RaytracingBase.h" />
     <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
     <ClInclude Include="DxGfxDrawRenderObject.h" />
@@ -220,6 +221,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="CameraLightsMaterialsBuffer.cpp" />
+    <ClCompile Include="Dx12RaytracingBase.cpp" />
     <ClCompile Include="Dx12SampleBase.cpp" />
     <ClCompile Include="DxCamera.cpp" />
     <ClCompile Include="DxGfxDrawRenderObject.cpp" />

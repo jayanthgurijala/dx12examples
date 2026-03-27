@@ -32,7 +32,7 @@ public:
     VOID InitializeDescriptorHeapManagerResourcesAndDescriptors();
     VOID InitializeImgui();
 
-    virtual HRESULT OnInit() { return S_OK; };
+    virtual VOID OnInit() { };
 
     HRESULT NextFrame(FLOAT frameDeltaTime);
 

@@ -21,7 +21,7 @@ Dx12HelloForest::Dx12HelloForest(UINT width, UINT height) :
 	m_numDSVs = m_finalDraw->NumDSVs() + m_shadowPass->NumDSVs();
 }
 
-HRESULT Dx12HelloForest::OnInit()
+VOID Dx12HelloForest::OnInit()
 {
 	CD3DX12_STATIC_SAMPLER_DESC staticSampler(0, D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR);
 
@@ -50,7 +50,6 @@ HRESULT Dx12HelloForest::OnInit()
 
 	CreateVSPSPipelineStateFromModel();
 
-	return S_OK;
 }
 
 VOID Dx12HelloForest::RenderFrameGfxDraw()
