@@ -32,7 +32,7 @@ protected:
 
 private:
 
-	inline UINT NumSrvsForRaytracing() { return 3; }
+	inline UINT NumSrvsForRaytracing() { return 4; }
 
 };
 

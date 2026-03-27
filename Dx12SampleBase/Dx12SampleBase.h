@@ -182,28 +182,9 @@ protected:
         return GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).indexBufferInfo;
     }
 
-    inline D3D12_VERTEX_BUFFER_VIEW& const GetModelVertexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT vbIndex)
-    {
-        auto& vbv = GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, vbIndex).modelVbv;
-        assert(vbv.BufferLocation != 0);
-        assert(vbv.SizeInBytes != 0);
-        assert(vbv.StrideInBytes != 0);
-        return vbv;
-    }
-
     inline DxDrawPrimitive& GetModelDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
     {
         return GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).modelDrawPrimitive;
-    }
-
-    inline ID3D12Resource* GetModelIndexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
-    {
-        return GetPrimitiveIndexData(sceneIdx, nodeIndex, primitiveIndex).indexBuffer.Get();
-    }
-
-    inline D3D12_INDEX_BUFFER_VIEW& GetModelIndexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
-    {
-        return  GetPrimitiveIndexData(sceneIdx, nodeIndex, primitiveIndex).modelIbv;
     }
 
     inline UINT NumVertexAttributesInPrimitive(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -211,27 +192,17 @@ protected:
         return static_cast<UINT>(GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex).vertexBufferInfo.size());
     }
 
-
     ///@todo Assumptions, POSITION, NORMAL, TEXCOORD0, TEXCOORD1 etc as per semantic order in gltfloader
-    inline D3D12_VERTEX_BUFFER_VIEW& GetModelPositionVertexBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
+    ///      But these can be in any order
+    inline const DxPrimVertexData& GetVertexBufferInfo(const DxPrimitiveInfo& primInfo, GltfVertexAttribIndex attribIndex)
     {
-        return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, 0).modelVbv;
+        return primInfo.vertexBufferInfo[attribIndex];
     }
 
-    inline ID3D12Resource* GetModelPositionVertexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
+    
+    inline const DxPrimIndexData& GetIndexBufferInfo(const DxPrimitiveInfo& primInfo)
     {
-        return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, 0).modelVbBuffer.Get();
-    }
-
-    inline ID3D12Resource* GetModelUvVertexBufferResource(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT texCoordIndex)
-    {
-        return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbBuffer.Get();
-    }
-
-    inline D3D12_VERTEX_BUFFER_VIEW& GetModelUvBufferView(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex, UINT texCoordIndex)
-    {
-        //@note POSITION = 0, NORMAL = 1, TEXCOORD0 = 2, TEXCOORD1 = 3 and so on as per gltfloader semantic order
-        return GetPrimitiveVertexData(sceneIdx, nodeIndex, primitiveIndex, texCoordIndex + 2).modelVbv;
+        return primInfo.indexBufferInfo;
     }
 
     inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -430,6 +401,40 @@ protected:
     inline static  Dx12SampleBase* GetInstance()
     {
         return s_sampleBase;
+    }
+
+    inline void CreateSrvBufferForPrimitive(const DxPrimitiveInfo& primInfo, GltfVertexAttribIndex attribIndex, UINT offset, BOOL isIndexBuffer = FALSE)
+    {
+        assert(attribIndex == UINT_MAX || isIndexBuffer == FALSE);
+
+        ID3D12Resource* pRes = nullptr;
+        UINT            numElements = 0;
+        UINT            elementSize = 0;
+
+        if (isIndexBuffer == FALSE)
+        {
+            auto vbPosInfo = GetVertexBufferInfo(primInfo, attribIndex);
+            auto posVbView = vbPosInfo.modelVbv;
+            elementSize = posVbView.StrideInBytes;
+            numElements = posVbView.SizeInBytes / elementSize;
+            pRes = vbPosInfo.modelVbBuffer.Get();
+        }
+        else
+        {
+            auto ibPosInfo = GetIndexBufferInfo(primInfo);
+            auto ibView = ibPosInfo.modelIbv;
+            elementSize = ibPosInfo.bufferStrideInBytes;
+            numElements = ibView.SizeInBytes / elementSize;
+            pRes = ibPosInfo.indexBuffer.Get();
+
+        }
+
+        assert(elementSize == 12 || elementSize == 8 || elementSize == 4);
+        CreateAppBufferSrvDescriptorAtIndex(primInfo.primLinearIdxInSceneElements,
+            offset,
+            pRes,
+            numElements,
+            elementSize);
     }
 
 private:

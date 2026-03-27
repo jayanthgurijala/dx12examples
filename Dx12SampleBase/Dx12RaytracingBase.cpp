@@ -149,26 +149,13 @@ VOID Dx12RaytracingBase::CreatePerPrimSrvs()
 	///create the extra two SRV descriptors for raytracing
 	ForEachSceneElementLoadedSceneNodePrim([this, appSrvOffset](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
-			auto uvVbBufferRes = GetModelUvVertexBufferResource(sceneIdx, nodeIdx, primIdx, 0);
-			auto uvVbView = GetModelUvBufferView(sceneIdx, nodeIdx, primIdx, 0);
+			const auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribPosition, appSrvOffset + 0);
+			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribNormal, appSrvOffset + 1);
+			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribTexcoord0, appSrvOffset + 2);
 
-			const UINT uvVbElementSizeInBytes = 8;
-			const UINT uvVbNumElements = uvVbView.SizeInBytes / 8;
-			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 0, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
-
-			auto posVbBufferRes = GetModelPositionVertexBufferResource(sceneIdx, nodeIdx, primIdx);
-			auto posVbView = GetModelPositionVertexBufferView(sceneIdx, nodeIdx, primIdx);
-			const UINT posVbElementSizeInBytes = 12;
-			const UINT numPosElements = posVbView.SizeInBytes / 12;
-			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 1, posVbBufferRes, numPosElements, posVbElementSizeInBytes);
-
-			auto indexBufferRes = GetModelIndexBufferResource(sceneIdx, nodeIdx, primIdx);
-			auto indexBufferView = GetModelIndexBufferView(sceneIdx, nodeIdx, primIdx);
-
-			const UINT ibElementSizeInBytes = 4;
-			const UINT ibNumElements = indexBufferView.SizeInBytes / ibElementSizeInBytes;
-			CreateAppBufferSrvDescriptorAtIndex(curPrimitive.primLinearIdxInSceneElements, appSrvOffset + 2, indexBufferRes, ibNumElements, ibElementSizeInBytes);
+			///@note Index buffer
+			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribMax, appSrvOffset + 3, TRUE);
 		});
 }
 
@@ -390,8 +377,9 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 			{
 				auto& geomDesc = geomDescs[primIdx];
-				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetModelIndexBufferView(sceneElemIdx, nodeIdx, primIdx);
-				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetModelPositionVertexBufferView(sceneElemIdx, nodeIdx, primIdx);
+				const auto curPrim = GetPrimitiveInfo(sceneElemIdx, nodeIdx, primIdx);
+				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetIndexBufferInfo(curPrim).modelIbv;
+				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetVertexBufferInfo(curPrim, GltfVertexAttribPosition).modelVbv;
 				const DxDrawPrimitive         drawInfo = GetDrawInfo(sceneElemIdx, nodeIdx, primIdx);
 				const BOOL isPrimTransparent = IsPrimitiveTransparent(sceneElemIdx, nodeIdx, primIdx);
 				geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;

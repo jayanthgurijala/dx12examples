@@ -95,23 +95,11 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 VOID Dx12HelloMesh::CreatePerPrimSRVs()
 {
 	const UINT numSRVsForMaterials = AppSrvOffsetForPrim();
-
-	auto indexBufferRes = GetModelIndexBufferResource(0, 0, 0);
-	auto indexBufferView = GetModelIndexBufferView(0, 0, 0);
-
-	///@todo 5 is magic number, need to avoid it
-	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 0, indexBufferRes, indexBufferView.SizeInBytes / 4, 4);
-
-	auto vertexBufferRes = GetModelPositionVertexBufferResource(0, 0, 0);
-	auto vertexBufferView = GetModelPositionVertexBufferView(0, 0, 0);
-	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 1, vertexBufferRes, vertexBufferView.SizeInBytes / 4, 4);
-
-	auto uvVbBufferRes = GetModelUvVertexBufferResource(0, 0, 0, 0);
-	auto uvVbView = GetModelUvBufferView(0, 0, 0, 0);
-
-	const UINT uvVbElementSizeInBytes = 4;
-	const UINT uvVbNumElements = uvVbView.SizeInBytes / 4;
-	CreateAppBufferSrvDescriptorAtIndex(0, numSRVsForMaterials + 2, uvVbBufferRes, uvVbNumElements, uvVbElementSizeInBytes);
+	const auto& curPrimInfo = GetPrimitiveInfo(0, 0, 0);
+	
+	CreateSrvBufferForPrimitive(curPrimInfo, GltfVertexAttribMax, numSRVsForMaterials + 0, TRUE);
+	CreateSrvBufferForPrimitive(curPrimInfo, GltfVertexAttribPosition, numSRVsForMaterials + 1, FALSE);
+	CreateSrvBufferForPrimitive(curPrimInfo, GltfVertexAttribTexcoord0, numSRVsForMaterials + 2, FALSE);
 }
 
 VOID Dx12HelloMesh::RenderFrame()

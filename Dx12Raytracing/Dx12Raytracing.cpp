@@ -28,30 +28,14 @@ VOID Dx12Raytracing::OnInit()
 
 VOID Dx12Raytracing::RenderFrame()
 {
-	static BOOL vbIbTransitioned = FALSE;
-
-    //@todo optimization - transition resources once in init and keep them in the required state for raytracing instead of transitioning every frame.
-	// This is just to keep the sample code simple and focused on raytracing.
-	auto uvVbBufferRes = GetModelUvVertexBufferResource(0, 0, 0, 0);
-	auto indexBufferRes = GetModelIndexBufferResource(0, 0, 0);
-
 	ImGui::Text("Ray Tracing");
 
 	AddFrameInfo(0, DxDescriptorTypeUavSrv);
 
-	//if (vbIbTransitioned == FALSE)
 	{
-		CD3DX12_RESOURCE_BARRIER resourceBarrier[3];
-		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(indexBufferRes,
-			                                                        D3D12_RESOURCE_STATE_INDEX_BUFFER,
-			                                                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		resourceBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(uvVbBufferRes,
-																	D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-																	D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		resourceBarrier[2] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
-
-		vbIbTransitioned = TRUE;
-		m_dxrCommandList->ResourceBarrier(3, resourceBarrier);
+		CD3DX12_RESOURCE_BARRIER resourceBarrier[1];
+		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
+		m_dxrCommandList->ResourceBarrier(1, resourceBarrier);
 	}
 
 
@@ -78,19 +62,9 @@ VOID Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->DispatchRays(&dispatchRaysDesc);
 
 	{
-		CD3DX12_RESOURCE_BARRIER resourceBarrier[3];
-		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(indexBufferRes,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-			D3D12_RESOURCE_STATE_INDEX_BUFFER
-			);
-		resourceBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(uvVbBufferRes,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
-			);
-		resourceBarrier[2] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
-
-		vbIbTransitioned = TRUE;
-		m_dxrCommandList->ResourceBarrier(3, resourceBarrier);
+		CD3DX12_RESOURCE_BARRIER resourceBarrier[1];
+		resourceBarrier[0] = CD3DX12_RESOURCE_BARRIER::UAV(m_uavOutputResource.Get());
+		m_dxrCommandList->ResourceBarrier(1, resourceBarrier);
 	}
 }
 

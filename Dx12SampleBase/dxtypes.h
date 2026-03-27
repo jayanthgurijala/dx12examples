@@ -168,6 +168,16 @@ struct DxGltfPrimInfo
 	DxExtents                       extents;
 };
 
+
+///@todo remove this and use a map
+enum GltfVertexAttribIndex
+{
+	GltfVertexAttribPosition  = 0,
+	GltfVertexAttribNormal    = 1,
+	GltfVertexAttribTexcoord0 = 2,
+	GltfVertexAttribMax       = UINT_MAX
+};
+
 struct DxMaterialCB
 {
 	FLOAT baseColorFactor[4];
@@ -223,8 +233,9 @@ struct DxPrimVertexData
 
 struct DxPrimIndexData
 {
-	ComPtr<ID3D12Resource>        indexBuffer;
-	D3D12_INDEX_BUFFER_VIEW       modelIbv;
+	ComPtr<ID3D12Resource>  indexBuffer;
+	D3D12_INDEX_BUFFER_VIEW modelIbv;
+	UINT bufferStrideInBytes;
 };
 
 struct DxPrimitiveInfo

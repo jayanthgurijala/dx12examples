@@ -1269,51 +1269,24 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT scene
 {
 	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(sceneIdx, nodeIndex, primitiveIndex);
 
-	for (UINT vbvIndex = 0; vbvIndex < numVertexBufferViews; vbvIndex++)
-	{
-		D3D12_VERTEX_BUFFER_VIEW& vbv = GetModelVertexBufferView(sceneIdx, nodeIndex, primitiveIndex, vbvIndex);
-		pCmdList->IASetVertexBuffers(vbvIndex, 1, &vbv);
-	}
+	///need some generalization to support chinese dragon etc
+	assert(numVertexBufferViews == 3);
+
+	const auto& curPrimInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex);
+
+
+	const auto& positionVbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribPosition).modelVbv;
+	const auto& normalVbv   = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribNormal).modelVbv;
+	const auto& uv0Vbv      = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0).modelVbv;
+	pCmdList->IASetVertexBuffers(0, 1, &positionVbv);
+	pCmdList->IASetVertexBuffers(1, 1, &normalVbv);
+	pCmdList->IASetVertexBuffers(2, 1, &uv0Vbv);
 
 	auto& primitiveDrawInfo = GetModelDrawInfo(sceneIdx, nodeIndex, primitiveIndex);
 
-	/////@todo this will no longer work for multiple primitives in the scene.
-	//static UINT       s_numTrianglesToDraw = (primitiveDrawInfo.isIndexedDraw ? primitiveDrawInfo.numIndices : primitiveDrawInfo.numVertices) / 3;
-	//static const UINT s_maxTriangles               = s_numTrianglesToDraw;
-	//static INT        s_numTrianglesToDrawFromUser = s_numTrianglesToDraw;
-	//
-	//ImGui::Text("Triangle Count");
-	//ImGui::SameLine();
-	//
-	//if (ImGui::Button("-##tricountminus"))
-	//	s_numTrianglesToDrawFromUser -= 1;
-	//
-	//ImGui::SameLine();
-	//
-	//
-	//ImGui::SetNextItemWidth(80);
-	//ImGui::InputInt("##trianglecount", &s_numTrianglesToDrawFromUser, 0, 0);
-	//
-	//ImGui::SameLine();
-	//
-	//if (ImGui::Button("+##tricountplus"))
-	//	s_numTrianglesToDrawFromUser += 1;
-	//
-	//ImGui::SameLine();
-	//
-	//
-	//if (ImGui::Button("Max"))
-	//	s_numTrianglesToDrawFromUser = s_maxTriangles;
-	//
-	//if (ImGui::Button("Zero"))
-	//	s_numTrianglesToDrawFromUser = 0;
-	//
-	//
-	//s_numTrianglesToDraw = s_numTrianglesToDrawFromUser;
-
 	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
-		auto& indexBufferView = GetModelIndexBufferView(sceneIdx, nodeIndex, primitiveIndex);
+		auto& indexBufferView = GetIndexBufferInfo(curPrimInfo).modelIbv;
 		pCmdList->IASetIndexBuffer(&indexBufferView);
 		pCmdList->DrawIndexedInstanced(primitiveDrawInfo.numIndices, 1, 0, 0, 0);
 	}
@@ -1588,19 +1561,19 @@ VOID Dx12SampleBase::LoadGltfFiles()
 							if (isVertexAttribNeeded == TRUE)
 							{
 								const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
-								const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
-								const UINT   bufferIndex = gltfVbInfo.bufferIndex;
-								const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
+								const UINT64 bufferSizeInBytes     = gltfVbInfo.bufferSizeInBytes;
+								const UINT   bufferIndex           = gltfVbInfo.bufferIndex;
+								const UINT   bufferStrideInBytes   = gltfVbInfo.bufferStrideInBytes;
 								BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
 
 								vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-									(UINT)bufferSizeInBytes,
-									gltfVbInfo.iaLayoutInfo.name.c_str());
+																			(UINT)bufferSizeInBytes,
+																			gltfVbInfo.iaLayoutInfo.name.c_str());
 
 								vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
-								vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
-								vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
-								vbInfo.iaSemantic = gltfVbInfo.iaLayoutInfo;
+								vbInfo.modelVbv.SizeInBytes    = bufferSizeInBytes;
+								vbInfo.modelVbv.StrideInBytes  = bufferStrideInBytes;
+								vbInfo.iaSemantic              = gltfVbInfo.iaLayoutInfo;
 							}
 							else
 							{
@@ -1615,15 +1588,18 @@ VOID Dx12SampleBase::LoadGltfFiles()
 						{
 							auto& ibInfo = currentPrim.indexBufferInfo;
 							const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
-							const UINT64 bufferSizeInBytes = gltfPrimInfo.ibInfo.bufferSizeInBytes;
-							const UINT   bufferIndex = gltfPrimInfo.ibInfo.bufferIndex;
-							BYTE* bufferData = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
-							ibInfo.indexBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-								(UINT)bufferSizeInBytes,
-								gltfPrimInfo.ibInfo.name.c_str());
+							const UINT64 bufferSizeInBytes     = gltfPrimInfo.ibInfo.bufferSizeInBytes;
+							const UINT   bufferIndex           = gltfPrimInfo.ibInfo.bufferIndex;
+							BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
+							ibInfo.indexBuffer                 = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+																					  (UINT)bufferSizeInBytes,
+																					  gltfPrimInfo.ibInfo.name.c_str());
 							ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
-							ibInfo.modelIbv.SizeInBytes = bufferSizeInBytes;
-							ibInfo.modelIbv.Format = gltfPrimInfo.ibInfo.indexFormat;
+							ibInfo.modelIbv.SizeInBytes    = bufferSizeInBytes;
+							ibInfo.modelIbv.Format         = gltfPrimInfo.ibInfo.indexFormat;
+
+							//@note this is required for SRV access and min alignment is 4 bytes
+							ibInfo.bufferStrideInBytes     = dxhelper::DxAlign(gltfPrimInfo.ibInfo.bufferStrideInBytes, 4);
 						}
 					}
 
@@ -1632,11 +1608,11 @@ VOID Dx12SampleBase::LoadGltfFiles()
 					{
 						dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
 						dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
-						primMaterialCB.alphaCutoff = gltfMaterial.alphaCutOff;
-						primMaterialCB.metallicFactor = gltfMaterial.pbrMetallicRoughness.metallicFactor;
-						primMaterialCB.normalScale = gltfNormalInfo.scale;
+						primMaterialCB.alphaCutoff       = gltfMaterial.alphaCutOff;
+						primMaterialCB.metallicFactor    = gltfMaterial.pbrMetallicRoughness.metallicFactor;
+						primMaterialCB.normalScale       = gltfNormalInfo.scale;
 						primMaterialCB.occlusionStrength = gltfOcclusion.strength;
-						primMaterialCB.roughnessFactor = gltfPbrInfo.roughnessFactor;
+						primMaterialCB.roughnessFactor   = gltfPbrInfo.roughnessFactor;
 
 						// Lambda to load texture from DxGltfTextureInfo
 						auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
@@ -1646,9 +1622,9 @@ VOID Dx12SampleBase::LoadGltfFiles()
 								if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
 								{
 									const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-									BYTE* bufferData = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-									UINT64 bufferSizeInBytes = imageBufferInfo.bufferSizeInBytes;
-									UINT64 bufferOffsetInBytes = imageBufferInfo.bufferOffsetInBytes;
+									BYTE* bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
+									UINT64 bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
+									UINT64 bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
 
 									ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
 										&bufferData[bufferOffsetInBytes],

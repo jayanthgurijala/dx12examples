@@ -36,8 +36,8 @@ private:
 	VOID InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx = 0);
 	VOID InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx = 0);
 
-	/// Position, Index and UV buffers
-	inline UINT NumSrvsForRaytracing() { return 3; }
+	/// Position, Normal, Index and UV buffers
+	inline UINT NumSrvsForRaytracing() { return 4; }
 
 };
 

@@ -44,6 +44,5 @@ protected:
 	DxSceneBlasDesc m_sceneBlas;
 	DxSceneTlasDesc m_sceneTlas;
 private:
-
 };
 

@@ -5,9 +5,10 @@
 Texture2D gTexture    : register(t0, space3); 
 
 //Ray tracing specific
-StructuredBuffer<float2> uvVbBuffer : register(t5, space3); 
-StructuredBuffer<float3> posVbBuffer : register(t6, space3); 
-StructuredBuffer<uint> indexBuffer    : register(t7, space3);
+StructuredBuffer<float3> posVbBuffer     : register(t5, space3);
+StructuredBuffer<float3> posNormalBuffer : register(t6, space3);
+StructuredBuffer<float2> uvVbBuffer      : register(t7, space3); 
+StructuredBuffer<uint> indexBuffer       : register(t8, space3);
 
 RaytracingAccelerationStructure Scene : register(t0, space2);
 RWTexture2D<float4> UAVOutput : register(u0, space0);

@@ -147,13 +147,26 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeInde
 			const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
 			const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
 
-			primInfo.ibInfo.indexFormat       = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
-			primInfo.ibInfo.name =            "indices";
-			primInfo.ibInfo.bufferIndex       = bufViewDesc.buffer;
+
+			//accessorDesc.componentType = TINYGLTF_PARAMETER_TYPE_FLOAT (5126)
+			//accessorDesc.type          = "type" : "VEC3"
+			UINT componentSizeInBytes = GetComponentTypeSizeInBytes(accessorDesc.componentType);
+			UINT numComponentsInType  = GetNumComponentsInType(accessorDesc.type);
+
+
+			///@note just to make sure it is not invalid
+			assert(componentSizeInBytes < 10);
+			assert(numComponentsInType < 10);
+
+			UINT numComponents                  = 
+			primInfo.ibInfo.indexFormat         = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
+			primInfo.ibInfo.bufferStrideInBytes  = componentSizeInBytes * numComponentsInType;
+			primInfo.ibInfo.name                = "indices";
+			primInfo.ibInfo.bufferIndex         = bufViewDesc.buffer;
 			primInfo.ibInfo.bufferOffsetInBytes = byteOffsetIntoBuffer;
-			primInfo.ibInfo.bufferSizeInBytes = bufferSizeInBytes;
-			primInfo.drawInfo.numIndices      = (UINT)accessorDesc.count;
-			primInfo.drawInfo.isIndexedDraw = TRUE;
+			primInfo.ibInfo.bufferSizeInBytes   = bufferSizeInBytes;
+			primInfo.drawInfo.numIndices        = (UINT)accessorDesc.count;
+			primInfo.drawInfo.isIndexedDraw     = TRUE;
 		}
 		else
 		{
