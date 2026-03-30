@@ -57,12 +57,12 @@ public:
         m_materialData.count += increment;
     }
 
-    inline UINT GetPerInstanceDataCount()
+    inline void IncrementLightsCount(UINT increment)
     {
-        return m_worldMatrixData.count;
+        m_lightsData.count += increment;
     }
 
-    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa(UINT index)
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjGpuVa()
     {
         return GetBaseGpuVa() + ViewProjDataOffset();
     }
@@ -102,7 +102,9 @@ private:
         m_viewProjData.CalcTotalSize();
         m_worldMatrixData.CalcTotalSize();
         m_materialData.CalcTotalSize();
+        m_lightsData.CalcTotalSize();
         m_totalBufferSize = m_viewProjData.totalAlignedSize    +
+                            m_lightsData.totalAlignedSize      +
                             m_worldMatrixData.totalAlignedSize +
                             m_materialData.totalAlignedSize;
                              
@@ -135,6 +137,7 @@ private:
     ComPtr<ID3D12Resource> m_bufferResource;
 
     DxSizeAlignedSize m_viewProjData;
+    DxSizeAlignedSize m_lightsData;
     DxSizeAlignedSize m_worldMatrixData;
     DxSizeAlignedSize m_materialData;
 

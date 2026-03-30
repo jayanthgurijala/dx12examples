@@ -75,6 +75,6 @@ private:
     BOOL m_needsDsv = FALSE;
     UINT m_dsvHeapStartOffset = 0;
 
-    UINT m_viewProjOffset;
+
 };
 

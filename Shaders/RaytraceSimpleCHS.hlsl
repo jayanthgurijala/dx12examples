@@ -60,9 +60,35 @@ float3 HitWorldPosition()
     return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 }
 
-inline void TraceShadowRay(float3 origin, float3 direction, out RayPayload payload)
+inline bool TraceShadowRay(float3 origin, float3 direction, uint recursionDepth)
 {
+    if (recursionDepth > 2)
+    {
+        return false;
+    }
+    ShadowRayPayload payload;
+    payload.isHit = false;
+    payload.currentRecursionDepth = recursionDepth + 1;
     
+    uint missShaderIndex = 1;
+    uint rayContrubitionToHitGroupIndex = 1;
+    uint multiplierForGeometryContribution = 2;
+    uint rayFlags = 0;
+    uint instanceInclusionMask = 0xFF;
+
+    
+    TraceRay(Scene,
+             rayFlags,
+             instanceInclusionMask,
+             rayContrubitionToHitGroupIndex,
+             multiplierForGeometryContribution,
+             missShaderIndex,
+             GetRay(origin, direction),
+             payload);
+
+    return payload.isHit;
+    
+
 }
 
 inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload payload)
@@ -71,7 +97,7 @@ inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload pay
     RayDesc ray = GetRay(origin, direction);
     
     uint missShaderIndex                   = 0;
-    uint multiplierForGeometryContribution = 1;
+    uint multiplierForGeometryContribution = 2;
     uint rayFlags                          = 0;
     uint instanceInclusionMask             = 0xFF;
     uint rayContrubitionToHitGroupIndex    = 0;
@@ -249,8 +275,15 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
     
-    //payload.color = float4(mipLevel, 0, 0, 1);
-    payload.color = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
+    float4 baseColor = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
+    
+    float3 triangleNormal = posNormalBuffer[indices[0]];
+    float3 hitPosition = HitWorldPosition();
+    float3 lightDirection = normalize(float3(0.5f, 1.0f, 0.5f));
+    
+    bool shadowHit = TraceShadowRay(hitPosition, lightDirection, payload.currentRecursionDepth);
+    float shadowing = shadowHit ? 0.5f : 1.0f;
+    payload.color = baseColor * shadowing;
 }
 
 [shader("anyhit")]
@@ -268,7 +301,7 @@ void AHSAlphaCutOff(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
     
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
-    float4 color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
+    float4 color = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
     
     if (color.a < 0.5f)
     {
@@ -282,14 +315,27 @@ void AHSAlphaCutOff(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
    
 }
 
+
 [shader("closesthit")]
 void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     payload.color = float4(1.0, 1.0, 1.0, 1.0);
 }
 
+[shader("closesthit")]
+void CHSShadow(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
+{
+    payload.isHit = true;
+}
+
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
     payload.color = float4(0.1f, 0.1f, 0.4f, 1.0f);
+}
+
+[shader("miss")]
+void ShadowMissShader(inout ShadowRayPayload payload)
+{
+    payload.isHit = false;
 }

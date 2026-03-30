@@ -388,9 +388,9 @@ protected:
 
     UINT CreateInputElementDesc(const std::vector<DxPrimVertexData>& inData, std::vector<D3D12_INPUT_ELEMENT_DESC>& outData);
 
-    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa(UINT index)
+    inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjGpuVa()
     {
-        return m_camLightsMaterialsManager->GetViewProjLightsGpuVa(index);
+        return m_camLightsMaterialsManager->GetViewProjGpuVa();
     }
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetPerInstanceDataGpuVa(UINT linearIdx)

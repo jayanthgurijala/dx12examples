@@ -194,6 +194,14 @@ struct DxMaterialCB
 	FLOAT padding[3];
 };
 
+struct DxLightDataCB
+{
+	FLOAT lightDirection[3];
+    FLOAT lightColor[3];
+	FLOAT lightPosition[3];
+    FLOAT lightIntensity;
+};
+
 struct DxTextureSamplerInfo
 {
 	ComPtr<ID3D12Resource> textureInfo;

@@ -53,7 +53,7 @@ VOID Dx12Raytracing::RenderFrame()
 	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
-	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjLightsGpuVa(0)); //GetUavGpuHandle
+	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjGpuVa()); //GetUavGpuHandle
 	m_dxrCommandList->SetComputeRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
 	m_dxrCommandList->SetComputeRootDescriptorTable(2, GetUavGpuHandle(0));
 	m_dxrCommandList->SetComputeRootShaderResourceView(3, m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress());

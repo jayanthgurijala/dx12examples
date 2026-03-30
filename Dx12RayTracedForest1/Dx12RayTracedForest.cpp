@@ -56,7 +56,7 @@ VOID Dx12RayTracedForest::RenderFrame()
 	m_dxrCommandList->SetComputeRootSignature(m_rootSignature.Get());
 
 	//Root args required - UAV in the descriptor heap and Accelaration structure
-	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjLightsGpuVa(0)); //GetUavGpuHandle
+	m_dxrCommandList->SetComputeRootConstantBufferView(0, GetViewProjGpuVa()); //GetUavGpuHandle
 	m_dxrCommandList->SetComputeRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
 	m_dxrCommandList->SetComputeRootDescriptorTable(2, GetUavGpuHandle(0));
 	m_dxrCommandList->SetComputeRootShaderResourceView(3, m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress());
@@ -82,7 +82,7 @@ VOID Dx12RayTracedForest::LoadSceneDescription(std::vector<DxSceneElementInstanc
 
 
 	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
-	const UINT numSceneElements = NumSceneElementsLoaded();
+	const UINT numSceneElements = NumSceneElementsLoaded() + 2;
 	sceneDescription.resize(numSceneElements);
 
 	UINT terrainIdx = 0;
@@ -167,12 +167,12 @@ VOID Dx12RayTracedForest::InitOakTrees(DxSceneElementInstance& sceneElement, UIN
 {
 	sceneElement.sceneElementIdx = 2;
 	sceneElement.numInstances = 1;
-	sceneElement.addToExtents = TRUE;
+	sceneElement.addToExtents = FALSE;
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
-	trsMatrix.translation[0] = 0.8f + localIdx * 0.8f; //looking from rear of Deer moving right
-	trsMatrix.translation[1] = 0.0f; //moving forward towards Deer nose
+	trsMatrix.translation[0] = -4.f + localIdx * 1.5f; //looking from rear of Deer moving right
+	trsMatrix.translation[1] = 0.5f; //moving forward towards Deer nose
 	trsMatrix.translation[2] = 0.8; //moving down
 
 	trsMatrix.rotationInDegrees[0] = 0.0f;

@@ -2,7 +2,6 @@
 #include "Dx12SampleBase.h"
 
 
-
 class Dx12RaytracingBase :
     public Dx12SampleBase
 {
@@ -46,5 +45,6 @@ protected:
 	DxSceneBlasDesc m_sceneBlas;
 	DxSceneTlasDesc m_sceneTlas;
 private:
+	
 };
 

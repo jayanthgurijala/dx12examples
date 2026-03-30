@@ -143,7 +143,7 @@ VOID Dx12Tessellation::RenderFrameGfxDraw()
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa(0));
+	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjGpuVa());
 	pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
 	pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(0));
 

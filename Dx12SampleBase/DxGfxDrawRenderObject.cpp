@@ -7,7 +7,6 @@ DxGfxDrawRenderObject::DxGfxDrawRenderObject(UINT viewProjOffset, UINT numRtvs, 
 	m_rtvHeapStartOffset = rtvHeapOffset;
     m_needsDsv       = needsDsv;
 	m_dsvHeapStartOffset = dsvHeapOffset;
-	m_viewProjOffset = viewProjOffset;
 	m_sampleBase     = Dx12SampleBase::GetInstance();
 }
 
@@ -26,7 +25,7 @@ VOID DxGfxDrawRenderObject::RenderInitViewProjRtvDsv()
 		nullptr);
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	pCmdList->SetGraphicsRootConstantBufferView(0, m_sampleBase->GetViewProjLightsGpuVa(m_viewProjOffset));
+	pCmdList->SetGraphicsRootConstantBufferView(0, m_sampleBase->GetViewProjGpuVa());
 }
 
 

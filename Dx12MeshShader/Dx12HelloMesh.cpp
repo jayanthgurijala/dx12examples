@@ -132,7 +132,7 @@ VOID Dx12HelloMesh::RenderFrame()
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	m_meshCommandList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetViewProjLightsGpuVa(0));
+	m_meshCommandList->SetGraphicsRootConstantBufferView(0, GetViewProjGpuVa());
 	m_meshCommandList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
 	m_meshCommandList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(0));
 

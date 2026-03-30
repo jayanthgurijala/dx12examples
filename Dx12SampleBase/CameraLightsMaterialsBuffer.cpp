@@ -14,6 +14,7 @@ CameraLightsMaterialsBuffer::CameraLightsMaterialsBuffer() :
     dxhelper::GetSizeAndAlignedSizeInfo<DxCBSceneData>(m_viewProjData);
     dxhelper::GetSizeAndAlignedSizeInfo<DxCBPerInstanceData>(m_worldMatrixData);
     dxhelper::GetSizeAndAlignedSizeInfo<DxMaterialCB>(m_materialData);
+    dxhelper::GetSizeAndAlignedSizeInfo<DxLightDataCB>(m_lightsData);
 
     //@todo
     m_viewProjData.count = 1;
