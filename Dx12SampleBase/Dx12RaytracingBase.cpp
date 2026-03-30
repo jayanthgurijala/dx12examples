@@ -15,6 +15,7 @@ static const wchar_t* const c_pHitGroupAlphaCutOff = L"hitgroup_alphacutoff";
 struct RayPayload
 {
 	float color[4];
+	UINT currentRecursionDepth;
 };
 
 VOID Dx12RaytracingBase::OnInit()
@@ -204,7 +205,7 @@ VOID Dx12RaytracingBase::CreateRayTracingStateObject()
 	globalRootSigSubObject->SetRootSignature(m_rootSignature.Get());
 
 	auto pipelineConfigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-	const UINT maxRecursionDepth = 1;
+	const UINT maxRecursionDepth = MaxRecursionDepth();
 	pipelineConfigSubObject->Config(maxRecursionDepth);
 
 	auto localRootSigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();

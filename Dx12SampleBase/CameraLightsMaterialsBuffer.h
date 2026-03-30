@@ -17,7 +17,7 @@ class CameraLightsMaterialsBuffer
     ///Model matrix - changes per instance (highest change frequency)
     /// 
     /// 
-    /// Buffer Layout [ Scene Data | Per Instance Geometry Data | Material Data]
+    /// Buffer Layout [ Scene Data | Lights (if any)  | Per Instance Geometry Data | Material Data]
     /// 
     /// Scene Data (just one value for each which might change e.g. user interaction)
     ///          values: camera position, FovY, Inverse_viewProj(RayTracing)
@@ -64,7 +64,7 @@ public:
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetViewProjLightsGpuVa(UINT index)
     {
-        return GetBaseGpuVa() + ViewProjLightsDataOffset();
+        return GetBaseGpuVa() + ViewProjDataOffset();
     }
 
     inline D3D12_GPU_VIRTUAL_ADDRESS GetPerInstanceDataGpuVa(UINT linearIdx)
@@ -108,7 +108,7 @@ private:
                              
     }
 
-    inline UINT64 ViewProjLightsDataOffset()
+    inline UINT64 ViewProjDataOffset()
     {
         return 0;
     }

@@ -12,6 +12,8 @@ public:
 	virtual VOID OnInit() override;
 
 protected:
+
+	virtual inline UINT MaxRecursionDepth() { return 1; }
 	VOID CreateGlobalRootSignature();
 	VOID CreateLocalRootSignature();
 	VOID CreatePerPrimSrvs();

@@ -28,8 +28,10 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
+	virtual inline UINT MaxRecursionDepth()           override { return 2; }
 	virtual inline const std::vector<std::string> GltfFileName() override { return { "terrain_gridlines.gltf", "deer.gltf", "oaktree.gltf" }; }
 	virtual VOID LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription) override;
+
 
 private:
 	VOID InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx = 0);

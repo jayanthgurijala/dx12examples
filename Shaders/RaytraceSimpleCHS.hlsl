@@ -33,30 +33,81 @@ inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 directi
     direction = normalize(world.xyz - origin);
 }
 
+inline RayPayload InitWithDirectionColor(float3 direction)
+{
+    RayPayload payload;
+    float3 normalizedDirection = (direction + 0.5f) / 2; // Shift to [0, 1] range for visualization.
+    float4 color               = float4(normalizedDirection, 1.0f);
+    
+    payload.color                 = color;
+    payload.currentRecursionDepth = 0;
+    return payload;
+}
+
+inline RayDesc GetRay(float3 origin, float3 direction)
+{
+    RayDesc ray;
+    ray.Direction = direction;
+    ray.Origin = origin;
+    ray.TMin = 0.001;
+    ray.TMax = 100;
+    return ray;
+}
+
+// Retrieve hit world position.
+float3 HitWorldPosition()
+{
+    return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+}
+
+inline void TraceShadowRay(float3 origin, float3 direction, out RayPayload payload)
+{
+    
+}
+
+inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload payload)
+{
+    RayPayload payload_ = InitWithDirectionColor(direction);
+    RayDesc ray = GetRay(origin, direction);
+    
+    uint missShaderIndex                   = 0;
+    uint multiplierForGeometryContribution = 1;
+    uint rayFlags                          = 0;
+    uint instanceInclusionMask             = 0xFF;
+    uint rayContrubitionToHitGroupIndex    = 0;
+    
+    TraceRay(Scene,
+             rayFlags,
+             instanceInclusionMask,
+             rayContrubitionToHitGroupIndex,
+             multiplierForGeometryContribution,
+             missShaderIndex,
+             ray,
+             payload_);
+    payload = payload_;
+}
+
 [shader("raygeneration")]
 void MyRaygenShader()
 {
     float3 direction;
     float3 origin;
+    RayPayload payload;
     GenerateCameraRay(DispatchRaysIndex().xy, origin, direction);
-    RayPayload payload = { float4((direction + 0.5f) / 2, 1.0f) };
-    RayDesc ray;
-    ray.Direction = direction;
-    ray.Origin    = origin;
-    ray.TMin      = 0.001;
-    ray.TMax      = 100;
-    
-    TraceRay(Scene,
-             0,
-             0xFF,
-             0,
-             0,
-            0,
-            ray,
-            payload);
-    
+    TraceRadianceRay(origin, direction, payload);
+
      // Write the raytraced color to the output texture.
     UAVOutput[DispatchRaysIndex().xy] = payload.color;
+}
+
+float2 InterpolateBarycentrics(float2 bary, float2 uv[3])
+{
+    float b0 = (1 - bary.x - bary.y);
+    float b1 = bary.x;
+    float b2 = bary.y;
+    
+    float2 uvInterpolated = b1 * uv[1] + b2 * uv[2] + b0 * uv[0];
+    return uvInterpolated;
 }
 
 uint3 GetHitTriangleIndices()
@@ -165,8 +216,22 @@ float CalculateRayConeUVFootPrint(float3 p[3], float2 uv[3])
     float rho = uvFootPrint * max(width, height);
     
     return rho;
-    
 }
+
+inline void GetValues(uint3 indices, StructuredBuffer<float3> buffer, out float3 values[3])
+{
+    values[0] = buffer[indices.x];
+    values[1] = buffer[indices.y];
+    values[2] = buffer[indices.z];
+}
+
+inline void GetValues(uint3 indices,StructuredBuffer<float2> buffer, out float2 values[3])
+{
+    values[0] = buffer[indices.x];
+    values[1] = buffer[indices.y];
+    values[2] = buffer[indices.z];
+}
+
 
 [shader("closesthit")]
 void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
@@ -176,22 +241,10 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     float3 p[3];
     float2 uv[3];
     
-    p[0] = posVbBuffer[indices.x];
-    p[1] = posVbBuffer[indices.y];
-    p[2] = posVbBuffer[indices.z];
- 
+    GetValues(indices, posVbBuffer, p);
+    GetValues(indices, uvVbBuffer, uv);
     
-    uv[0] = uvVbBuffer[indices.x];
-    uv[1] = uvVbBuffer[indices.y];
-    uv[2] = uvVbBuffer[indices.z];
-    
-   
-    
-    float b0 = (1 - attr.barycentrics.x - attr.barycentrics.y);
-    float b1 = attr.barycentrics.x;
-    float b2 = attr.barycentrics.y;
-    
-    float2 uvInterpolated =b1 * uv[1] + b2 * uv[2] + b0 * uv[0];
+    float2 uvInterpolated = InterpolateBarycentrics(attr.barycentrics, uv);
     
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
@@ -208,20 +261,10 @@ void AHSAlphaCutOff(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
     float3 p[3];
     float2 uv[3];
     
-    p[0] = posVbBuffer[indices.x];
-    p[1] = posVbBuffer[indices.y];
-    p[2] = posVbBuffer[indices.z];
- 
+    GetValues(indices, posVbBuffer, p);
+    GetValues(indices, uvVbBuffer, uv);
     
-    uv[0] = uvVbBuffer[indices.x];
-    uv[1] = uvVbBuffer[indices.y];
-    uv[2] = uvVbBuffer[indices.z];
-    
-    float b0 = (1 - attr.barycentrics.x - attr.barycentrics.y);
-    float b1 = attr.barycentrics.x;
-    float b2 = attr.barycentrics.y;
-    
-    float2 uvInterpolated = b1 * uv[1] + b2 * uv[2] + b0 * uv[0];
+    float2 uvInterpolated = InterpolateBarycentrics(attr.barycentrics, uv);
     
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
@@ -248,5 +291,5 @@ void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 [shader("miss")]
 void MyMissShader(inout RayPayload payload)
 {
-    payload.color = float4(0.1f, 0.1f, 0.1f, 1.0f);
+    payload.color = float4(0.1f, 0.1f, 0.4f, 1.0f);
 }
