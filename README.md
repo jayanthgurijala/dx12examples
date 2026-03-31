@@ -41,6 +41,8 @@ A collection of DirectX 12 sample projects demonstrating different graphics pipe
 
 [RayTracing OakTree Debugging](https://www.youtube.com/watch?v=GdAYPBeFWrM)
 
+[Gfxr and ExecuteIndirect](https://youtu.be/fMGDN8BbAg4)
+
 
 ## 🛠 Requirements
 
