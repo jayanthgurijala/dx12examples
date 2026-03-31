@@ -16,6 +16,64 @@
 
 using namespace DirectX;
 
+//somewhat a grid
+static const FLOAT OakTreePositions[][3] =
+{
+	{ -4.0f, -4.0, 0.8f },
+    {  0.0f, -4.0, 0.8f },
+	{ 4.0f, -4.0, 0.8f },
+	{ 4.0f, 0.0, 0.8f },
+	{ -4.0f, 4.0, 0.8f },
+	{ -4.0f, 0.0, 0.8f },
+    { 4.0f, 4.0, 0.8f },
+	{ 0.0f, 4.0, 0.8f },
+
+
+	{ -2.0f, -2.0, 0.8f },
+	{  0.0f, -2.0, 0.8f },
+	{ 2.0f, -2.0, 0.8f },
+	{ 2.0f, 0.0, 0.8f },
+	{ -2.0f, 2.0, 0.8f },
+	{ -2.0f, 0.0, 0.8f },
+	{ 2.0f, 2.0, 0.8f },
+	{ 0.0f, 2.0, 0.8f },
+
+};
+
+
+//absolute positions
+static const FLOAT DeerPositions[][3] =
+{
+	{ 0.0f, 0.0f, 0.0f },
+	{ 4.0f, 0.0f, 3.0f },
+	{ -4.0f, 0.0f, 3.0f },
+	{ 4.0f, 0.0f, -3.0f },
+	{ -4.0f, 0.0f, -3.0f },
+    { 8.0f, 0.0f, 3.0f },
+    {  -8.0f, 0.0f, 3.0f },
+	{ 8.0f, 0.0f, -3.0f },
+	{ -8.0f, 0.0f, -3.0f },
+};
+
+
+static const FLOAT DeerRotations[][3] =
+{
+	{ 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 90.0f, 0.0f },
+	{ 0.0f, 45.0f, 0.0f },
+	{ 0.0f, 30.0f, 0.0f },
+	{ 0.0f, 10.0f, 0.0f },
+	{ 0.0f, 80.0f, 0.0f },
+	{ 0.0f, 0.0f, 0.0f },
+	{ 0.0f, 90.0f, 0.0f },
+	{ 0.0f, 45.0f, 0.0f },
+	{ 0.0f, 30.0f, 0.0f },
+	{ 0.0f, 10.0f, 0.0f },
+	{ 0.0f, 80.0f, 0.0f },
+
+};
+
+
 Dx12RayTracedForest::Dx12RayTracedForest(UINT width, UINT height) :
 	Dx12RaytracingBase(width, height)
 {
@@ -82,31 +140,32 @@ VOID Dx12RayTracedForest::LoadSceneDescription(std::vector<DxSceneElementInstanc
 
 
 	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
-	const UINT numSceneElements = NumSceneElementsLoaded() + 2;
+
+    const UINT numTerrainElements = 1;
+    const UINT numDeerElements    = _countof(DeerPositions);
+    const UINT numOakTreeElements = _countof(OakTreePositions);
+
+    const UINT numSceneElements = numDeerElements + numOakTreeElements + numTerrainElements;
 	sceneDescription.resize(numSceneElements);
 
-	UINT terrainIdx = 0;
-	UINT deerIdx = 0;
-	UINT oakTreeIdx = 0;
+	UINT currentDescIdx = 0;
 
-	for (UINT idx = 0; idx < numSceneElements; idx++)
 	{
-		auto& currentSceneElement = sceneDescription[idx];
-		if (idx == 0)
-		{
-			InitTerrain(currentSceneElement, terrainIdx);
-			terrainIdx++;
-		}
-		else if (idx == 1)
-		{
-			InitAnimalsDeer(currentSceneElement, deerIdx);
-			deerIdx++;
-		}
-		else
-		{
-			InitOakTrees(currentSceneElement, oakTreeIdx);
-			oakTreeIdx++;
-		}
+		auto& currentSceneElement = sceneDescription[currentDescIdx];
+		InitTerrain(currentSceneElement, 0);
+		currentDescIdx++;
+	}
+
+    for (UINT deerIdx = 0; deerIdx < numDeerElements; deerIdx++, currentDescIdx++)
+	{
+		auto& currentSceneElement = sceneDescription[currentDescIdx];
+		InitAnimalsDeer(currentSceneElement, deerIdx);
+	}
+
+    for (UINT oakTreeIdx = 0; oakTreeIdx < numOakTreeElements; oakTreeIdx++, currentDescIdx++)
+	{
+		auto& currentSceneElement = sceneDescription[currentDescIdx];
+		InitOakTrees(currentSceneElement, oakTreeIdx);
 	}
 }
 
@@ -150,13 +209,13 @@ VOID Dx12RayTracedForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, 
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = 0.0f;
-	trsMatrix.translation[1] = 0.0f;
-	trsMatrix.translation[2] = 0.0f;
+	trsMatrix.translation[0] = DeerPositions[localIdx][0];
+	trsMatrix.translation[1] = DeerPositions[localIdx][1];
+	trsMatrix.translation[2] = DeerPositions[localIdx][2];
 
-	trsMatrix.rotationInDegrees[0] = 0.0f;
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
+    trsMatrix.rotationInDegrees[0] = DeerRotations[localIdx][0];
+    trsMatrix.rotationInDegrees[1] = DeerRotations[localIdx][1];
+    trsMatrix.rotationInDegrees[2] = DeerPositions[localIdx][2];
 
 	trsMatrix.scale[0] = 1.0f;
 	trsMatrix.scale[1] = 1.0f;
@@ -171,9 +230,11 @@ VOID Dx12RayTracedForest::InitOakTrees(DxSceneElementInstance& sceneElement, UIN
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
-	trsMatrix.translation[0] = -4.f + localIdx * 1.5f; //looking from rear of Deer moving right
-	trsMatrix.translation[1] = 0.5f; //moving forward towards Deer nose
-	trsMatrix.translation[2] = 0.8; //moving down
+
+
+    trsMatrix.translation[0] = OakTreePositions[localIdx][0];
+    trsMatrix.translation[1] = OakTreePositions[localIdx][1];
+    trsMatrix.translation[2] = OakTreePositions[localIdx][2];
 
 	trsMatrix.rotationInDegrees[0] = 0.0f;
 	trsMatrix.rotationInDegrees[1] = 0.0f;

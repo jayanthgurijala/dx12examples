@@ -12,7 +12,7 @@ public:
 
 protected:
 
-	virtual inline UINT MaxRecursionDepth() { return 1; }
+	virtual inline UINT MaxRecursionDepth() { return 2; }
 	VOID CreateGlobalRootSignature();
 	VOID CreateLocalRootSignature();
 	VOID CreatePerPrimSrvs();

@@ -62,21 +62,22 @@ float3 HitWorldPosition()
 
 inline bool TraceShadowRay(float3 origin, float3 direction, uint recursionDepth)
 {
-    if (recursionDepth > 2)
+    if (recursionDepth > 1)
     {
         return false;
     }
     ShadowRayPayload payload;
     payload.isHit = false;
-    payload.currentRecursionDepth = recursionDepth + 1;
     
-    uint missShaderIndex = 1;
-    uint rayContrubitionToHitGroupIndex = 1;
+    
+    uint missShaderIndex                   = 1;
+    uint rayContrubitionToHitGroupIndex    = 1;
     uint multiplierForGeometryContribution = 2;
-    uint rayFlags = 0;
-    uint instanceInclusionMask = 0xFF;
+    uint rayFlags                          = 0;
+    uint instanceInclusionMask             = 0xFF;
 
-    
+    //Level 2
+    payload.currentRecursionDepth = recursionDepth + 1;
     TraceRay(Scene,
              rayFlags,
              instanceInclusionMask,
@@ -91,17 +92,19 @@ inline bool TraceShadowRay(float3 origin, float3 direction, uint recursionDepth)
 
 }
 
-inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload payload)
+inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload payload, uint recursionDepth)
 {
     RayPayload payload_ = InitWithDirectionColor(direction);
     RayDesc ray = GetRay(origin, direction);
     
     uint missShaderIndex                   = 0;
+    uint rayContrubitionToHitGroupIndex    = 0;
     uint multiplierForGeometryContribution = 2;
     uint rayFlags                          = 0;
     uint instanceInclusionMask             = 0xFF;
-    uint rayContrubitionToHitGroupIndex    = 0;
-    
+
+    //Level one
+    payload_.currentRecursionDepth = recursionDepth + 1;
     TraceRay(Scene,
              rayFlags,
              instanceInclusionMask,
@@ -120,7 +123,7 @@ void MyRaygenShader()
     float3 origin;
     RayPayload payload;
     GenerateCameraRay(DispatchRaysIndex().xy, origin, direction);
-    TraceRadianceRay(origin, direction, payload);
+    TraceRadianceRay(origin, direction, payload, 0);
 
      // Write the raytraced color to the output texture.
     UAVOutput[DispatchRaysIndex().xy] = payload.color;
@@ -262,6 +265,11 @@ inline void GetValues(uint3 indices,StructuredBuffer<float2> buffer, out float2 
 [shader("closesthit")]
 void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {    
+    if (payload.currentRecursionDepth > 1)
+    {
+        payload.color = float4(1.0f, 0.0f, 1.0f, 1.0f); // Magenta for debugging excessive recursion.
+        return;
+    };
     uint3 indices = GetHitTriangleIndices();
     
     float3 p[3];
@@ -278,7 +286,7 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     float4 baseColor = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
     
     float3 triangleNormal = posNormalBuffer[indices[0]];
-    float3 hitPosition = HitWorldPosition();
+    float3 hitPosition    = HitWorldPosition();
     float3 lightDirection = normalize(float3(0.5f, 1.0f, 0.5f));
     
     bool shadowHit = TraceShadowRay(hitPosition, lightDirection, payload.currentRecursionDepth);
