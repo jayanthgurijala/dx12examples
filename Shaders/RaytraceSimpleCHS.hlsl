@@ -309,7 +309,8 @@ void AHSAlphaCutOff(inout RayPayload payload, in BuiltInTriangleIntersectionAttr
     
     float rho = CalculateRayConeUVFootPrint(p, uv);
     float mipLevel = log2(rho);
-    float4 color = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
+    mipLevel = clamp(mipLevel, 0, 3); // Clamp mip level to valid range.)
+    float4 color = gTexture.SampleLevel(gSampler, uvInterpolated, 0);
     
     if (color.a < 0.5f)
     {
