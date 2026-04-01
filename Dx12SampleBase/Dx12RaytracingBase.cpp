@@ -438,7 +438,9 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 				auto& geomDesc = geomDescs[primIdx];
 				const auto curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
 				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetIndexBufferInfo(curPrim).modelIbv;
-				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetVertexBufferInfo(curPrim, GltfVertexAttribPosition).modelVbv;
+
+				//@note we should always have position
+				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetVertexBufferInfo(curPrim, GltfVertexAttribPosition)->modelVbv;
 				const DxDrawPrimitive         drawInfo = GetDrawInfo(sceneElementIdx, nodeIdx, primIdx);
 				const BOOL isPrimTransparent = IsPrimitiveTransparent(sceneElementIdx, nodeIdx, primIdx);
 				geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;

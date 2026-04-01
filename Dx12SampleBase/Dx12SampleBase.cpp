@@ -1274,13 +1274,25 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT scene
 
 	const auto& curPrimInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex);
 
+	//@note Position and Normal are always there, at 0 and 1 index, chinesedragon as no texture so no UVs
+	const auto& positionVbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribPosition)->modelVbv;
+	const auto& normalVbv   = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribNormal)->modelVbv;
 
-	const auto& positionVbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribPosition).modelVbv;
-	const auto& normalVbv   = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribNormal).modelVbv;
-	const auto& uv0Vbv      = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0).modelVbv;
 	pCmdList->IASetVertexBuffers(0, 1, &positionVbv);
 	pCmdList->IASetVertexBuffers(1, 1, &normalVbv);
-	pCmdList->IASetVertexBuffers(2, 1, &uv0Vbv);
+
+	auto* uvVbData = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0);
+	if (uvVbData != nullptr)
+	{
+		const auto& uv0Vbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0)->modelVbv;
+		pCmdList->IASetVertexBuffers(2, 1, &uv0Vbv);
+	}
+	else
+	{
+		//Set dummy buffer for UVs, shader should not read from it as it should check material textures count before reading UVs
+        D3D12_VERTEX_BUFFER_VIEW dummyVbv = {};
+        pCmdList->IASetVertexBuffers(2, 1, &dummyVbv);
+	}
 
 	auto& primitiveDrawInfo = GetModelDrawInfo(sceneIdx, nodeIndex, primitiveIndex);
 

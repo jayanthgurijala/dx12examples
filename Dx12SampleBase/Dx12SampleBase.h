@@ -194,9 +194,16 @@ protected:
 
     ///@todo Assumptions, POSITION, NORMAL, TEXCOORD0, TEXCOORD1 etc as per semantic order in gltfloader
     ///      But these can be in any order
-    inline const DxPrimVertexData& GetVertexBufferInfo(const DxPrimitiveInfo& primInfo, GltfVertexAttribIndex attribIndex)
+    inline const DxPrimVertexData* GetVertexBufferInfo(const DxPrimitiveInfo& primInfo, GltfVertexAttribIndex attribIndex)
     {
-        return primInfo.vertexBufferInfo[attribIndex];
+        const DxPrimVertexData* vbData = nullptr;
+
+        if (attribIndex < primInfo.vertexBufferInfo.size())
+        {
+            vbData = &primInfo.vertexBufferInfo[attribIndex];
+        }
+
+        return vbData;
     }
 
     
@@ -413,28 +420,32 @@ protected:
 
         if (isIndexBuffer == FALSE)
         {
-            auto vbPosInfo = GetVertexBufferInfo(primInfo, attribIndex);
-            auto posVbView = vbPosInfo.modelVbv;
-            elementSize = posVbView.StrideInBytes;
-            numElements = posVbView.SizeInBytes / elementSize;
-            pRes = vbPosInfo.modelVbBuffer.Get();
+            auto* vbPosInfo = GetVertexBufferInfo(primInfo, attribIndex);
+            if (vbPosInfo != nullptr)
+            {
+                auto posVbView = vbPosInfo->modelVbv;
+
+                elementSize    = posVbView.StrideInBytes;
+                numElements    = posVbView.SizeInBytes / elementSize;
+                pRes           = vbPosInfo->modelVbBuffer.Get();
+            }
         }
         else
         {
             auto ibPosInfo = GetIndexBufferInfo(primInfo);
-            auto ibView = ibPosInfo.modelIbv;
-            elementSize = ibPosInfo.bufferStrideInBytes;
-            numElements = ibView.SizeInBytes / elementSize;
-            pRes = ibPosInfo.indexBuffer.Get();
+            auto ibView    = ibPosInfo.modelIbv;
+            elementSize    = ibPosInfo.bufferStrideInBytes;
+            numElements    = ibView.SizeInBytes / elementSize;
+            pRes           = ibPosInfo.indexBuffer.Get();
 
         }
 
-        assert(elementSize == 12 || elementSize == 8 || elementSize == 4);
+        assert(pRes == nullptr || elementSize == 12 || elementSize == 8 || elementSize == 4);
         CreateAppBufferSrvDescriptorAtIndex(primInfo.primLinearIdxInSceneElements,
-            offset,
-            pRes,
-            numElements,
-            elementSize);
+                                            offset,
+                                            pRes,
+                                            numElements,
+                                            elementSize);
     }
 
 private:
