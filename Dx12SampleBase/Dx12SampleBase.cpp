@@ -1662,6 +1662,8 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 					///@Fill in material and texture info if material is defined for the primitive
 					{
+						const UINT tessMask = ((IsTessEnabled() == TRUE ? ~0 : 0) & RenderFlagsTessEnabled);
+						const UINT pbrMask  = ((EnablePBRShading() == TRUE ? ~0 : 0) & RenderFlagsUsePBR);
 						dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
 						dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
 						primMaterialCB.alphaCutoff       = gltfMaterial.alphaCutOff;
@@ -1669,6 +1671,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 						primMaterialCB.normalScale       = gltfNormalInfo.scale;
 						primMaterialCB.occlusionStrength = gltfOcclusion.strength;
 						primMaterialCB.roughnessFactor   = gltfPbrInfo.roughnessFactor;
+						primMaterialCB.renderFlags       = (tessMask | pbrMask);
 
 						// Lambda to load texture from DxGltfTextureInfo
 						auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)

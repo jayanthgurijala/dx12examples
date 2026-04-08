@@ -301,6 +301,11 @@ protected:
     virtual inline const std::vector<std::string> GltfFileName() { return { "triangle.gltf" }; }
     virtual inline std::array<FLOAT, 4> RenderTargetClearColor() { return{ 0.2f, 0.2f, 0.2f, 1.0f }; }
 
+    virtual inline BOOL EnablePBRShading()
+    {
+        return FALSE;
+    }
+
     virtual inline std::string GetVertexShaderName(SIZE_T numVertexAttributes)
     {
         char shaderName[64];
@@ -481,6 +486,11 @@ private:
     inline VOID IncrementMaterialDataCount(UINT increment)
     {
         m_camLightsMaterialsManager->IncrementMaterialDataCount(increment);
+    }
+
+    inline BOOL IsTessEnabled()
+    {
+        return ((GetHullShaderName().length() > 0) ? TRUE : FALSE);
     }
 
     struct FrameComposition

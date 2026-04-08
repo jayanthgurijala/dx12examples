@@ -1,5 +1,11 @@
 #include "CameraBuffer.hlsli"
 
+struct HSConstantsTriOutput
+{
+    float TessLevelOuter[3] : SV_TessFactor;
+    float TessLevelInner : SV_InsideTessFactor;
+};
+
 #define COMPUTE_POSITION(inputPos, worldPos, clipPos) \
     worldPos = mul(float4(inputPos, 1.0f), g_modelMatrixT); \
     clipPos = mul(worldPos, g_viewProjT);
@@ -51,7 +57,15 @@ VSOutput_5 VSMain_1( VSInput_1 input )
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    {
+        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    }
+    else
+    {
+        output.position = float4(input.position, 1.0f);
+    }
+    
     output.normal     = float3(0, 0, 0);
     output.tangent    = float3(0, 0, 0);
     output.texcoord0  = float2(0, 0);
@@ -66,7 +80,14 @@ VSOutput_5 VSMain_2(VSInput_2 input)
 {
     VSOutput_5 output;
  
-    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    {
+        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    }
+    else
+    {
+        output.position = float4(input.position, 1.0f);
+    }
     output.normal     = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.tangent    = float3(0, 0, 0);
     output.texcoord0  = float2(0, 0);
@@ -82,7 +103,14 @@ VSOutput_5 VSMain_3(VSInput_3 input)
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    {
+        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    }
+    else
+    {
+        output.position = float4(input.position, 1.0f);
+    }
     output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.texcoord0 = input.texcoord0;
     output.tangent   = float3(0, 0, 0);
@@ -98,7 +126,14 @@ VSOutput_5 VSMain_4(VSInput_4 input)
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    {
+        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
+    }
+    else
+    {
+        output.position = float4(input.position, 1.0f);
+    }
     output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.texcoord0 = input.texcoord0;
     output.tangent   = input.tangent;
@@ -113,10 +148,10 @@ cbuffer RootConstant : register(b0, space2)
     float tessLevel;
 };
 
-HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_3_Tess, 3> patch, uint patchId : SV_PrimitiveID)
+HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_5, 3> patch, uint patchId : SV_PrimitiveID)
 {
     HSConstantsTriOutput triPatchConstants;
-    triPatchConstants.TessLevelInner = 1;
+    triPatchConstants.TessLevelInner = tessLevel;
     triPatchConstants.TessLevelOuter[0] = tessLevel;
     triPatchConstants.TessLevelOuter[1] = tessLevel;
     triPatchConstants.TessLevelOuter[2] = tessLevel;
@@ -125,10 +160,11 @@ HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_3_Tess, 3> patch, uint p
 
 //----------------------------------- Passthrough HS DS--------------------------------------------------------//
 [domain("tri")]
-[partitioning("integer")]
+[partitioning("fractional_odd")]
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(3)]
 [patchconstantfunc("HSConstantFunc")]
+[maxtessfactor(20.0f)]
 VSOutput_5 HSMain(
     InputPatch<VSOutput_5, 3> patch,
     uint i : SV_OutputControlPointID,
@@ -147,18 +183,18 @@ VSOutput_5 HSMain(
 }
 
 [domain("tri")]
-VSOutput_5 DSMain_Pass(HSConstantsTriOutput tessFactors, float3 TessCoord : SV_DomainLocation, const OutputPatch<VSOutput_5, 3> patch)
+VSOutput_5 DSMain_Pass(HSConstantsTriOutput tessFactors, float3 bary : SV_DomainLocation, const OutputPatch<VSOutput_5, 3> patch)
 {
     VSOutput_5 output = (VSOutput_5) 0;
-    output.position = (TessCoord.x * patch[0].position) +
-                      (TessCoord.y * patch[1].position) +
-                      (TessCoord.z * patch[2].position);
+    output.position = (bary.x * patch[0].position) +
+                      (bary.y * patch[1].position) +
+                      (bary.z * patch[2].position);
     COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
    
-    output.texcoord0 = patch[0].texcoord0 * TessCoord.x + patch[1].texcoord0 * TessCoord.y + patch[2].texcoord0 * TessCoord.z;
-    output.normal    = patch[0].normal * TessCoord.x    + patch[1].normal    * TessCoord.y + patch[2].normal    * TessCoord.z;
-    output.tangent   = patch[0].tangent * TessCoord.x   + patch[1].tangent   * TessCoord.y + patch[2].tangent   * TessCoord.z;
-    output.worldPosition = patch[0].worldPosition * TessCoord.x + patch[0].worldPosition * TessCoord.y + patch[0].worldPosition * TessCoord.z;
+    output.texcoord0 = patch[0].texcoord0 * bary.x + patch[1].texcoord0 * bary.y + patch[2].texcoord0 * bary.z;
+    output.normal    = patch[0].normal    * bary.x + patch[1].normal    * bary.y + patch[2].normal    * bary.z;
+    output.tangent   = patch[0].tangent   * bary.x + patch[1].tangent   * bary.y + patch[2].tangent   * bary.z;
+    output.worldPosition = patch[0].worldPosition * bary.x + patch[0].worldPosition * bary.y + patch[0].worldPosition * bary.z;
     
     output.flags     = patch[0].flags;
     return output;
@@ -242,6 +278,7 @@ VSOutput_5 DSMain_PN(HSConstantsTriOutput input, const OutputPatch<VSOutput_5, 3
 
     output.position = float4(position, 1.0);
     output.normal = normal;
+    output.texcoord0 = patch[0].texcoord0 * bary.x + patch[1].texcoord0 * bary.y + patch[2].texcoord0 * bary.z;
     
     COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
     
@@ -350,9 +387,19 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
 
     }
     
+    baseColor = baseColor * lightColor * lightIntensity;
     
+    if ((materialProperties.g_renderFlags & RenderFlagsUsePBR) == 0)
+    {
+        baseColor = materialProperties.baseColorFactor;
+        if ((input.flags & HasTexCoord) != 0)
+        {
+            float2 uv = input.texcoord0;
+            baseColor *= pbrBaseColorTexture.Sample(gSampler, uv);
+        }
+    }
 
     //@todo force a=1 for opaque
-    return float4(baseColor * lightColor * lightIntensity);
+        return float4(baseColor);
 
 }

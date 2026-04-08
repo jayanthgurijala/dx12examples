@@ -30,7 +30,8 @@ struct MaterialProperties
     float alphaCutoff;
    
     uint materialFlags;
-    float3 padding;
+    uint g_renderFlags;
+    float2 padding;
 };
 
 cbuffer MaterialData : register(b0, space3)
@@ -46,10 +47,14 @@ static const uint HasEmissiveTexture      = 1 << 4;
 static const uint AlphaModeMask           = 1 << 5;
 static const uint AlphaModeBlend          = 1 << 6;
 static const uint DoubleSided             = 1 << 7;
+static const uint RenderFlagsUsePBR       = 1 << 0;
+static const uint RenderFlagsTessEnabled  = 1 << 1;
 
 static const uint HasNormal   = 1 << 0;
 static const uint HasTexCoord = 1 << 1;
 static const uint HasTangent  = 1 << 2;
+
+
 
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {

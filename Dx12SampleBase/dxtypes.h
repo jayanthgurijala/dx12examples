@@ -191,8 +191,9 @@ struct DxMaterialCB
 	FLOAT occlusionStrength;
 	FLOAT alphaCutoff;
 
-	UINT  flags;
-	FLOAT padding[3];
+	UINT flags;
+	UINT renderFlags;
+	FLOAT padding[2];
 };
 
 struct DxLightDataCB
@@ -231,6 +232,12 @@ enum MaterialFlags
 	AlphaModeMask = 1 << 5,
 	AlphaModeBlend = 1 << 6,
 	DoubleSided = 1 << 7
+};
+
+enum SceneRenderFlags
+{
+	RenderFlagsUsePBR      = 1 << 0,
+	RenderFlagsTessEnabled = 1 << 1
 };
 
 struct DxPrimVertexData
@@ -312,6 +319,7 @@ struct DxCBSceneData
 	XMFLOAT4X4 invViewProj;
 	XMFLOAT4   cameraPosition;
 	XMFLOAT4   cameraFovY;
+	UINT       renderflags;
 };
 
 struct DxCBPerInstanceData
