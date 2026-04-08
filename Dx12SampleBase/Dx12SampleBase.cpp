@@ -565,6 +565,8 @@ VOID Dx12SampleBase::CreateAppBufferSrvDescriptorAtIndex(UINT linearPrimIdx, UIN
 }
 
 ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
+													                       const std::string& hullShaderName,
+																	       const std::string& domainShaderName,
 																		   const std::string& pixelShaderName,
 																		   ID3D12RootSignature* signature,
 																		   const D3D12_INPUT_LAYOUT_DESC& iaLayout,
@@ -573,12 +575,45 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 																		   BOOL useDepthStencil,
 																		   BOOL enableBlend)
 {
+	auto GetShaderByteCodeFromBlob = [](ID3DBlob* blob)
+		{
+			D3D12_SHADER_BYTECODE shaderByteCode;
+			if (blob != nullptr)
+			{
+				shaderByteCode = CD3DX12_SHADER_BYTECODE(blob);
+			}
+			else
+			{
+				shaderByteCode.BytecodeLength = 0;
+				shaderByteCode.pShaderBytecode = nullptr;
+			}
+			return shaderByteCode;
+		};
+
+	auto GetShaderBlob = [this](std::string shaderName) {
+		ComPtr<ID3DBlob> shaderBlob = nullptr; 
+		if (shaderName.length() > 0)
+		{
+			shaderBlob = GetCompiledShaderBlob(shaderName);
+		}
+		return shaderBlob;
+		};
+
+
 	ComPtr<ID3D12PipelineState> gfxPipelineState = nullptr;
 
-	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
-	ComPtr<ID3DBlob> pixelShader = GetCompiledShaderBlob(pixelShaderName);
+	auto blobVertexShader = GetShaderBlob(vertexShaderName);
+	auto blobHullShader   = GetShaderBlob(hullShaderName);
+	auto blobDomainShader = GetShaderBlob(domainShaderName);
+	auto blobPixelShader  = GetShaderBlob(pixelShaderName);
 
-	assert(vertexShader != nullptr && pixelShader != nullptr);
+	auto primTopology = (blobHullShader != nullptr) ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	BOOL forceWireFrame = (primTopology == D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH) ? TRUE : FALSE;
+
+	if (forceWireFrame == TRUE)
+	{
+		enableWireFrame = TRUE;
+	}
 
     const D3D12_CULL_MODE cullMode = doubleSided ? D3D12_CULL_MODE_NONE : D3D12_CULL_MODE_BACK;
     const D3D12_FILL_MODE fillMode = enableWireFrame ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
@@ -589,17 +624,19 @@ ComPtr<ID3D12PipelineState> Dx12SampleBase::GetGfxPipelineStateWithShaders(const
 	auto dsState = dxhelper::GetDepthStencilState(useDepthStencil, FALSE, enableDepthWrite);
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.InputLayout = iaLayout;
-	pipelineStateDesc.pRootSignature = signature;
-	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-	pipelineStateDesc.RasterizerState = rast;
-	pipelineStateDesc.BlendState = blend;
+	pipelineStateDesc.InputLayout       = iaLayout;
+	pipelineStateDesc.pRootSignature    = signature;
+	pipelineStateDesc.VS                = GetShaderByteCodeFromBlob(blobVertexShader.Get());
+	pipelineStateDesc.HS                = GetShaderByteCodeFromBlob(blobHullShader.Get());
+	pipelineStateDesc.DS                = GetShaderByteCodeFromBlob(blobDomainShader.Get());
+	pipelineStateDesc.PS                = GetShaderByteCodeFromBlob(blobPixelShader.Get());
+	pipelineStateDesc.RasterizerState   = rast;
+	pipelineStateDesc.BlendState        = blend;
 	pipelineStateDesc.DepthStencilState = dsState;
 	
 	///@todo write some test cases for this
 	pipelineStateDesc.SampleMask = UINT_MAX;
-	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipelineStateDesc.PrimitiveTopologyType = primTopology;
 	pipelineStateDesc.NumRenderTargets = 1;
 	pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
 	pipelineStateDesc.DSVFormat = (useDepthStencil == TRUE) ? GetDepthStencilDsvFormat() : DXGI_FORMAT_UNKNOWN;
@@ -624,6 +661,8 @@ HRESULT Dx12SampleBase::InitializeFrameComposition()
 
 	auto layout_1 = dxhelper::GetInputLayoutDesc_Layout1();
 	m_simpleComposition.pipelineState = GetGfxPipelineStateWithShaders("FrameSimple_VS.cso",
+																	   "",
+															           "",
 																	   "FrameSimple_PS.cso",
 		                                                               m_simpleComposition.rootSignature.Get(),
 		                                                               layout_1);
@@ -1308,7 +1347,7 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT scene
 	}
 }
 
-HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
+HRESULT Dx12SampleBase::CreatePerPrimGfxPipelineState()
 {
 	HRESULT result = S_OK;
 
@@ -1324,10 +1363,10 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 		const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
 		assert(numAttributes == modelIaSemantics.size());
 
-		char vertexShaderName[64];
-		char pixelShaderName[64];
-		GetVertexShaderName(vertexShaderName, numAttributes);
-		GetPixelShaderName(pixelShaderName, numAttributes);
+		std::string vertexShaderName = GetVertexShaderName(numAttributes);
+		std::string hullShaderName   = GetHullShaderName();
+		std::string domainShaderName = GetDomainShaderName();
+		std::string pixelShaderName  = GetPixelShaderName();
 
 		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes, };
 
@@ -1335,13 +1374,15 @@ HRESULT Dx12SampleBase::CreateVSPSPipelineStateFromModel()
 		const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
 
 		curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
-			pixelShaderName,
-			pRootSignature,
-			inputLayoutDesc,
-			FALSE,                  //wireframe
-			doubleSied,				//doubleSided
-			TRUE,				    //depth enable?
-			blendEnabled);
+																	hullShaderName,
+																	domainShaderName,
+																	pixelShaderName,
+																	pRootSignature,
+																	inputLayoutDesc,
+																	FALSE,                  //wireframe
+																	doubleSied,				//doubleSided
+																	TRUE,				    //depth enable?
+																	blendEnabled);
 	});
 	
 	return result;

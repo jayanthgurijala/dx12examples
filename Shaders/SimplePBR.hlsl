@@ -1,4 +1,3 @@
-#include "SimpleVSPSInterface.hlsli"
 #include "CameraBuffer.hlsli"
 
 #define COMPUTE_POSITION(inputPos, worldPos, clipPos) \
@@ -109,14 +108,18 @@ VSOutput_5 VSMain_4(VSInput_4 input)
     return output;
 }
 
+cbuffer RootConstant : register(b0, space2)
+{
+    float tessLevel;
+};
 
 HSConstantsTriOutput HSConstantFunc(InputPatch<VSOutput_3_Tess, 3> patch, uint patchId : SV_PrimitiveID)
 {
     HSConstantsTriOutput triPatchConstants;
     triPatchConstants.TessLevelInner = 1;
-    triPatchConstants.TessLevelOuter[0] = 1;
-    triPatchConstants.TessLevelOuter[1] = 1;
-    triPatchConstants.TessLevelOuter[2] = 1;
+    triPatchConstants.TessLevelOuter[0] = tessLevel;
+    triPatchConstants.TessLevelOuter[1] = tessLevel;
+    triPatchConstants.TessLevelOuter[2] = tessLevel;
     return triPatchConstants;
 }
 

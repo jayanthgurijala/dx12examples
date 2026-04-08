@@ -68,6 +68,8 @@ protected:
     VOID CreateDsvResourcesAndViews();
 
     ComPtr<ID3D12PipelineState> GetGfxPipelineStateWithShaders(const std::string& vertexShaderName,
+                                                               const std::string& hullShaderName,
+                                                               const std::string& domainShaderName,
                                                                const std::string& pixelShaderName,
                                                                ID3D12RootSignature* signature,
                                                                const D3D12_INPUT_LAYOUT_DESC& iaLayout,
@@ -299,14 +301,28 @@ protected:
     virtual inline const std::vector<std::string> GltfFileName() { return { "triangle.gltf" }; }
     virtual inline std::array<FLOAT, 4> RenderTargetClearColor() { return{ 0.2f, 0.2f, 0.2f, 1.0f }; }
 
-    virtual inline void GetVertexShaderName(char* outVsNameString, SIZE_T numVertexAttributes)
+    virtual inline std::string GetVertexShaderName(SIZE_T numVertexAttributes)
     {
-        snprintf(outVsNameString, 64, "Simple%zu_VS.cso", numVertexAttributes);
+        char shaderName[64];
+        snprintf(shaderName, 64, "Simple%zu_VS.cso", numVertexAttributes);
+        return std::string(shaderName);
     }
 
-    virtual inline void GetPixelShaderName(char* outPsNameString, SIZE_T numVertexAttributes)
+    virtual inline std::string GetHullShaderName()
     {
-        snprintf(outPsNameString, 64, "SimplePS.cso", numVertexAttributes);
+        return std::string();
+    }
+
+    virtual inline std::string GetDomainShaderName()
+    {
+        return std::string();
+    }
+
+    virtual inline std::string GetPixelShaderName()
+    {
+        char shaderName[64];
+        snprintf(shaderName, 64, "SimplePS.cso");
+        return std::string(shaderName);
     }
 
     template<typename Func>
@@ -385,7 +401,7 @@ protected:
     VOID LoadGltfFiles();
     VOID LoadSceneMaterialInfo();
     VOID LoadScene();
-    HRESULT CreateVSPSPipelineStateFromModel();
+    HRESULT CreatePerPrimGfxPipelineState();
 
     VOID StartBuildingAccelerationStructures();
     VOID ExecuteBuildAccelerationStructures();

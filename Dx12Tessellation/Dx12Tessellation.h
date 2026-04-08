@@ -27,10 +27,19 @@ protected:
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
 	virtual inline VOID RenderFrame() override { RenderFrameGfxDraw(); }
 
+	virtual inline std::string GetHullShaderName() override
+	{
+		return std::string("TessPassthrough_HS.cso");
+	}
+
+	virtual inline std::string GetDomainShaderName() override
+	{
+		return std::string("TessFactor3_DS.cso");
+	}
+
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
 	FLOAT m_tesstriTessLevel;
-	ComPtr<ID3D12PipelineState> m_modelPipelineState;
 
 };
 

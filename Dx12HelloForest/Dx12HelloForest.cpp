@@ -34,7 +34,7 @@ VOID Dx12HelloForest::OnInit()
 	auto sceneData        = dxhelper::GetRootCbv(0);
 	auto worldData        = dxhelper::GetRootCbv(1);
 	auto descTable        = dxhelper::GetRootDescTable(descRanges);
-    auto materialsRootCbv = dxhelper::GetRootCbv(2);
+    auto materialsRootCbv = dxhelper::GetRootCbv(0,3);
 
 
 	dxhelper::DxCreateRootSignature(
@@ -48,7 +48,7 @@ VOID Dx12HelloForest::OnInit()
 		},
 		{ staticSampler });
 
-	CreateVSPSPipelineStateFromModel();
+	CreatePerPrimGfxPipelineState();
 
 }
 

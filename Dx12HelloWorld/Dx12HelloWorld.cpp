@@ -43,7 +43,7 @@ VOID Dx12HelloWorld::OnInit()
 		},
 		{ staticSampler });
 
-	CreateVSPSPipelineStateFromModel();
+	CreatePerPrimGfxPipelineState();
 
 }
 

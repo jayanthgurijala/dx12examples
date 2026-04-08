@@ -31,10 +31,12 @@ VOID Dx12Tessellation::OnInit()
 	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
-	auto viewProj = dxhelper::GetRootCbv(0);
-	auto perInstance = dxhelper::GetRootCbv(0,3);
-	auto descTable = dxhelper::GetRootDescTable(descRanges);
-	auto rootConstant = dxhelper::GetRootConstants(1, 2);
+	auto viewProj         = dxhelper::GetRootCbv(0);
+	auto perInstance      = dxhelper::GetRootCbv(1);
+	auto descTable        = dxhelper::GetRootDescTable(descRanges);
+	auto materialsRootCbv = dxhelper::GetRootCbv(0, 3);
+	auto rootConstant     = dxhelper::GetRootConstants(1, 0, 2);
+
 
 	dxhelper::DxCreateRootSignature(
 		pDevice,
@@ -43,7 +45,9 @@ VOID Dx12Tessellation::OnInit()
 			viewProj,
 			perInstance,
 			descTable,
-			rootConstant
+			materialsRootCbv,
+			rootConstant,
+
 		},
 		{ staticSampler });
 
@@ -52,50 +56,7 @@ VOID Dx12Tessellation::OnInit()
 	std::vector<D3D12_INPUT_ELEMENT_DESC> inputElementsDesc;
 	const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, inputElementsDesc);
 
-
-
-	char vertexShaderName[64];
-	char hullShaderName[64];
-	char domainShaderName[64];
-	char pixelShaderName[64];
-	snprintf(vertexShaderName, 64, "Simple3_VS.cso");
-	snprintf(hullShaderName, 64, "TessPassthrough_HS.cso");
-	snprintf(domainShaderName, 64, "TessFactor3_DS.cso");
-	snprintf(pixelShaderName, 64, "SimplePS.cso", numAttributes);
-
-	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
-	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob(hullShaderName);
-	ComPtr<ID3DBlob> domainShader = GetCompiledShaderBlob(domainShaderName);
-	ComPtr<ID3DBlob> pixelShader  = GetCompiledShaderBlob(pixelShaderName);
-
-	assert(vertexShader != nullptr && hullShader != nullptr && domainShader != nullptr && pixelShader != nullptr);
-
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.InputLayout = { inputElementsDesc.data() , numAttributes };
-	pipelineStateDesc.pRootSignature = m_pRootSignature.Get();
-	
-	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-	pipelineStateDesc.HS = CD3DX12_SHADER_BYTECODE(hullShader.Get());
-	pipelineStateDesc.DS = CD3DX12_SHADER_BYTECODE(domainShader.Get());
-
-	pipelineStateDesc.RasterizerState = dxhelper::GetRasterizerState(D3D12_CULL_MODE_BACK, D3D12_FILL_MODE_WIREFRAME);
-	pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	pipelineStateDesc.DepthStencilState = dxhelper::GetDepthStencilState();
-
-	///@todo write some test cases for this
-	pipelineStateDesc.SampleMask = UINT_MAX;
-	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
-	pipelineStateDesc.NumRenderTargets = 1;
-	pipelineStateDesc.RTVFormats[0] = GetBackBufferFormat();
-	pipelineStateDesc.DSVFormat = GetDepthStencilDsvFormat();
-
-	///@todo experiment with flags
-	pipelineStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-
-	pipelineStateDesc.SampleDesc.Count = 1;
-
-	pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&m_modelPipelineState));
+	CreatePerPrimGfxPipelineState();
 }
 
 VOID Dx12Tessellation::RenderFrameGfxDraw()
@@ -120,7 +81,7 @@ VOID Dx12Tessellation::RenderFrameGfxDraw()
 	m_tesstriTessLevel = (m_tesstriTessLevel > 20.0f) ? 20.0f : m_tesstriTessLevel;
 	m_tesstriTessLevel = m_tesstriTessLevel;
 
-	ID3D12GraphicsCommandList* pCmdList = GetCmdList();
+	ID3D12GraphicsCommandList* pCmdList   = GetCmdList();
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = GetRtvCpuHandle(0);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDsvCpuHandle(0);
 
@@ -137,18 +98,27 @@ VOID Dx12Tessellation::RenderFrameGfxDraw()
 	pCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
-	pCmdList->SetPipelineState(m_modelPipelineState.Get());
 	pCmdList->SetGraphicsRootSignature(m_pRootSignature.Get());
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
 
-
-	pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjGpuVa());
-	pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(0));
-	pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(0));
+	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
 
 	UINT bits = *reinterpret_cast<UINT*>(&m_tesstriTessLevel);
-	pCmdList->SetGraphicsRoot32BitConstant(3, bits, 0);
+	pCmdList->SetGraphicsRoot32BitConstant(4, bits, 0);
+
+
+	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
+		{
+			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
+			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
+			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjGpuVa());
+			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(curPrimitive.primLinearIdxInSceneElements));
+			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
+			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+		});
 
 	RenderModel(pCmdList, 0, 0, 0);
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);
