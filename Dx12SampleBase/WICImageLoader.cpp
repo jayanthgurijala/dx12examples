@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 #pragma comment(lib, "windowscodecs.lib")
 
@@ -18,7 +19,7 @@ namespace WICImageLoader
 
 
 	///@todo returning ImageData seem to be fine, mordern compilers use move semantics instead of copy. Need to verify this.
-	ImageData LoadImageFromMemory_WIC(const uint8_t* data, size_t sizeInBytes)
+	ImageData LoadImageFromMemory_WIC(const uint8_t* data, size_t sizeInBytes, const char* filename)
 	{
 		ImageData outputResource;
 
@@ -33,7 +34,22 @@ namespace WICImageLoader
 
 		//Decode Image
 		ComPtr<IWICBitmapDecoder> decoder;
-		factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
+
+		if (data != nullptr)
+		{
+			assert(sizeInBytes > 0);
+			factory->CreateDecoderFromStream(stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, &decoder);
+		}
+		else
+		{
+			int bufferSize = MultiByteToWideChar(CP_ACP, 0, filename, -1, NULL, 0);
+			// Smart pointer for a wchar_t array
+			std::unique_ptr<wchar_t[]> buffer(new wchar_t[bufferSize]);
+
+			// Perform the conversion
+			MultiByteToWideChar(CP_ACP, 0, filename, -1, buffer.get(), bufferSize);
+			factory->CreateDecoderFromFilename(buffer.get(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder);
+		}
 
 		ComPtr<IWICBitmapFrameDecode> frame;
 		decoder->GetFrame(0, &frame);

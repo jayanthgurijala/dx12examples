@@ -32,7 +32,7 @@ VOID Dx12Tessellation::OnInit()
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto viewProj = dxhelper::GetRootCbv(0);
-	auto perInstance = dxhelper::GetRootCbv(1);
+	auto perInstance = dxhelper::GetRootCbv(0,3);
 	auto descTable = dxhelper::GetRootDescTable(descRanges);
 	auto rootConstant = dxhelper::GetRootConstants(1, 2);
 
@@ -58,10 +58,10 @@ VOID Dx12Tessellation::OnInit()
 	char hullShaderName[64];
 	char domainShaderName[64];
 	char pixelShaderName[64];
-	snprintf(vertexShaderName, 64, "TessFactor%u_VS.cso", numAttributes);
-	snprintf(hullShaderName, 64, "TessFactor%u_HS.cso", numAttributes);
-	snprintf(domainShaderName, 64, "TessFactor%u_DS.cso", numAttributes);
-	snprintf(pixelShaderName, 64, "TessFactor%u_PS.cso", numAttributes);
+	snprintf(vertexShaderName, 64, "Simple3_VS.cso");
+	snprintf(hullShaderName, 64, "TessPassthrough_HS.cso");
+	snprintf(domainShaderName, 64, "TessFactor3_DS.cso");
+	snprintf(pixelShaderName, 64, "SimplePS.cso", numAttributes);
 
 	ComPtr<ID3DBlob> vertexShader = GetCompiledShaderBlob(vertexShaderName);
 	ComPtr<ID3DBlob> hullShader   = GetCompiledShaderBlob(hullShaderName);

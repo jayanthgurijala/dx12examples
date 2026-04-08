@@ -182,23 +182,11 @@
     <None Include="..\Shaders\CameraBuffer.hlsli">
       <Filter>Shaders\hlsi</Filter>
     </None>
-    <None Include="..\Shaders\SimpleVSPSInterface.hlsli">
-      <Filter>Shaders\hlsi</Filter>
-    </None>
-    <None Include="..\Shaders\TessPassthrough.hlsl">
-      <Filter>Shaders\Tess</Filter>
-    </None>
-    <None Include="..\Shaders\Simple1.hlsl">
-      <Filter>Shaders\VSPS</Filter>
-    </None>
-    <None Include="..\Shaders\Simple5.hlsl">
+    <None Include="..\Shaders\SimplePBR.hlsl">
       <Filter>Shaders\VSPS</Filter>
     </None>
     <None Include="..\Shaders\FrameSimple.hlsl">
       <Filter>Shaders</Filter>
-    </None>
-    <None Include="..\Shaders\TessPnTriangles3.hlsl">
-      <Filter>Shaders\Tess</Filter>
     </None>
     <None Include="..\Shaders\Raytracing.hlsli">
       <Filter>Shaders\RayTracing\hlsli</Filter>
@@ -209,20 +197,12 @@
     <None Include="..\Shaders\HelloMesh.hlsl">
       <Filter>Shaders\MeshShaders</Filter>
     </None>
-    <None Include="..\Shaders\Simple2.hlsl">
-      <Filter>Shaders\VSPS</Filter>
-    </None>
     <None Include="..\Shaders\MaterialsBuffer.hlsli">
       <Filter>Shaders\hlsi</Filter>
-    </None>
-    <None Include="..\Shaders\Simple3.hlsl">
-      <Filter>Shaders\VSPS</Filter>
-    </None>
-    <None Include="..\Shaders\TessPnTriangles2.hlsl">
-      <Filter>Shaders\Tess</Filter>
     </None>
     <None Include="..\Shaders\CsGenerateMips.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\Shaders\PBRCalculationHelpers.hlsli" />
   </ItemGroup>
 </Project>

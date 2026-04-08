@@ -306,7 +306,7 @@ protected:
 
     virtual inline void GetPixelShaderName(char* outPsNameString, SIZE_T numVertexAttributes)
     {
-        snprintf(outPsNameString, 64, "Simple%zu_PS.cso", numVertexAttributes);
+        snprintf(outPsNameString, 64, "SimplePS.cso", numVertexAttributes);
     }
 
     template<typename Func>

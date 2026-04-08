@@ -264,31 +264,49 @@ inline void GetValues(uint3 indices,StructuredBuffer<float2> buffer, out float2 
 
 [shader("closesthit")]
 void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
-{    
+{   
+    //@todo put it in CBuffer
+    float3 lightDirection = normalize(float3(0.5f, 1.0f, 0.5f));
+    
     if (payload.currentRecursionDepth > 1)
     {
         payload.color = float4(1.0f, 0.0f, 1.0f, 1.0f); // Magenta for debugging excessive recursion.
         return;
     };
+    
     uint3 indices = GetHitTriangleIndices();
-    
-    float3 p[3];
-    float2 uv[3];
-    
-    GetValues(indices, posVbBuffer, p);
-    GetValues(indices, uvVbBuffer, uv);
-    
-    float2 uvInterpolated = InterpolateBarycentrics(attr.barycentrics, uv);
-    
-    float rho = CalculateRayConeUVFootPrint(p, uv);
-    float mipLevel = log2(rho);
-    
-    float4 baseColor = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
-    
     float3 triangleNormal = posNormalBuffer[indices[0]];
-    float3 hitPosition    = HitWorldPosition();
-    float3 lightDirection = normalize(float3(0.5f, 1.0f, 0.5f));
     
+    float4 baseColor = materialProperties.baseColorFactor;
+    if ((materialProperties.materialFlags & HasBaseColorTexture) != 0)
+    {
+       
+        float3 p[3];
+        float2 uv[3];
+    
+        GetValues(indices, posVbBuffer, p);
+        GetValues(indices, uvVbBuffer, uv);
+    
+        float2 uvInterpolated = InterpolateBarycentrics(attr.barycentrics, uv);
+    
+        float rho = CalculateRayConeUVFootPrint(p, uv);
+        float mipLevel = log2(rho);
+        baseColor *= gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
+    }
+    
+    //float metallic = metallicFactor;
+    //float roughness = roughnessFactor;
+    
+    //if (flags & HasMetallicRoughnessTex != 0)
+    //{
+    //    float4 mrSample = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
+    //    metallic *= mrSample.b;
+    //    roughness *= mrSample.g;
+    //}
+
+    
+
+    float3 hitPosition    = HitWorldPosition();
     bool shadowHit = TraceShadowRay(hitPosition, lightDirection, payload.currentRecursionDepth);
     float shadowing = shadowHit ? 0.5f : 1.0f;
     payload.color = baseColor * shadowing;

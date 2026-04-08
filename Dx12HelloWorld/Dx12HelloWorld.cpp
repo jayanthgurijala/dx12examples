@@ -29,7 +29,7 @@ VOID Dx12HelloWorld::OnInit()
 	auto viewProj         = dxhelper::GetRootCbv(0);
 	auto perInstance      = dxhelper::GetRootCbv(1);
 	auto descTable        = dxhelper::GetRootDescTable(descRanges);
-    auto materialsRootCbv = dxhelper::GetRootCbv(2);
+    auto materialsRootCbv = dxhelper::GetRootCbv(0, 3);
 
 
 	dxhelper::DxCreateRootSignature(

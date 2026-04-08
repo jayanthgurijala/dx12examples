@@ -40,10 +40,6 @@ HSOutput_2 HSMain(InputPatch<VSOutput_2_Tess, 3> patch, uint i : SV_OutputContro
     return output;
 }
 
-float3 ProjectToPlane(float3 vec, float3 normal)
-{
-    return vec - dot(vec, normal) * normal;
-}
 
 [domain("tri")]
 DSOutput_2 DSMain(HSConstantsTriOutput input, const OutputPatch<HSOutput_2, 3> patch,

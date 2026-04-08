@@ -1270,7 +1270,7 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT scene
 	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(sceneIdx, nodeIndex, primitiveIndex);
 
 	///need some generalization to support chinese dragon etc
-	assert(numVertexBufferViews == 3);
+	//assert(numVertexBufferViews == 3);
 
 	const auto& curPrimInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex);
 
@@ -1559,8 +1559,11 @@ VOID Dx12SampleBase::LoadGltfFiles()
 								const UINT semanticIndex   = gltfVbInfo.iaLayoutInfo.index;
 								auto IsIndexUsedInMaterial = [semanticIndex](const DxGltfTextureInfo& textureInfo) -> BOOL
 									{
-										return (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0 &&
-											textureInfo.texCoordIndex == semanticIndex);
+										const BOOL isInlineTexure  = ((textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0) ? TRUE : FALSE);
+										const BOOL isFileTexture   = ((textureInfo.texture.imageBufferInfo.uri.length() > 0) ? TRUE : FALSE);
+										const BOOL isTextureValid  = (isInlineTexure  == TRUE || isFileTexture == TRUE);
+										return (isTextureValid            == TRUE           &&
+											    textureInfo.texCoordIndex == semanticIndex);
 									};
 
 								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.baseColorTexture);
@@ -1629,25 +1632,52 @@ VOID Dx12SampleBase::LoadGltfFiles()
 						// Lambda to load texture from DxGltfTextureInfo
 						auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
 							{
-								ComPtr<ID3D12Resource> textureResource = nullptr;
+								BYTE*       bufferData          = nullptr;
+								UINT64      bufferSizeInBytes   = 0;
+								UINT64      bufferOffsetInBytes = 0;
+								std::string textureUri          = {};
+								BOOL        isTextureValid      = false;
+
 
 								if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
 								{
 									const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-									BYTE* bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-									UINT64 bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
-									UINT64 bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
+									bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
+									bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
+									bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
+
+									assert(bufferData != nullptr);
+									bufferData += bufferOffsetInBytes;
+									isTextureValid = true;
+								}
+								else if (textureInfo.texture.imageBufferInfo.uri.length() != 0)
+								{
+									std::string assetName = textureInfo.texture.imageBufferInfo.uri;
+
+									textureUri     = m_assetReader->GetFullModelFilePath(assetName);
+									isTextureValid = true;
+								}
+
+								if (isTextureValid == true)
+								{
+									assert(bufferData != nullptr || textureUri.length() > 0);
 
 									ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
-										&bufferData[bufferOffsetInBytes],
-										bufferSizeInBytes
+										                                                         bufferData,
+										                                                         bufferSizeInBytes,
+										                                                         textureUri.c_str()
 									);
 
 									texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
-										imageData.pixels.size(),
-										imageData.width,
-										imageData.height,
-										DXGI_FORMAT_R8G8B8A8_UNORM);
+																						 imageData.pixels.size(),
+																						 imageData.width,
+																						 imageData.height,
+																						 DXGI_FORMAT_R8G8B8A8_UNORM);
+								}
+								else
+								{
+									assert(textureInfo.texture.imageBufferInfo.bufferSizeInBytes == 0);
+									assert(textureInfo.texture.imageBufferInfo.uri.length() == 0);
 								}
 							};
 

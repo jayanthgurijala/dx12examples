@@ -88,6 +88,7 @@ struct DxGltfTextureBuffer : public DxGltfBuffer
 {
 	std::string mimeType;
 	std::string name;
+	std::string uri;
 };
 
 struct DxGltfSampler

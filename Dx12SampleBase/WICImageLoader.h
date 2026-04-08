@@ -16,8 +16,7 @@ namespace WICImageLoader
         std::vector<uint8_t> pixels; // RGBA8
     };
 
-    ImageData LoadImageFromMemory_WIC(const uint8_t* data, size_t sizeInBytes);
-
+    ImageData LoadImageFromMemory_WIC(const uint8_t* data, size_t sizeInBytes, const char* fileName);
 }
 
 

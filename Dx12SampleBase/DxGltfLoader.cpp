@@ -10,13 +10,16 @@ using namespace GltfUtils;
 
 DxGltfLoader::DxGltfLoader(std::string modelPath) :
 	m_modelPath(modelPath),
-	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0"})
+	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0", "TANGENT"})
 {
 }
 
 HRESULT DxGltfLoader::LoadModel()
 {
 	bool ret = m_loader.LoadASCIIFromFile(&m_model, &m_loadStatus.m_err, &m_loadStatus.m_warn, m_modelPath);
+	PrintUtils::PrintString(m_loadStatus.m_err.c_str());
+	assert(ret == true);
+
 	return (ret == TRUE) ? S_OK : E_FAIL;
 }
 
@@ -51,8 +54,10 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeInde
 {
 	const tinygltf::Mesh& mesh = GetMesh(nodeIndex);
 	const tinygltf::Primitive& primitive = GetPrimitive(nodeIndex, primitiveIndex);
+
 	const UINT totalAttributesInPrimitive = min(m_supportedAttributes.size(), primitive.attributes.size());
-	primInfo.vbInfo.resize(totalAttributesInPrimitive);
+	//primInfo.vbInfo.resize(totalAttributesInPrimitive);
+	primInfo.vbInfo.clear();
 	primInfo.name = mesh.name;
 	//@note load vertex buffers
 	{
@@ -64,6 +69,8 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeInde
 			auto it = primitive.attributes.find(*attributeIt);
 			if (it != primitive.attributes.end())
 			{
+				primInfo.vbInfo.emplace_back();
+				auto& vbInfo = primInfo.vbInfo.back();
 				const std::string attributeName        = it->first;
 				const int accessorIdx                  = it->second;
 				const tinygltf::Accessor& accessorDesc = GetAccessor(accessorIdx);
@@ -99,13 +106,13 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeInde
 				const size_t bufOffset          = bufViewDesc.byteOffset;
 				const size_t accessorByteOffset = accessorDesc.byteOffset;
 
-				primInfo.vbInfo[attrIndx].iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
-				primInfo.vbInfo[attrIndx].bufferIndex         = bufferIdx;
-				primInfo.vbInfo[attrIndx].bufferOffsetInBytes = accessorByteOffset + bufOffset;
-				primInfo.vbInfo[attrIndx].bufferSizeInBytes   = buflength;
-				primInfo.vbInfo[attrIndx].bufferStrideInBytes = componentSizeInBytes * numComponents;
+				vbInfo.iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
+				vbInfo.bufferIndex         = bufferIdx;
+				vbInfo.bufferOffsetInBytes = accessorByteOffset + bufOffset;
+				vbInfo.bufferSizeInBytes   = buflength;
+				vbInfo.bufferStrideInBytes = componentSizeInBytes * numComponents;
 
-				auto& currentSemantic = primInfo.vbInfo[attrIndx].iaLayoutInfo;
+				auto& currentSemantic = vbInfo.iaLayoutInfo;
 				///@todo make a string utils class to check for stuff
 				auto pos = attributeName.find("_");
 
@@ -240,6 +247,7 @@ VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeInde
 
 VOID DxGltfLoader::LoadGltfTextureInfo(DxGltfTextureInfo& dxTextureInfo, const tinygltf::TextureInfo& gltfTextureInfo)
 {
+	dxTextureInfo = {};
 	const int textureIndex      = gltfTextureInfo.index;
 	dxTextureInfo.texCoordIndex = gltfTextureInfo.texCoord;
 
@@ -274,15 +282,22 @@ VOID DxGltfLoader::LoadGltfTextureInfo(DxGltfTextureInfo& dxTextureInfo, const t
 			dxTextureInfo.texture.imageBufferInfo.name     = imageInfo.name;
 			dxTextureInfo.texture.imageBufferInfo.mimeType = imageInfo.mimeType;
 
-			assert(imageInfo.bufferView != -1);
+			if (imageInfo.bufferView != -1)
+			{
+				const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
+				assert(bufViewDesc.byteStride == 0);
 
-			const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
-			assert(bufViewDesc.byteStride == 0);
+				dxTextureInfo.texture.imageBufferInfo.bufferIndex         = bufViewDesc.buffer;
+				dxTextureInfo.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
+				dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes   = bufViewDesc.byteLength;
+				dxTextureInfo.texture.imageBufferInfo.bufferStrideInBytes = 0;
+			}
+			else
+			{
+				assert(imageInfo.uri.c_str() != nullptr);
+				dxTextureInfo.texture.imageBufferInfo.uri = imageInfo.uri;
 
-			dxTextureInfo.texture.imageBufferInfo.bufferIndex         = bufViewDesc.buffer;
-			dxTextureInfo.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
-			dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes   = bufViewDesc.byteLength;
-			dxTextureInfo.texture.imageBufferInfo.bufferStrideInBytes = 0;
+			}
 		}
 		else
 		{

@@ -2,36 +2,24 @@ cd /d "%~dp0"
 
 del *.cso *.pdb 2> nul
 
+set SHADERNAME=SimplePBR.hlsl
+
 dxc -T vs_6_0 -E VSMain -Fo FrameSimple_VS.cso -Zi -Od -Qembed_debug -Fd FrameSimple_VS.pdb FrameSimple.hlsl
 dxc -T ps_6_0 -E PSMain -Fo FrameSimple_PS.cso -Zi -Od -Qembed_debug -Fd FrameSimple_PS.pdb FrameSimple.hlsl
 dxc -T cs_6_0 -E GenerateMipCS -Fo CsGenerateMips.cso -Zi -Od -Qembed_debug -Fd CsGenerateMips.pdb CsGenerateMips.hlsl
 
-dxc -T vs_6_0 -E VSMain -Fo Simple1_VS.cso -Zi -Od -Qembed_debug -Fd Simple1_VS.pdb Simple1.hlsl
-dxc -T ps_6_0 -E PSMain -Fo Simple1_PS.cso -Zi -Od -Qembed_debug -Fd Simple1_PS.pdb Simple1.hlsl
+dxc -T vs_6_0 -E VSMain_1 -Fo Simple1_VS.cso -Zi -Od -Qembed_debug -Fd Simple1_VS.pdb %SHADERNAME%
+dxc -T vs_6_0 -E VSMain_2 -Fo Simple2_VS.cso -Zi -Od -Qembed_debug -Fd Simple2_VS.pdb %SHADERNAME%
+dxc -T vs_6_0 -E VSMain_3 -Fo Simple3_VS.cso -Zi -Od -Qembed_debug -Fd Simple3_VS.pdb %SHADERNAME%
+dxc -T vs_6_0 -E VSMain_4 -Fo Simple4_VS.cso  -Zi -Od -Qembed_debug -Fd Simple4_VS.pdb %SHADERNAME%
+dxc -T ps_6_0 -E PSMain -Fo SimplePS.cso  -Zi -Od -Qembed_debug -Fd SimplePS.pdb %SHADERNAME%
 
-dxc -T vs_6_0 -E VSMain -Fo Simple2_VS.cso -Zi -Od -Qembed_debug -Fd Simple2_VS.pdb Simple2.hlsl
-dxc -T ps_6_0 -E PSMain -Fo Simple2_PS.cso -Zi -Od -Qembed_debug -Fd Simple2_PS.pdb Simple2.hlsl
+dxc -T hs_6_0 -E HSMain -Fo TessPassthrough_HS.cso %SHADERNAME%
 
-dxc -T vs_6_0 -E VSMain -Fo Simple3_VS.cso -Zi -Od -Qembed_debug -Fd Simple3_VS.pdb Simple3.hlsl
-dxc -T ps_6_0 -E PSMain -Fo Simple3_PS.cso -Zi -Od -Qembed_debug -Fd Simple3_PS.pdb Simple3.hlsl
+dxc -T ds_6_0 -E DSMain_Pass -Fo TessPassthrough_DS.cso %SHADERNAME%
+dxc -T ds_6_0 -E DSMain_PN -Fo TessFactor3_DS.cso %SHADERNAME%
 
-dxc -T vs_6_0 -E VSMain -Fo Simple5_VS.cso  -Zi -Od -Qembed_debug -Fd Simple5_VS.pdb Simple5.hlsl
-dxc -T ps_6_0 -E PSMain -Fo Simple5_PS.cso  -Zi -Od -Qembed_debug -Fd Simple5_PS.pdb Simple5.hlsl
 
-dxc -T vs_6_0 -E VSMain -Fo TessPassthrough_VS.cso TessPassthrough.hlsl
-dxc -T hs_6_0 -E HSMain -Fo TessPassthrough_HS.cso TessPassthrough.hlsl
-dxc -T ds_6_0 -E DSMain -Fo TessPassthrough_DS.cso TessPassthrough.hlsl
-dxc -T ps_6_0 -E PSMain -Fo TessPassthrough_PS.cso TessPassthrough.hlsl
-
-dxc -T vs_6_0 -E VSMain -Fo TessFactor3_VS.cso TessPnTriangles3.hlsl
-dxc -T hs_6_0 -E HSMain -Fo TessFactor3_HS.cso TessPnTriangles3.hlsl
-dxc -T ds_6_0 -E DSMain -Fo TessFactor3_DS.cso TessPnTriangles3.hlsl
-dxc -T ps_6_0 -E PSMain -Fo TessFactor3_PS.cso TessPnTriangles3.hlsl
-
-dxc -T vs_6_0 -E VSMain -Fo TessFactor2_VS.cso TessPnTriangles2.hlsl
-dxc -T hs_6_0 -E HSMain -Fo TessFactor2_HS.cso TessPnTriangles2.hlsl
-dxc -T ds_6_0 -E DSMain -Fo TessFactor2_DS.cso TessPnTriangles2.hlsl
-dxc -T ps_6_0 -E PSMain -Fo TessFactor2_PS.cso TessPnTriangles2.hlsl
 
 dxc /T lib_6_6 /Fo RaytraceSimpleCHS.cso -Zi -Od -Qembed_debug -Fd RaytraceSimpleCHS.pdb RaytraceSimpleCHS.hlsl
 

@@ -1,7 +1,4 @@
-struct VSInput_1
-{
-    float3 position : POSITION;
-};
+
 
 struct VSOutput_1
 {
@@ -19,11 +16,7 @@ struct PSInput_1
 
 //<------------------------------ FOR 2 input attributes ----------------->
 
-struct VSInput_2
-{
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-};
+
 
 struct VSOutput_2
 {
@@ -35,12 +28,6 @@ struct VSOutput_2
 
 //<------------------------------ FOR 3 input attributes ----------------->
 
-struct VSInput_3
-{
-    float3 position : POSITION;
-    float3 normal : NORMAL;
-    float2 texcoord : TEXCOORD0;
-};
 
 struct VSOutput_3
 {
@@ -52,24 +39,9 @@ struct VSOutput_3
 
 
 //<------------------------------ FOR 5 input attributes ----------------->
-struct VSInput_5
-{
-    float3 position  : POSITION;
-    float3 normal    : NORMAL;
-    float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
-    float2 texcoord2 : TEXCOORD2;
-};
 
-struct VSOutput_5
-{
-    float4 position      : SV_POSITION;
-    float4 worldPosition : WORLDPOSITION;
-    float3 normal        : NORMAL;
-    float2 texcoord0     : TEXCOORD0;
-    float2 texcoord1     : TEXCOORD1;
-    float2 texcoord2     : TEXCOORD2;
-};
+
+
 
 struct PSInput_5
 {

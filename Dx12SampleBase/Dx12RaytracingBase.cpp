@@ -115,15 +115,19 @@ VOID Dx12RaytracingBase::CreateGlobalRootSignature()
 VOID Dx12RaytracingBase::CreateLocalRootSignature()
 {
 	const UINT numDescTableRanges = 1;
-	const UINT numSRVsPerPrim = NumSRVsPerPrimitive();
-	const UINT registerSpace = 3;
+	const UINT numSRVsPerPrim     = NumSRVsPerPrimitive();
+	const UINT registerSpace      = 3;
 
-	//one SRV descriptor table with numSRVsPerPrim primitives
+    //Root Paramater Idx = 0, space = 3 for material CB
+	auto rootCbv = dxhelper::GetRootCbv(0, registerSpace);
+
+    //one SRV descriptor table with numSRVsPerPrim primitives - PBR textures + SRVs needed for raytracing like vertex buffer, index buffer, uv buffer, etc.
 	std::vector<CD3DX12_DESCRIPTOR_RANGE> descTableRanges(numDescTableRanges);
-
 	descTableRanges[0] = dxhelper::GetSRVDescRange(numSRVsPerPrim, 0, registerSpace);
 	auto rootDescriptorTable = dxhelper::GetRootDescTable(descTableRanges);
-	auto rootCbv = dxhelper::GetRootCbv(0, registerSpace);
+
+
+	
 
 	dxhelper::DxCreateRootSignature
 	(
@@ -356,9 +360,12 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 				memcpy(sbtDataWritePtr, curHitGroupID, hitGroupTableSize);
 				sbtDataWritePtr += shaderRecordSize;
 				assert(pHitGroupStartWritePtr + hitgroupIndex * hitGroupAlignedSize + shaderRecordSize == sbtDataWritePtr);
+
 				memcpy(sbtDataWritePtr, &gpuVAMaterialsCB, sizeof(gpuVAMaterialsCB));
 				sbtDataWritePtr += sizeof(gpuVAMaterialsCB);
 				assert(pHitGroupStartWritePtr + hitgroupIndex * hitGroupAlignedSize + shaderRecordSize + sizeof(gpuVAMaterialsCB) == sbtDataWritePtr);
+
+
 				memcpy(sbtDataWritePtr, &gpuVAMatTex, sizeof(gpuVAMatTex));
 				sbtDataWritePtr += sizeof(gpuVAMatTex);
 
