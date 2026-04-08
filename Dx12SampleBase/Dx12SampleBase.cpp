@@ -1539,36 +1539,38 @@ VOID Dx12SampleBase::LoadGltfFiles()
 	UINT globalPrimitiveIndex = 0;
 	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
+		auto& curFileInfo = m_sceneElements[fileIdx];
 		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx]);
 		m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 
 		m_gltfLoader->LoadModel();
 		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene();
-		m_sceneElements[fileIdx].nodes.resize(numNodesInScene);
+		curFileInfo.nodes.clear();
 
 		UINT primitiveIndex = 0;
-		for (UINT node = 0; node < numNodesInScene; node++)
+		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			auto& currentNode = GetNodeInfo(fileIdx, node);
-			currentNode.name = m_gltfLoader->GetNodeName(node);
+			curFileInfo.nodes.emplace_back();
+			auto& currentNode = curFileInfo.nodes.back();
+			currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
 
-			DxNodeTransformInfo& meshTransformInfo = GetNodeInfo(fileIdx, node).transformInfo;
-			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, node);
+			DxNodeTransformInfo& meshTransformInfo = currentNode.transformInfo;
+			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
 
-			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(node);
+			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(nodeIdx);
 			if (isMeshPrimInfoValid == TRUE)
 			{
-				const UINT numPrimitives = m_gltfLoader->NumPrimitives(node);
+				const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
 				currentNode.meshInfo.primitives.resize(numPrimitives);
 
 				for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 				{
 					///@note Load VB, IB and textures for each primitive.
 					DxGltfPrimInfo gltfPrimInfo;
-					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, node, primitive);
+					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, nodeIdx, primitive);
 
 					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-					auto& currentPrim              = GetPrimitiveInfo(fileIdx, node, primitive);
+					auto& currentPrim              = GetPrimitiveInfo(fileIdx, nodeIdx, primitive);
 					const auto& gltfMaterial       = gltfPrimInfo.materialInfo;
 					const auto& gltfPbrInfo        = gltfMaterial.pbrMetallicRoughness;
 					const auto& gltfNormalInfo     = gltfMaterial.normalInfo;
