@@ -404,6 +404,7 @@ protected:
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
     VOID LoadGltfFiles();
+    VOID ParseNode(DxNodeInfo& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex);
     VOID LoadSceneMaterialInfo();
     VOID LoadScene();
     HRESULT CreatePerPrimGfxPipelineState();

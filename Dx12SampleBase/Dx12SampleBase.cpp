@@ -1528,6 +1528,245 @@ UINT Dx12SampleBase::CreateInputElementDesc(const std::vector<DxPrimVertexData>&
 	return numAttributes;
 }
 
+/*
+* Node has is a container optionally having and proceed in this order
+* - transform
+* - mesh
+* - child nodes
+*/
+VOID Dx12SampleBase::ParseNode(DxNodeInfo& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex)
+{
+	currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
+	PrintUtils::DebugPrintf("Processing Node: %s\n", currentNode.name.c_str());
+
+	DxNodeTransformInfo& meshTransformInfo = currentNode.transformInfo;
+	m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
+
+	BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(nodeIdx);
+	if (isMeshPrimInfoValid == TRUE)
+	{
+		const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
+		currentNode.meshInfo.primitives.resize(numPrimitives);
+
+		for (UINT primitive = 0; primitive < numPrimitives; primitive++)
+		{
+			///@note Load VB, IB and textures for each primitive.
+			DxGltfPrimInfo gltfPrimInfo;
+			m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, nodeIdx, primitive);
+
+			const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
+			auto& currentPrim = GetPrimitiveInfo(fileIdx, nodeIdx, primitive);
+			const auto& gltfMaterial = gltfPrimInfo.materialInfo;
+			const auto& gltfPbrInfo = gltfMaterial.pbrMetallicRoughness;
+			const auto& gltfNormalInfo = gltfMaterial.normalInfo;
+			const auto& gltfOcclusion = gltfMaterial.occlusionInfo;
+			const auto& gltfEmissive = gltfMaterial.emissiveInfo;
+			auto& primMaterialCB = currentPrim.materialCbData;
+
+			currentPrim.vertexBufferInfo.clear();
+
+			currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
+			currentPrim.meshExtents = gltfPrimInfo.extents;
+			currentPrim.primLinearIdxInSceneElements = globalPrimitiveIndex;
+			globalPrimitiveIndex++;
+
+			///@Fill in vertex buffer info for each vertex buffer view in the primitive.
+			{
+				for (UINT k = 0; k < numVertexAttributes; k++)
+				{
+					currentPrim.vertexBufferInfo.emplace_back();
+					auto& vbInfo = currentPrim.vertexBufferInfo.back();
+					const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
+
+					BOOL isVertexAttribNeeded = TRUE;
+
+					if ((gltfVbInfo.iaLayoutInfo.isIndexValid == TRUE) &&
+						(dxhelper::IsSemanticNameTexCoord(gltfVbInfo.iaLayoutInfo.name) == TRUE))
+					{
+						isVertexAttribNeeded = FALSE;
+						const UINT semanticIndex = gltfVbInfo.iaLayoutInfo.index;
+						auto IsIndexUsedInMaterial = [semanticIndex](const DxGltfTextureInfo& textureInfo) -> BOOL
+							{
+								const BOOL isInlineTexure = ((textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0) ? TRUE : FALSE);
+								const BOOL isFileTexture = ((textureInfo.texture.imageBufferInfo.uri.length() > 0) ? TRUE : FALSE);
+								const BOOL isTextureValid = (isInlineTexure == TRUE || isFileTexture == TRUE);
+								return (isTextureValid == TRUE &&
+									textureInfo.texCoordIndex == semanticIndex);
+							};
+
+						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.baseColorTexture);
+						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.metallicRoughnessTexture);
+						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfNormalInfo.normalTexture);
+						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfOcclusion.occlusionTexture);
+						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfEmissive.emissiveTexture);
+					}
+
+					if (isVertexAttribNeeded == TRUE)
+					{
+						const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
+						const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
+						const UINT   bufferIndex = gltfVbInfo.bufferIndex;
+						const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
+						BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
+
+						vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+							(UINT)bufferSizeInBytes,
+							gltfVbInfo.iaLayoutInfo.name.c_str());
+
+						vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
+						vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
+						vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
+						vbInfo.iaSemantic = gltfVbInfo.iaLayoutInfo;
+					}
+					else
+					{
+						currentPrim.vertexBufferInfo.pop_back();
+					}
+				}
+			}
+
+			///@Fill in index buffer info if indexed draw
+			{
+				if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
+				{
+					auto& ibInfo = currentPrim.indexBufferInfo;
+					const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
+					const UINT64 bufferSizeInBytes = gltfPrimInfo.ibInfo.bufferSizeInBytes;
+					const UINT   bufferIndex = gltfPrimInfo.ibInfo.bufferIndex;
+					BYTE* bufferData = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
+					ibInfo.indexBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
+						(UINT)bufferSizeInBytes,
+						gltfPrimInfo.ibInfo.name.c_str());
+					ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
+					ibInfo.modelIbv.SizeInBytes = bufferSizeInBytes;
+					ibInfo.modelIbv.Format = gltfPrimInfo.ibInfo.indexFormat;
+
+					//@note this is required for SRV access and min alignment is 4 bytes
+					ibInfo.bufferStrideInBytes = dxhelper::DxAlign(gltfPrimInfo.ibInfo.bufferStrideInBytes, 4);
+				}
+			}
+
+
+			///@Fill in material and texture info if material is defined for the primitive
+			{
+				const UINT tessMask = ((IsTessEnabled() == TRUE ? ~0 : 0) & RenderFlagsTessEnabled);
+				const UINT pbrMask = ((EnablePBRShading() == TRUE ? ~0 : 0) & RenderFlagsUsePBR);
+				dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
+				dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
+				primMaterialCB.alphaCutoff = gltfMaterial.alphaCutOff;
+				primMaterialCB.metallicFactor = gltfMaterial.pbrMetallicRoughness.metallicFactor;
+				primMaterialCB.normalScale = gltfNormalInfo.scale;
+				primMaterialCB.occlusionStrength = gltfOcclusion.strength;
+				primMaterialCB.roughnessFactor = gltfPbrInfo.roughnessFactor;
+				primMaterialCB.renderFlags = (tessMask | pbrMask);
+
+				// Lambda to load texture from DxGltfTextureInfo
+				auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
+					{
+						BYTE* bufferData = nullptr;
+						UINT64      bufferSizeInBytes = 0;
+						UINT64      bufferOffsetInBytes = 0;
+						std::string textureUri = {};
+						BOOL        isTextureValid = false;
+
+
+						if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
+						{
+							const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
+							bufferData = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
+							bufferSizeInBytes = imageBufferInfo.bufferSizeInBytes;
+							bufferOffsetInBytes = imageBufferInfo.bufferOffsetInBytes;
+
+							assert(bufferData != nullptr);
+							bufferData += bufferOffsetInBytes;
+							isTextureValid = true;
+						}
+						else if (textureInfo.texture.imageBufferInfo.uri.length() != 0)
+						{
+							std::string assetName = textureInfo.texture.imageBufferInfo.uri;
+
+							textureUri = m_assetReader->GetFullModelFilePath(assetName);
+							isTextureValid = true;
+						}
+
+						if (isTextureValid == true)
+						{
+							assert(bufferData != nullptr || textureUri.length() > 0);
+
+							ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
+								bufferData,
+								bufferSizeInBytes,
+								textureUri.c_str()
+							);
+
+							texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
+								imageData.pixels.size(),
+								imageData.width,
+								imageData.height,
+								DXGI_FORMAT_R8G8B8A8_UNORM);
+						}
+						else
+						{
+							assert(textureInfo.texture.imageBufferInfo.bufferSizeInBytes == 0);
+							assert(textureInfo.texture.imageBufferInfo.uri.length() == 0);
+						}
+					};
+
+				auto& primTextureInfo = currentPrim.materialTextures;
+
+				LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture, primTextureInfo.pbrBaseColorTexture);
+				LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture, primTextureInfo.normalTexture);
+				LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
+				LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture, primTextureInfo.occlusionTexture);
+				LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture, primTextureInfo.emissiveTexture);
+
+				auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
+					flags |= (texture != nullptr) ? bit : 0;
+					};
+
+				primMaterialCB.flags = 0;
+
+
+				//HasBaseColorTexture = 1 << 0,
+				//HasNormalTexture = 1 << 1,
+				//HasMetallicRoughnessTex = 1 << 2,
+				//HasOcclusionTexture = 1 << 3,
+				//HasEmissiveTexture = 1 << 4,
+				SetFlag(primMaterialCB.flags, HasBaseColorTexture, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
+				SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
+				SetFlag(primMaterialCB.flags, HasEmissiveTexture, primTextureInfo.emissiveTexture.textureInfo.Get());
+				SetFlag(primMaterialCB.flags, HasNormalTexture, primTextureInfo.normalTexture.textureInfo.Get());
+				SetFlag(primMaterialCB.flags, HasOcclusionTexture, primTextureInfo.occlusionTexture.textureInfo.Get());
+
+				//DoubleSided = 1 << 7
+				primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
+
+				//AlphaModeMask = 1 << 5,
+				//AlphaModeBlend = 1 << 6,
+				//enum DxAlphaMode
+				//{
+				//	DxOpaque,
+				//	DxMask,
+				//	DxBlend
+				//};
+				switch (gltfMaterial.alphaMode)
+				{
+				case DxBlend:
+					primMaterialCB.flags |= AlphaModeBlend;
+					break;
+				case DxMask:
+					primMaterialCB.flags |= AlphaModeMask;
+					break;
+				case DxOpaque:
+					break;
+				}
+				IncrementMaterialDataCount(1);
+			}
+			primitiveIndex++;
+		}
+	}
+}
+
 VOID Dx12SampleBase::LoadGltfFiles()
 {
 	const std::vector<std::string> gltfFileNames = GltfFileName();
@@ -1552,234 +1791,10 @@ VOID Dx12SampleBase::LoadGltfFiles()
 		{
 			curFileInfo.nodes.emplace_back();
 			auto& currentNode = curFileInfo.nodes.back();
-			currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
 
-			DxNodeTransformInfo& meshTransformInfo = currentNode.transformInfo;
-			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
+			ParseNode(currentNode, fileIdx, nodeIdx, primitiveIndex, globalPrimitiveIndex);
 
-			BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(nodeIdx);
-			if (isMeshPrimInfoValid == TRUE)
-			{
-				const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
-				currentNode.meshInfo.primitives.resize(numPrimitives);
-
-				for (UINT primitive = 0; primitive < numPrimitives; primitive++)
-				{
-					///@note Load VB, IB and textures for each primitive.
-					DxGltfPrimInfo gltfPrimInfo;
-					m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, nodeIdx, primitive);
-
-					const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-					auto& currentPrim              = GetPrimitiveInfo(fileIdx, nodeIdx, primitive);
-					const auto& gltfMaterial       = gltfPrimInfo.materialInfo;
-					const auto& gltfPbrInfo        = gltfMaterial.pbrMetallicRoughness;
-					const auto& gltfNormalInfo     = gltfMaterial.normalInfo;
-					const auto& gltfOcclusion      = gltfMaterial.occlusionInfo;
-					const auto& gltfEmissive       = gltfMaterial.emissiveInfo;
-					auto& primMaterialCB           = currentPrim.materialCbData;
-
-					currentPrim.vertexBufferInfo.clear();
-
-					currentPrim.modelDrawPrimitive           = gltfPrimInfo.drawInfo;
-					currentPrim.meshExtents                  = gltfPrimInfo.extents;
-					currentPrim.primLinearIdxInSceneElements = globalPrimitiveIndex;
-					globalPrimitiveIndex++;
-
-					///@Fill in vertex buffer info for each vertex buffer view in the primitive.
-					{
-						for (UINT k = 0; k < numVertexAttributes; k++)
-						{
-							currentPrim.vertexBufferInfo.emplace_back();
-							auto& vbInfo = currentPrim.vertexBufferInfo.back();
-							const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
-
-							BOOL isVertexAttribNeeded = TRUE;
-
-							if ((gltfVbInfo.iaLayoutInfo.isIndexValid                           == TRUE) &&
-								(dxhelper::IsSemanticNameTexCoord(gltfVbInfo.iaLayoutInfo.name) == TRUE))
-							{
-								isVertexAttribNeeded       = FALSE;
-								const UINT semanticIndex   = gltfVbInfo.iaLayoutInfo.index;
-								auto IsIndexUsedInMaterial = [semanticIndex](const DxGltfTextureInfo& textureInfo) -> BOOL
-									{
-										const BOOL isInlineTexure  = ((textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0) ? TRUE : FALSE);
-										const BOOL isFileTexture   = ((textureInfo.texture.imageBufferInfo.uri.length() > 0) ? TRUE : FALSE);
-										const BOOL isTextureValid  = (isInlineTexure  == TRUE || isFileTexture == TRUE);
-										return (isTextureValid            == TRUE           &&
-											    textureInfo.texCoordIndex == semanticIndex);
-									};
-
-								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.baseColorTexture);
-								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.metallicRoughnessTexture);
-								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfNormalInfo.normalTexture);
-								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfOcclusion.occlusionTexture);
-								isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfEmissive.emissiveTexture);
-							}
-
-							if (isVertexAttribNeeded == TRUE)
-							{
-								const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
-								const UINT64 bufferSizeInBytes     = gltfVbInfo.bufferSizeInBytes;
-								const UINT   bufferIndex           = gltfVbInfo.bufferIndex;
-								const UINT   bufferStrideInBytes   = gltfVbInfo.bufferStrideInBytes;
-								BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
-
-								vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-																			(UINT)bufferSizeInBytes,
-																			gltfVbInfo.iaLayoutInfo.name.c_str());
-
-								vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
-								vbInfo.modelVbv.SizeInBytes    = bufferSizeInBytes;
-								vbInfo.modelVbv.StrideInBytes  = bufferStrideInBytes;
-								vbInfo.iaSemantic              = gltfVbInfo.iaLayoutInfo;
-							}
-							else
-							{
-								currentPrim.vertexBufferInfo.pop_back();
-							}
-						}
-					}
-
-					///@Fill in index buffer info if indexed draw
-					{
-						if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
-						{
-							auto& ibInfo = currentPrim.indexBufferInfo;
-							const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
-							const UINT64 bufferSizeInBytes     = gltfPrimInfo.ibInfo.bufferSizeInBytes;
-							const UINT   bufferIndex           = gltfPrimInfo.ibInfo.bufferIndex;
-							BYTE* bufferData                   = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
-							ibInfo.indexBuffer                 = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-																					  (UINT)bufferSizeInBytes,
-																					  gltfPrimInfo.ibInfo.name.c_str());
-							ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
-							ibInfo.modelIbv.SizeInBytes    = bufferSizeInBytes;
-							ibInfo.modelIbv.Format         = gltfPrimInfo.ibInfo.indexFormat;
-
-							//@note this is required for SRV access and min alignment is 4 bytes
-							ibInfo.bufferStrideInBytes     = dxhelper::DxAlign(gltfPrimInfo.ibInfo.bufferStrideInBytes, 4);
-						}
-					}
-
-
-					///@Fill in material and texture info if material is defined for the primitive
-					{
-						const UINT tessMask = ((IsTessEnabled() == TRUE ? ~0 : 0) & RenderFlagsTessEnabled);
-						const UINT pbrMask  = ((EnablePBRShading() == TRUE ? ~0 : 0) & RenderFlagsUsePBR);
-						dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
-						dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
-						primMaterialCB.alphaCutoff       = gltfMaterial.alphaCutOff;
-						primMaterialCB.metallicFactor    = gltfMaterial.pbrMetallicRoughness.metallicFactor;
-						primMaterialCB.normalScale       = gltfNormalInfo.scale;
-						primMaterialCB.occlusionStrength = gltfOcclusion.strength;
-						primMaterialCB.roughnessFactor   = gltfPbrInfo.roughnessFactor;
-						primMaterialCB.renderFlags       = (tessMask | pbrMask);
-
-						// Lambda to load texture from DxGltfTextureInfo
-						auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
-							{
-								BYTE*       bufferData          = nullptr;
-								UINT64      bufferSizeInBytes   = 0;
-								UINT64      bufferOffsetInBytes = 0;
-								std::string textureUri          = {};
-								BOOL        isTextureValid      = false;
-
-
-								if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
-								{
-									const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-									bufferData            = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-									bufferSizeInBytes    = imageBufferInfo.bufferSizeInBytes;
-									bufferOffsetInBytes  = imageBufferInfo.bufferOffsetInBytes;
-
-									assert(bufferData != nullptr);
-									bufferData += bufferOffsetInBytes;
-									isTextureValid = true;
-								}
-								else if (textureInfo.texture.imageBufferInfo.uri.length() != 0)
-								{
-									std::string assetName = textureInfo.texture.imageBufferInfo.uri;
-
-									textureUri     = m_assetReader->GetFullModelFilePath(assetName);
-									isTextureValid = true;
-								}
-
-								if (isTextureValid == true)
-								{
-									assert(bufferData != nullptr || textureUri.length() > 0);
-
-									ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
-										                                                         bufferData,
-										                                                         bufferSizeInBytes,
-										                                                         textureUri.c_str()
-									);
-
-									texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
-																						 imageData.pixels.size(),
-																						 imageData.width,
-																						 imageData.height,
-																						 DXGI_FORMAT_R8G8B8A8_UNORM);
-								}
-								else
-								{
-									assert(textureInfo.texture.imageBufferInfo.bufferSizeInBytes == 0);
-									assert(textureInfo.texture.imageBufferInfo.uri.length() == 0);
-								}
-							};
-
-						auto& primTextureInfo = currentPrim.materialTextures;
-
-						LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture, primTextureInfo.pbrBaseColorTexture);
-						LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture, primTextureInfo.normalTexture);
-						LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
-						LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture, primTextureInfo.occlusionTexture);
-						LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture, primTextureInfo.emissiveTexture);
-
-						auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
-							flags |= (texture != nullptr) ? bit : 0;
-							};
-
-						primMaterialCB.flags = 0;
-
-
-						//HasBaseColorTexture = 1 << 0,
-						//HasNormalTexture = 1 << 1,
-						//HasMetallicRoughnessTex = 1 << 2,
-						//HasOcclusionTexture = 1 << 3,
-						//HasEmissiveTexture = 1 << 4,
-						SetFlag(primMaterialCB.flags, HasBaseColorTexture, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
-						SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
-						SetFlag(primMaterialCB.flags, HasEmissiveTexture, primTextureInfo.emissiveTexture.textureInfo.Get());
-						SetFlag(primMaterialCB.flags, HasNormalTexture, primTextureInfo.normalTexture.textureInfo.Get());
-						SetFlag(primMaterialCB.flags, HasOcclusionTexture, primTextureInfo.occlusionTexture.textureInfo.Get());
-
-						//DoubleSided = 1 << 7
-						primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
-
-						//AlphaModeMask = 1 << 5,
-						//AlphaModeBlend = 1 << 6,
-						//enum DxAlphaMode
-						//{
-						//	DxOpaque,
-						//	DxMask,
-						//	DxBlend
-						//};
-						switch (gltfMaterial.alphaMode)
-						{
-						case DxBlend:
-							primMaterialCB.flags |= AlphaModeBlend;
-							break;
-						case DxMask:
-							primMaterialCB.flags |= AlphaModeMask;
-							break;
-						case DxOpaque:
-							break;
-						}
-						IncrementMaterialDataCount(1);
-					}
-					primitiveIndex++;
-				}
-			}
+			
 			SetNumTotalPrimitivesInScene(primitiveIndex, fileIdx);
 		}
 	}
