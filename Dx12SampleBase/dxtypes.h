@@ -254,6 +254,11 @@ struct DxPrimIndexData
 	UINT bufferStrideInBytes;
 };
 
+
+///@note PrimitiveInfo has TransformInfo as design is to flatten the gltf information.
+///      In simple cases, it made sense to have a hierarchy, but if a node has a child,
+///      it gets complicated.
+///      There could be redundant data, need to address this later.
 struct DxPrimitiveInfo
 {
 	DxDrawPrimitive               modelDrawPrimitive;
@@ -264,6 +269,7 @@ struct DxPrimitiveInfo
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;
 	DxExtents                     meshExtents;
+	DxNodeTransformInfo	          transformInfo;
 
 	///@note this is required to index into descriptor heap
 	UINT                          primLinearIdxInSceneElements;
@@ -273,7 +279,6 @@ struct DxPrimitiveInfo
 struct DxModelAsset
 {
 	std::string name;
-	DxNodeTransformInfo	      transformInfo;
 	std::vector<DxPrimitiveInfo> primitives;
 };
 

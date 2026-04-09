@@ -1539,9 +1539,6 @@ VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nod
 	currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
 	PrintUtils::DebugPrintf("Processing Node: %s\n", currentNode.name.c_str());
 
-	DxNodeTransformInfo& meshTransformInfo = currentNode.transformInfo;
-	m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
-
 	BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(nodeIdx);
 	if (isMeshPrimInfoValid == TRUE)
 	{
@@ -1562,6 +1559,12 @@ VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nod
 			const auto& gltfOcclusion = gltfMaterial.occlusionInfo;
 			const auto& gltfEmissive = gltfMaterial.emissiveInfo;
 			auto& primMaterialCB = currentPrim.materialCbData;
+
+			///@note this is redundant and needs better implementation.
+			///      Might have a transform manager and just add pointers.
+			///      It might be easier than it seems to be.
+			DxNodeTransformInfo& meshTransformInfo = currentPrim.transformInfo;
+			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
 
 			currentPrim.vertexBufferInfo.clear();
 
@@ -1851,12 +1854,13 @@ VOID Dx12SampleBase::LoadScene()
 			
 			for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
 			{
-				///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
-				m_camera->AddTransformInfo(sceneElement.nodes[nodeIdx].transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
+				
 				const UINT numPrimitives = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
 				for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)
 				{
 					auto& curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
+					///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
+					m_camera->AddTransformInfo(curPrim.transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
 					if (currentSceneElementDesc.addToExtents == TRUE)
 					{
 						m_camera->AddMinMaxExtents(curPrim.meshExtents);
