@@ -270,7 +270,7 @@ struct DxPrimitiveInfo
 };
 
 //change to DxModelAsset, it should have all the info
-struct DxNodeInfo
+struct DxModelAsset
 {
 	std::string name;
 	DxNodeTransformInfo	      transformInfo;
@@ -281,7 +281,7 @@ struct DxNodeInfo
 //change to DxModelAssets, it should collect all the assets and some metadata
 struct DxSceneElements 
 {
-	std::vector<DxNodeInfo> nodes;
+	std::vector<DxModelAsset> nodes;
 	UINT numTotalPrimitivesInScene;
 };
 

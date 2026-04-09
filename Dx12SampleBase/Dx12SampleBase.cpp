@@ -1534,7 +1534,7 @@ UINT Dx12SampleBase::CreateInputElementDesc(const std::vector<DxPrimVertexData>&
 * - mesh
 * - child nodes
 */
-VOID Dx12SampleBase::ParseNode(DxNodeInfo& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex)
+VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex)
 {
 	currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
 	PrintUtils::DebugPrintf("Processing Node: %s\n", currentNode.name.c_str());

@@ -145,7 +145,7 @@ protected:
         return m_sceneElements.size();
     }
 
-    inline DxNodeInfo& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
+    inline DxModelAsset& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
     {
         return m_sceneElements[sceneIdx].nodes[nodeIndex];
     }
@@ -399,7 +399,7 @@ protected:
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
     VOID LoadGltfFiles();
-    VOID ParseNode(DxNodeInfo& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex);
+    VOID ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex);
     VOID LoadSceneMaterialInfo();
     VOID LoadScene();
     HRESULT CreatePerPrimGfxPipelineState();
