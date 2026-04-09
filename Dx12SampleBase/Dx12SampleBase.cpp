@@ -1546,7 +1546,7 @@ VOID Dx12SampleBase::ParseNode(DxNodeInfo& currentNode, UINT fileIdx, UINT nodeI
 	if (isMeshPrimInfoValid == TRUE)
 	{
 		const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
-		currentNode.meshInfo.primitives.resize(numPrimitives);
+		currentNode.primitives.resize(numPrimitives);
 
 		for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 		{

@@ -150,14 +150,9 @@ protected:
         return m_sceneElements[sceneIdx].nodes[nodeIndex];
     }
 
-    inline DxMeshInfo& GetMeshInfo(UINT sceneIdx, UINT nodeIndex)
-    {
-        return GetNodeInfo(sceneIdx, nodeIndex).meshInfo; 
-    }
-
     inline DxPrimitiveInfo& GetPrimitiveInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
     {
-        return GetMeshInfo(sceneIdx, nodeIndex).primitives[primitiveIndex];
+        return GetNodeInfo(sceneIdx, nodeIndex).primitives[primitiveIndex];
     }
 
     inline BOOL IsPrimitiveTransparent(DxPrimitiveInfo& primInfo)
@@ -216,7 +211,7 @@ protected:
 
     inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
     {
-        return m_sceneElements[sceneIdx].nodes[nodeIndex].meshInfo.primitives[0].modelDrawPrimitive;
+        return m_sceneElements[sceneIdx].nodes[nodeIndex].primitives[primitiveIndex].modelDrawPrimitive;
     }
 
     inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -241,7 +236,7 @@ protected:
 
     inline UINT NumPrimitivesInNodeMesh(UINT sceneIdx, UINT nodeIdx)
     {
-        return GetMeshInfo(sceneIdx, nodeIdx).primitives.size();
+        return GetNodeInfo(sceneIdx, nodeIdx).primitives.size();
     }
 
     inline UINT NumSRVsPerPrimForMaterials()

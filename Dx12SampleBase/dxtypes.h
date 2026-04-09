@@ -269,20 +269,17 @@ struct DxPrimitiveInfo
 	UINT                          primLinearIdxInSceneElements;
 };
 
-struct DxMeshInfo
-{
-	std::vector<DxPrimitiveInfo> primitives;
-};
-
+//change to DxModelAsset, it should have all the info
 struct DxNodeInfo
 {
 	std::string name;
-	BOOL                      hasMeshInfo;
 	DxNodeTransformInfo	      transformInfo;
-	DxMeshInfo		          meshInfo;
+	std::vector<DxPrimitiveInfo> primitives;
 };
 
-struct DxSceneElements
+
+//change to DxModelAssets, it should collect all the assets and some metadata
+struct DxSceneElements 
 {
 	std::vector<DxNodeInfo> nodes;
 	UINT numTotalPrimitivesInScene;
