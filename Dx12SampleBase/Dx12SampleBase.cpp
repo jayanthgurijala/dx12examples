@@ -1537,16 +1537,17 @@ VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nod
 	if (isMeshPrimInfoValid == TRUE)
 	{
 		const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
-		currentNode.primitives.resize(numPrimitives);
 
 		for (UINT primitive = 0; primitive < numPrimitives; primitive++)
 		{
+			currentNode.primitives.emplace_back();
+			auto& currentPrim = currentNode.primitives.back();
 			///@note Load VB, IB and textures for each primitive.
 			DxGltfPrimInfo gltfPrimInfo;
 			m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, nodeIdx, primitive);
 
 			const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-			auto& currentPrim = GetPrimitiveInfo(fileIdx, nodeIdx, primitive);
+			
 			const auto& gltfMaterial = gltfPrimInfo.materialInfo;
 			const auto& gltfPbrInfo = gltfMaterial.pbrMetallicRoughness;
 			const auto& gltfNormalInfo = gltfMaterial.normalInfo;
@@ -1781,13 +1782,14 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 		m_gltfLoader->LoadModel();
 		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene();
-		curFileInfo.nodes.clear();
+
+		curFileInfo.modelAssets.clear();
 
 		UINT primitiveIndex = 0;
 		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
 		{
-			curFileInfo.nodes.emplace_back();
-			auto& currentNode = curFileInfo.nodes.back();
+			curFileInfo.modelAssets.emplace_back();
+			auto& currentNode = curFileInfo.modelAssets.back();
 
 			ParseNode(currentNode, fileIdx, nodeIdx, primitiveIndex, globalPrimitiveIndex);
 

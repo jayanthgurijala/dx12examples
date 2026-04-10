@@ -324,14 +324,11 @@ struct DxModelAsset
 
 
 //change to DxModelAssets, it should collect all the assets and some metadata
-struct DxSceneElements 
+struct DxModelAssets 
 {
-	std::vector<DxModelAsset> nodes;
+	std::vector<DxModelAsset> modelAssets;
 	UINT numTotalPrimitivesInScene;
 };
-
-
-
 
 struct DxSceneElementInstance
 {

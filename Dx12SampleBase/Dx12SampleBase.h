@@ -147,7 +147,7 @@ protected:
 
     inline DxModelAsset& GetNodeInfo(UINT sceneIdx, UINT nodeIndex)
     {
-        return m_sceneElements[sceneIdx].nodes[nodeIndex];
+        return m_sceneElements[sceneIdx].modelAssets[nodeIndex];
     }
 
     inline DxPrimitiveInfo& GetPrimitiveInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -211,7 +211,7 @@ protected:
 
     inline DxDrawPrimitive& GetDrawInfo(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
     {
-        return m_sceneElements[sceneIdx].nodes[nodeIndex].primitives[primitiveIndex].modelDrawPrimitive;
+        return m_sceneElements[sceneIdx].modelAssets[nodeIndex].primitives[primitiveIndex].modelDrawPrimitive;
     }
 
     inline DXGI_FORMAT GetVertexPositionBufferFormat(UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
@@ -231,7 +231,7 @@ protected:
 
     inline UINT NumNodesInScene(UINT sceneIdx)
     {
-        return m_sceneElements[sceneIdx].nodes.size();
+        return m_sceneElements[sceneIdx].modelAssets.size();
     }
 
     inline UINT NumPrimitivesInNodeMesh(UINT sceneIdx, UINT nodeIdx)
@@ -565,7 +565,8 @@ private:
     std::vector<DxAppFrameInfo>    m_appFrameInfo;
     std::unique_ptr<DxGltfLoader>  m_gltfLoader;
 
-    std::vector<DxSceneElements>	    m_sceneElements;
+    std::vector<DxModelAssets>	    m_sceneElements;
+
     static 	Dx12SampleBase*             s_sampleBase;
 
     std::vector<DxSceneElementInstance> m_sceneDescription;
