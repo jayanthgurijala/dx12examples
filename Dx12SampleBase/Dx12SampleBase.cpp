@@ -15,6 +15,7 @@
 #include <backends/imgui_impl_win32.h>
 #include <backends/imgui_impl_dx12.h>
 #include <backends/imgui_impl_win32.cpp>
+#include "DxTransformHelper.h"
 
 using namespace WICImageLoader;
 using namespace GltfUtils;
@@ -502,17 +503,10 @@ VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& s
 
 		sceneDescription[idx].trsMatrix.resize(1);
 		auto& trsMatrix = sceneDescription[idx].trsMatrix[0];
-		trsMatrix.translation[0] = 0.0f;
-		trsMatrix.translation[1] = 0.0f;
-		trsMatrix.translation[2] = 0.0f;
 
-		trsMatrix.rotationInDegrees[0] = 0.0f;
-		trsMatrix.rotationInDegrees[1] = 0.0f;
-		trsMatrix.rotationInDegrees[2] = 0.0f;
-
-		trsMatrix.scale[0] = 1.0f;
-		trsMatrix.scale[1] = 1.0f;
-		trsMatrix.scale[2] = 1.0f;
+		DxTransformHelper::SetTranslationValues(trsMatrix, 0, 0, 0);
+		DxTransformHelper::SetRotationInDegrees(trsMatrix, 0, 0, 0);
+		DxTransformHelper::SetScaleValues(trsMatrix, 1, 1, 1);
 	}
 }
 
@@ -1563,7 +1557,7 @@ VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nod
 			///@note this is redundant and needs better implementation.
 			///      Might have a transform manager and just add pointers.
 			///      It might be easier than it seems to be.
-			DxNodeTransformInfo& meshTransformInfo = currentPrim.transformInfo;
+			DxTransformInfo& meshTransformInfo = currentPrim.transformInfo;
 			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
 
 			currentPrim.vertexBufferInfo.clear();

@@ -169,6 +169,7 @@
     <ClInclude Include="dxhelper.h" />
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="DxDescriptorHeapManager.h" />
+    <ClInclude Include="DxTransformHelper.h" />
     <ClInclude Include="dxtypes.h" />
     <ClInclude Include="ExampleEntryPoint.h" />
     <ClInclude Include="FileReader.h" />

@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "DxGltfLoader.h"
 #include "gltfutils.h"
+#include "DxTransformHelper.h"
 
 using namespace GltfUtils;
 
@@ -29,17 +30,21 @@ UINT DxGltfLoader::NumScenes()
 	return 1;
 }
 
-VOID DxGltfLoader::GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT nodeIndex)
+VOID DxGltfLoader::GetNodeTransformInfo(DxTransformInfo& transformInfo, UINT nodeIndex)
 {
 	tinygltf::Node& nodeDesc = GetNode(nodeIndex);
 
-	meshTransformInfo.hasScale       = (nodeDesc.scale.size() != 0);
-	meshTransformInfo.hasTranslation = (nodeDesc.translation.size() != 0);
-	meshTransformInfo.hasRotation    = (nodeDesc.rotation.size() != 0);
-	meshTransformInfo.hasMatrix      = (nodeDesc.matrix.size() != 0);
-	meshTransformInfo.translation    = nodeDesc.translation;
-	meshTransformInfo.rotation       = nodeDesc.rotation;
-	meshTransformInfo.scale          = nodeDesc.scale;
+	BOOL hasScale       = (nodeDesc.scale.size() != 0);
+	BOOL hasTranslation = (nodeDesc.translation.size() != 0);
+	BOOL hasRotation    = (nodeDesc.rotation.size() != 0);
+	BOOL hasMatrix      = (nodeDesc.matrix.size() != 0);
+
+	//need to test this path
+	assert(hasMatrix == false);
+
+	DxTransformHelper::SetTranslation(transformInfo, nodeDesc.translation, hasTranslation);
+	DxTransformHelper::SetScale(transformInfo, nodeDesc.scale, hasScale);
+	DxTransformHelper::SetQuaternionRotation(transformInfo, nodeDesc.rotation, hasRotation);
 }
 
 

@@ -33,17 +33,57 @@ struct DxExtents
 	BOOL hasValidExtents;
 };
 
-struct DxNodeTransformInfo
+enum DxRotationMode
 {
-	BOOL hasTranslation;
-	BOOL hasRotation;
-	BOOL hasScale;
-	BOOL hasMatrix;
+	DxRotationModeInvalid,
+	DxRotationModeQuaternion,
+	DxRotationModeDegree,
+	DxRotationModeRadians
+};
 
-	std::vector<double> translation;
-	std::vector<double> rotation;
-	std::vector<double> scale;
-	std::vector<double> matrix;
+struct DxRotationQuaternion
+{
+	FLOAT x;
+	FLOAT y;
+	FLOAT z;
+	FLOAT w;
+};
+
+struct DxRotationDegrees
+{
+	FLOAT xDeg;
+	FLOAT yDeg;
+	FLOAT zDeg;
+};
+
+struct DxRotationRadians
+{
+	FLOAT xRad;
+	FLOAT yRad;
+	FLOAT zRAD;
+};
+
+struct DxTRSInfo
+{
+	FLOAT translation[3];
+	FLOAT scale[3];
+	DxRotationMode rotationMode;
+	union
+	{
+		DxRotationQuaternion quaterion;
+		DxRotationDegrees    degree;
+		DxRotationRadians    radians;
+	};
+};
+
+struct DxTransformInfo
+{
+	BOOL hasMatrix;
+	union
+	{
+		DxTRSInfo trsInfo;
+		FLOAT     matrix[16];
+	};
 };
 
 struct DxIASemantic
@@ -269,7 +309,7 @@ struct DxPrimitiveInfo
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;
 	DxExtents                     meshExtents;
-	DxNodeTransformInfo	          transformInfo;
+	DxTransformInfo	              transformInfo;
 
 	///@note this is required to index into descriptor heap
 	UINT                          primLinearIdxInSceneElements;
@@ -291,18 +331,13 @@ struct DxSceneElements
 };
 
 
-struct DxSceneElementTRS
-{
-	FLOAT translation[3];
-	FLOAT rotationInDegrees[3];
-	FLOAT scale[3];
-};
+
 
 struct DxSceneElementInstance
 {
 	UINT sceneElementIdx;
 	UINT numInstances;
-	std::vector<DxSceneElementTRS> trsMatrix;
+	std::vector<DxTransformInfo> trsMatrix;
 	BOOL addToExtents;
 };
 

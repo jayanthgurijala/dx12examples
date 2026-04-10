@@ -10,6 +10,7 @@
 #include <d3dx12.h>
 #include "dxhelper.h"
 #include <imgui.h>
+#include "DxTransformHelper.h"
 
 Dx12HelloForest::Dx12HelloForest(UINT width, UINT height) :
 	Dx12SampleBase(width, height)
@@ -121,17 +122,9 @@ VOID Dx12HelloForest::InitChineseDragon(DxSceneElementInstance& sceneElement, UI
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = 0.0f;
-	trsMatrix.translation[1] = 0.0f;
-	trsMatrix.translation[2] = 0.0f;
-
-	trsMatrix.rotationInDegrees[0] = 0.0f;
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 0.3f;
-	trsMatrix.scale[1] = 0.3f;
-	trsMatrix.scale[2] = 0.3f;
+	DxTransformHelper::SetTranslationIdentityValues(trsMatrix);
+	DxTransformHelper::SetRotationIdentityDegrees(trsMatrix);
+	DxTransformHelper::SetScaleValues(trsMatrix, 0.3f, 0.3f, 0.3f);
 }
 
 VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT localIdx)
@@ -144,24 +137,10 @@ VOID Dx12HelloForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT loc
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = 0.0f;
-	trsMatrix.translation[1] = -.04f;
-	trsMatrix.translation[2] = 0.0f;
+	DxTransformHelper::SetTranslationValues(trsMatrix, 0.0f, -0.04f, 0.0f);
+	DxTransformHelper::SetRotationIdentityDegrees(trsMatrix);
+	DxTransformHelper::SetScaleIdentityValues(trsMatrix);
 
-	if (localIdx == 0)
-	{
-		trsMatrix.rotationInDegrees[0] = 0.0f;
-	} 
-	else
-	{
-		trsMatrix.rotationInDegrees[0] = 90.0f;
-	}
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 1.0f;
-	trsMatrix.scale[1] = 1.0f;
-	trsMatrix.scale[2] = 1.0f;
 }
 
 VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx)
@@ -173,17 +152,9 @@ VOID Dx12HelloForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = 0.0f;
-	trsMatrix.translation[1] = 0.0f;
-	trsMatrix.translation[2] = 0.0f;
-
-	trsMatrix.rotationInDegrees[0] = 0.0f;
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 1.0f;
-	trsMatrix.scale[1] = 1.0f;
-	trsMatrix.scale[2] = 1.0f;
+	DxTransformHelper::TranslationIdentity(trsMatrix);
+	DxTransformHelper::SetRotationIdentityDegrees(trsMatrix);
+	DxTransformHelper::SetScaleIdentityValues(trsMatrix);
 }
 
 VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
@@ -194,17 +165,10 @@ VOID Dx12HelloForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT lo
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
-	trsMatrix.translation[0] = 0.8f + localIdx * 0.8f; //looking from rear of Deer moving right
-	trsMatrix.translation[1] = 0.0f; //moving forward towards Deer nose
-	trsMatrix.translation[2] = 0.8; //moving down
 
-	trsMatrix.rotationInDegrees[0] = 0.0f;
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 3.0f;
-	trsMatrix.scale[1] = 3.0f;
-	trsMatrix.scale[2] = 3.0f;
+	DxTransformHelper::SetTranslationValues(trsMatrix, 0.8f + localIdx * 0.8f, 0.0f, 0.8f);
+	DxTransformHelper::SetRotationIdentityDegrees(trsMatrix);
+	DxTransformHelper::SetScaleValues(trsMatrix, 3.0f, 3.0f, 3.0f);
 }
 
 DX_ENTRY_POINT(Dx12HelloForest);

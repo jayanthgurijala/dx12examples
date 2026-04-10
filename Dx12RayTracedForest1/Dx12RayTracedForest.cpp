@@ -13,6 +13,7 @@
 #include "dxhelper.h"
 #include "DxPrintUtils.h"
 #include <imgui.h>
+#include "DxTransformHelper.h"
 
 using namespace DirectX;
 
@@ -180,24 +181,9 @@ VOID Dx12RayTracedForest::InitTerrain(DxSceneElementInstance& sceneElement, UINT
 	sceneElement.trsMatrix.resize(sceneElement.numInstances);
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = 0.0f;
-	trsMatrix.translation[1] = -.04f;
-	trsMatrix.translation[2] = 0.0f;
-
-	if (localIdx == 0)
-	{
-		trsMatrix.rotationInDegrees[0] = 0.0f;
-	}
-	else
-	{
-		trsMatrix.rotationInDegrees[0] = 90.0f;
-	}
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 1.0f;
-	trsMatrix.scale[1] = 1.0f;
-	trsMatrix.scale[2] = 1.0f;
+	DxTransformHelper::SetTranslationValues(trsMatrix, 0.0f, -0.04f, 0.0f);
+	DxTransformHelper::SetRotationInDegrees(trsMatrix, 0.0f, 0.0f, 0.0f);
+	DxTransformHelper::SetScaleValues(trsMatrix, 1.0f, 1.0f, 1.f);
 }
 
 VOID Dx12RayTracedForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, UINT localIdx)
@@ -209,17 +195,10 @@ VOID Dx12RayTracedForest::InitAnimalsDeer(DxSceneElementInstance& sceneElement, 
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
-	trsMatrix.translation[0] = DeerPositions[localIdx][0];
-	trsMatrix.translation[1] = DeerPositions[localIdx][1];
-	trsMatrix.translation[2] = DeerPositions[localIdx][2];
+	DxTransformHelper::SetTranslationValues(trsMatrix, DeerPositions[localIdx]);
+	DxTransformHelper::SetRotationInDegrees(trsMatrix, DeerRotations[localIdx]);
+	DxTransformHelper::SetScaleValues(trsMatrix, 1.0f, 1.0f, 1.0f);
 
-    trsMatrix.rotationInDegrees[0] = DeerRotations[localIdx][0];
-    trsMatrix.rotationInDegrees[1] = DeerRotations[localIdx][1];
-    trsMatrix.rotationInDegrees[2] = DeerPositions[localIdx][2];
-
-	trsMatrix.scale[0] = 1.0f;
-	trsMatrix.scale[1] = 1.0f;
-	trsMatrix.scale[2] = 1.0f;
 }
 
 VOID Dx12RayTracedForest::InitOakTrees(DxSceneElementInstance& sceneElement, UINT localIdx)
@@ -231,18 +210,10 @@ VOID Dx12RayTracedForest::InitOakTrees(DxSceneElementInstance& sceneElement, UIN
 
 	auto& trsMatrix = sceneElement.trsMatrix[0];
 
+	DxTransformHelper::SetTranslationValues(trsMatrix, OakTreePositions[localIdx]);
+	DxTransformHelper::SetRotationInDegrees(trsMatrix, 0.0f, 0.0f, 0.0f);
+	DxTransformHelper::SetScaleValues(trsMatrix, 3.0f, 3.0f, 3.0f);
 
-    trsMatrix.translation[0] = OakTreePositions[localIdx][0];
-    trsMatrix.translation[1] = OakTreePositions[localIdx][1];
-    trsMatrix.translation[2] = OakTreePositions[localIdx][2];
-
-	trsMatrix.rotationInDegrees[0] = 0.0f;
-	trsMatrix.rotationInDegrees[1] = 0.0f;
-	trsMatrix.rotationInDegrees[2] = 0.0f;
-
-	trsMatrix.scale[0] = 3.0f;
-	trsMatrix.scale[1] = 3.0f;
-	trsMatrix.scale[2] = 3.0f;
 }
 
 DX_ENTRY_POINT(Dx12RayTracedForest);

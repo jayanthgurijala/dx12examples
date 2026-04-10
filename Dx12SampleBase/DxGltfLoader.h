@@ -23,7 +23,7 @@ public:
 	UINT NumScenes();
 	
 
-	VOID GetNodeTransformInfo(DxNodeTransformInfo& meshTransformInfo, UINT nodeIndex);
+	VOID GetNodeTransformInfo(DxTransformInfo& transformInfo, UINT nodeIndex);
 	VOID LoadMeshPrimitiveInfo(DxGltfPrimInfo& meshInfo, UINT nodeIndex, UINT primitiveIndex);
 
 	inline unsigned char* GetBufferData(UINT index)

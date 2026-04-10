@@ -6,6 +6,7 @@
 #include "DxCamera.h"
 #include "DxPrintUtils.h"
 #include "Dx12SampleBase.h"
+#include "DxTransformHelper.h"
 
 DxCamera::DxCamera(UINT width, UINT height)
 {
@@ -35,34 +36,15 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 		up);
 }
 
-VOID DxCamera::AddTransformInfo(const DxNodeTransformInfo& transformInfo, const DxSceneElementTRS* const sceneElementTRS)
+VOID DxCamera::AddTransformInfo(const DxTransformInfo& transformInfo, const DxTransformInfo* const sceneElementTRS)
 {
 	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
 
 	if (sceneElementTRS != nullptr)
 	{
-		XMVECTOR translationVec = XMVectorSet(sceneElementTRS->translation[0],
-								              sceneElementTRS->translation[1],
-											  sceneElementTRS->translation[2], 1.0f);
+		XMMATRIX sceneElementWorldMatrix = DxTransformHelper::GetWorldMatrix(*sceneElementTRS);
 
-
-		XMVECTOR qRotVec = XMQuaternionRotationRollPitchYaw(
-			XMConvertToRadians(sceneElementTRS->rotationInDegrees[0]),						    
-			XMConvertToRadians(sceneElementTRS->rotationInDegrees[1]),
-			XMConvertToRadians(sceneElementTRS->rotationInDegrees[2])
-		);
-
-		XMVECTOR scaleVec = XMVectorSet(sceneElementTRS->scale[0],
-								        sceneElementTRS->scale[1],
-									    sceneElementTRS->scale[2], 1.0f);
-
-		XMMATRIX T = XMMatrixTranslationFromVector(translationVec);
-		XMMATRIX R = XMMatrixRotationQuaternion(qRotVec);
-		XMMATRIX S = XMMatrixScalingFromVector(scaleVec);
-
-		XMMATRIX sceneWorldMatrix = S * R * T;
-
-		worldMatrix = sceneWorldMatrix * worldMatrix;
+		worldMatrix = sceneElementWorldMatrix * worldMatrix;
 
 	}
 
@@ -177,53 +159,37 @@ VOID DxCamera::CreateProjectionMatrix()
                                                   80.0f);
 }
 
-XMMATRIX DxCamera::CreateModelMatrix(const DxNodeTransformInfo& transformInfo)
+XMMATRIX DxCamera::CreateModelMatrix(const DxTransformInfo& transformInfo)
 {
 	XMMATRIX modelMatrix;
-
-	const std::vector<double>& meshTranslation = transformInfo.translation;
-	const std::vector<double>& meshRotation = transformInfo.rotation;
-	const std::vector<double>& meshScale = transformInfo.scale;
-
-	if (transformInfo.hasMatrix == FALSE)
+	
+	if (transformInfo.hasMatrix == false)
 	{
-		XMVECTOR translation = (transformInfo.hasTranslation == TRUE) ? XMVectorSet((FLOAT)meshTranslation[0],
-																		            (FLOAT)meshTranslation[1],
-																		            (FLOAT)meshTranslation[2], 1.0f) : XMVectorZero();
 
-		XMVECTOR scale = (transformInfo.hasScale == TRUE) ? XMVectorSet((FLOAT)meshScale[0],
-																		(FLOAT)meshScale[1],
-																		(FLOAT)meshScale[2],
-																		1.0f) : XMVectorSplatOne();
+		modelMatrix = DxTransformHelper::GetWorldMatrix(transformInfo);
 
-		XMVECTOR quaternionRotation = (transformInfo.hasRotation == TRUE) ? XMVectorSet(meshRotation[0],
-			                                                                            meshRotation[1],
-			                                                                            meshRotation[2],
-			                                                                            meshRotation[3]) : XMVectorSet(0, 0, 0, 1);
-		XMMATRIX T = XMMatrixTranslationFromVector(translation);
-		XMMATRIX R = XMMatrixRotationQuaternion(quaternionRotation);
-		XMMATRIX S = XMMatrixScalingFromVector(scale);
-
-		modelMatrix = S * R * T;
+	
 	}
 	else
 	{
-		const std::vector<double>& m4x4 = transformInfo.matrix;
-
-
-		///@note gltf matrix is column major but DirectX Math expects row major.
-		///      We could transpose it while construction but looks likt that is "error prone"
-		///      Taking the safer approach.
-		XMFLOAT4X4 temp =
-		{
-			(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
-			(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
-			(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
-			(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
-		};
-
-		XMMATRIX tempMat = XMLoadFloat4x4(&temp);
-		modelMatrix = XMMatrixTranspose(tempMat);
+		assert(0);
+		
+		//const std::vector<double>& m4x4 = transformInfo.matrix;
+		//
+		//
+		/////@note gltf matrix is column major but DirectX Math expects row major.
+		/////      We could transpose it while construction but looks likt that is "error prone"
+		/////      Taking the safer approach.
+		//XMFLOAT4X4 temp =
+		//{
+		//	(FLOAT)m4x4[0], (FLOAT)m4x4[1], (FLOAT)m4x4[2], (FLOAT)m4x4[3],
+		//	(FLOAT)m4x4[4], (FLOAT)m4x4[5], (FLOAT)m4x4[6], (FLOAT)m4x4[7],
+		//	(FLOAT)m4x4[8], (FLOAT)m4x4[9], (FLOAT)m4x4[10], (FLOAT)m4x4[11],
+		//	(FLOAT)m4x4[12], (FLOAT)m4x4[13], (FLOAT)m4x4[14], (FLOAT)m4x4[15]
+		//};
+		//
+		//XMMATRIX tempMat = XMLoadFloat4x4(&temp);
+		//modelMatrix = XMMatrixTranspose(tempMat);
 	}
 	return modelMatrix;
 }
