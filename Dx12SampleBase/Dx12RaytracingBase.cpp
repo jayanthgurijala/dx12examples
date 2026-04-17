@@ -516,7 +516,6 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	std::vector< D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
 	UINT instanceLinearIndex = 0;
 
-
 	for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
 	{
 		auto& info               = SceneElementInstance(idx);

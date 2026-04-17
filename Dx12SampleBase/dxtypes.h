@@ -105,104 +105,6 @@ struct DxDrawPrimitive
 };
 
 
-struct DxGltfBuffer
-{
-	UINT         bufferIndex;
-	UINT64       bufferOffsetInBytes;
-	UINT	     bufferStrideInBytes;
-	UINT64       bufferSizeInBytes;
-};
-
-
-struct DxGltfVertexBuffer : public DxGltfBuffer
-{
-	DxIASemantic iaLayoutInfo;
-};
-
-struct DxGltfIndexBuffer : public DxGltfBuffer
-{
-	std::string name;
-	DXGI_FORMAT indexFormat;
-};
-
-struct DxGltfTextureBuffer : public DxGltfBuffer
-{
-	std::string mimeType;
-	std::string name;
-	std::string uri;
-};
-
-struct DxGltfSampler
-{
-	UINT minFilter;
-	UINT magFilter;
-	UINT wrapS;
-	UINT wrapT;
-};
-
-
-struct DxGltfTexture
-{
-	DxGltfSampler       samplerInfo;
-	DxGltfTextureBuffer imageBufferInfo;
-};
-
-struct DxGltfTextureInfo
-{
-	DxGltfTexture texture;
-	UINT          texCoordIndex;
-};
-
-struct DxPbrMetallicRoughness
-{
-	DxGltfTextureInfo baseColorTexture;
-	DxGltfTextureInfo metallicRoughnessTexture;
-	FLOAT             baseColorFactor[4];
-	FLOAT             metallicFactor;
-	FLOAT             roughnessFactor;
-
-};
-
-struct DxNormalTextureInfo
-{
-	DxGltfTextureInfo normalTexture;
-	FLOAT scale;
-};
-
-struct DxOcclusionTextureInfo
-{
-	DxGltfTextureInfo occlusionTexture;
-	FLOAT strength;
-};
-
-struct DxEmissiveTextureInfo
-{
-	DxGltfTextureInfo emissiveTexture;
-	FLOAT emissiveFactor[3];
-};
-
-struct DxGltfMaterial
-{
-	std::string            name;
-	DxPbrMetallicRoughness pbrMetallicRoughness;
-	DxNormalTextureInfo    normalInfo;
-	DxOcclusionTextureInfo occlusionInfo;
-	DxEmissiveTextureInfo  emissiveInfo;
-	FLOAT                  alphaCutOff;
-	BOOL                   doubleSided;
-};
-
-struct DxGltfPrimInfo
-{
-	std::string                     name;
-	std::vector<DxGltfVertexBuffer> vbInfo;
-	DxGltfIndexBuffer               ibInfo;
-	DxGltfMaterial					materialInfo;
-	DxDrawPrimitive                 drawInfo;
-	DxExtents                       extents;
-};
-
-
 ///@todo remove this and use a map
 enum GltfVertexAttribIndex
 {
@@ -225,7 +127,6 @@ struct DxMaterialCB
 	FLOAT alphaCutoff;
 
 	UINT flags;
-	UINT renderFlags;
 	FLOAT padding[2];
 };
 
