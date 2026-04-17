@@ -542,7 +542,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
 			{
 				DxTransformInfo& instanceTransform = sceneElementInfo.trsMatrix[instanceIdx];
-				const XMFLOAT4X4                pData = DxTransformHelper::GetCombinedWorldMatrixData(instanceTransform, curPrimitive.transformInfo);
+				const XMFLOAT4X4                pData = DxTransformHelper::GetCombinedWorldMatrixData(curPrimitive.transformInfo, instanceTransform);
 				memcpy(instanceDesc.Transform, &pData, sizeof(instanceDesc.Transform));
 				instanceDesc.InstanceMask = 1;
 				instanceDesc.InstanceContributionToHitGroupIndex = (modelAssetIdx + primIdx) * 2;

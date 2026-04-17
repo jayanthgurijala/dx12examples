@@ -221,24 +221,24 @@ namespace DxTransformHelper
         return worldTransformMatrix* transformToApplyMatrix;
     }
 
-    inline XMFLOAT4X4 GetWorldMatrixData(const DxTransformInfo& transformInfo)
+    inline XMFLOAT4X4 GetWorldMatrixDataTransposed(const DxTransformInfo& transformInfo)
     {
         auto worldMatrix = GetWorldMatrix(transformInfo);
         XMFLOAT4X4 matrixData;
-        XMStoreFloat4x4(&matrixData, worldMatrix);
+        XMStoreFloat4x4(&matrixData, XMMatrixTranspose(worldMatrix));
         return matrixData;
     }
 
-    inline XMFLOAT4X4 GetWorldMatrixData(XMMATRIX transformMatrix)
+    inline XMFLOAT4X4 GetWorldMatrixDataTransposed(XMMATRIX transformMatrix)
     {
         XMFLOAT4X4 matrixData;
-        XMStoreFloat4x4(&matrixData, transformMatrix);
+        XMStoreFloat4x4(&matrixData, XMMatrixTranspose(transformMatrix));
         return matrixData;
     }
 
     inline XMFLOAT4X4 GetCombinedWorldMatrixData(const DxTransformInfo& worldTransform, const DxTransformInfo& transformToApply)
     {
-        return GetWorldMatrixData(GetCombinedWorldMatrix(worldTransform, transformToApply));
+        return GetWorldMatrixDataTransposed(GetCombinedWorldMatrix(worldTransform, transformToApply));
     }
 };
 
