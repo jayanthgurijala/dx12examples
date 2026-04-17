@@ -6,6 +6,7 @@
 
 #include "resource.h"
 #include "Dx12SampleBase.h"
+#include "DxGfxDrawRenderObject.h"
 
 using namespace Microsoft::WRL;
 
@@ -19,7 +20,7 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
 	virtual inline UINT NumSRVsPerPrimNeededForApp() override { return 0; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "oaktree.gltf" }; }
 
 	virtual VOID OnInit() override;
 
@@ -40,6 +41,7 @@ protected:
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;
 	FLOAT m_tesstriTessLevel;
+	std::unique_ptr<DxGfxDrawRenderObject> m_finalDraw;
 
 };
 

@@ -9,6 +9,7 @@
 #include <string>
 #include <wrl.h>
 #include <d3dx12.h>
+#include <map>
 
 #include <DirectXMath.h>
 
@@ -180,13 +181,6 @@ struct DxEmissiveTextureInfo
 	FLOAT emissiveFactor[3];
 };
 
-enum DxAlphaMode
-{
-	DxOpaque,
-	DxMask,
-	DxBlend
-};
-
 struct DxGltfMaterial
 {
 	std::string            name;
@@ -194,7 +188,6 @@ struct DxGltfMaterial
 	DxNormalTextureInfo    normalInfo;
 	DxOcclusionTextureInfo occlusionInfo;
 	DxEmissiveTextureInfo  emissiveInfo;
-	DxAlphaMode            alphaMode;
 	FLOAT                  alphaCutOff;
 	BOOL                   doubleSided;
 };
@@ -252,6 +245,7 @@ struct DxTextureSamplerInfo
 
 struct DxMaterialResourceInfo
 {
+	std::string name;
 	DxTextureSamplerInfo pbrBaseColorTexture;
 	DxTextureSamplerInfo pbrMetallicRoughnessTexture;
 	DxTextureSamplerInfo normalTexture;
@@ -264,14 +258,14 @@ struct DxMaterialResourceInfo
 
 enum MaterialFlags
 {
-	HasBaseColorTexture = 1 << 0,
-	HasNormalTexture = 1 << 1,
-	HasMetallicRoughnessTex = 1 << 2,
-	HasOcclusionTexture = 1 << 3,
-	HasEmissiveTexture = 1 << 4,
-	AlphaModeMask = 1 << 5,
-	AlphaModeBlend = 1 << 6,
-	DoubleSided = 1 << 7
+	MaterialFlagsHasBaseColorTexture     = 1 << 0,
+	MaterialFlagsHasNormalTexture        = 1 << 1,
+	MaterialFlagsHasMetallicRoughnessTex = 1 << 2,
+	MaterialFlagsHasOcclusionTexture     = 1 << 3,
+	MaterialFlagsHasEmissiveTexture      = 1 << 4,
+	MaterialFlagsAlphaModeMask           = 1 << 5,
+	MaterialFlagsAlphaModeBlend          = 1 << 6,
+	MaterialFlagsDoubleSided             = 1 << 7
 };
 
 enum SceneRenderFlags
@@ -302,20 +296,23 @@ struct DxPrimIndexData
 struct DxPrimitiveInfo
 {
 	DxDrawPrimitive               modelDrawPrimitive;
-	std::string                   name;
+	std::string                   meshName;
 	std::vector<DxPrimVertexData> vertexBufferInfo;
 	DxPrimIndexData			      indexBufferInfo;	  
 	ComPtr<ID3D12PipelineState>   pipelineState; 
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;
-	DxExtents                     meshExtents;
+	DxExtents                     primitiveExtents;
 	DxTransformInfo	              transformInfo;
+	BOOL                          doubleSided;
 
 	///@note this is required to index into descriptor heap
-	UINT                          primLinearIdxInSceneElements;
+	UINT                          primLinearIdxInModelAssets;
 };
 
-//change to DxModelAsset, it should have all the info
+///@note Change to DxModelAsset, it should have all the info
+///      e.g. Oaktree and ChineseDragon should have flattened 2 primitives
+///           Lantern should also have flattened prims
 struct DxModelAsset
 {
 	std::string name;
@@ -323,11 +320,13 @@ struct DxModelAsset
 };
 
 
-//change to DxModelAssets, it should collect all the assets and some metadata
+///@note Collection of assets from multiple files.
+///      This should not be flattened because scene description granularity
+///      is model asset.
 struct DxModelAssets 
 {
-	std::vector<DxModelAsset> modelAssets;
-	UINT numTotalPrimitivesInScene;
+	std::vector<DxModelAsset> modelAssetList;
+	UINT numTotalPrimitivesInAllAssets;
 };
 
 struct DxSceneElementInstance
@@ -445,13 +444,11 @@ struct DxASDesc
 	ComPtr<ID3D12Resource> scratchBuffer;
 };
 
-///@note Every gltf primitive needs a D3D12_RAYTRACING_GEOMETRY_DESC e.g. (1) Just the deer (2) Oak Tree - bark and leaves
-///      Each gltf mesh needs a BLAS, containing multiple geometries.
-/// 
+///@note In present implementation, each primitive is a node with a transform
+///      But we do need to group them together as an asset used while scene construction
 struct DxSceneBlasDesc
 {
-	//Complete objects like Deer, OakTree terrain etc
-	std::vector<DxASDesc> sceneElementsBlas;
+	std::vector<std::vector<DxASDesc>> modelAssetBlas;
 };
 
 

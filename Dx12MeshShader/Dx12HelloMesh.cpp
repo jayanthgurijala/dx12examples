@@ -45,7 +45,7 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 	const UINT numDescRanges = 1;
 	std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-	const UINT numSrvsNeededForApp = NumSRVsInScene(0);
+	const UINT numSrvsNeededForApp = NumSRVsInAllModelAssets();
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto viewProj         = dxhelper::GetRootCbv(0);
@@ -95,7 +95,7 @@ VOID Dx12HelloMesh::CreateMeshPSO()
 VOID Dx12HelloMesh::CreatePerPrimSRVs()
 {
 	const UINT numSRVsForMaterials = AppSrvOffsetForPrim();
-	const auto& curPrimInfo = GetPrimitiveInfo(0, 0, 0);
+	const auto& curPrimInfo = GetPrimitiveInfo(0, 0);
 	
 	CreateSrvBufferForPrimitive(curPrimInfo, GltfVertexAttribMax, numSRVsForMaterials + 0, TRUE);
 	CreateSrvBufferForPrimitive(curPrimInfo, GltfVertexAttribPosition, numSRVsForMaterials + 1, FALSE);

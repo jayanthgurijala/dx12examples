@@ -165,10 +165,7 @@ XMMATRIX DxCamera::CreateModelMatrix(const DxTransformInfo& transformInfo)
 	
 	if (transformInfo.hasMatrix == false)
 	{
-
 		modelMatrix = DxTransformHelper::GetWorldMatrix(transformInfo);
-
-	
 	}
 	else
 	{

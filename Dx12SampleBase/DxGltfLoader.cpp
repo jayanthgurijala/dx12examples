@@ -6,22 +6,298 @@
 #include "DxGltfLoader.h"
 #include "gltfutils.h"
 #include "DxTransformHelper.h"
+#include <stack>
+#include "WICImageLoader.h"
 
 using namespace GltfUtils;
 
-DxGltfLoader::DxGltfLoader(std::string modelPath) :
-	m_modelPath(modelPath),
-	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0", "TANGENT"})
+DxGltfLoader::DxGltfLoader(Dx12SampleBase* pSampleBase) :
+	m_pSampleBase(pSampleBase),
+	m_supportedAttributes({"POSITION", "NORMAL", "TEXCOORD_0", "TANGENT"}),
+	m_modelAssetParsingInfo({})
 {
 }
 
-HRESULT DxGltfLoader::LoadModel()
+HRESULT DxGltfLoader::LoadModel(std::string modelPath)
 {
-	bool ret = m_loader.LoadASCIIFromFile(&m_model, &m_loadStatus.m_err, &m_loadStatus.m_warn, m_modelPath);
+	bool ret = m_loader.LoadASCIIFromFile(&m_model, &m_loadStatus.m_err, &m_loadStatus.m_warn, modelPath);
 	PrintUtils::PrintString(m_loadStatus.m_err.c_str());
 	assert(ret == true);
-
 	return (ret == TRUE) ? S_OK : E_FAIL;
+}
+
+VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName)
+{
+	const UINT componentDataType    = inGltfAccessorDesc.componentType;
+	const UINT componentVecType     = inGltfAccessorDesc.type;
+	const UINT componentSizeInBytes = GetComponentTypeSizeInBytes(componentDataType);
+	const UINT numComponents        = GetNumComponentsInType(componentVecType);
+
+	const int bufferViewIdx = inGltfAccessorDesc.bufferView;
+	const tinygltf::BufferView bufViewDesc = GetBufferView(bufferViewIdx);
+
+	///@todo need to support interleaved data
+	assert(bufViewDesc.byteStride == 0);
+
+	const DXGI_FORMAT vbFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
+
+	const int    bufferIdx = bufViewDesc.buffer;
+	const size_t buflength = bufViewDesc.byteLength;
+	const size_t bufOffset = bufViewDesc.byteOffset;
+
+	const size_t accessorByteOffset = inGltfAccessorDesc.byteOffset;
+	const size_t dataOffsetInBuffer = accessorByteOffset + bufOffset;
+	const UINT  bufferStrideInBytes = componentSizeInBytes * numComponents;
+
+	BYTE* const bufferData = m_model.buffers[bufferIdx].data.data() + dataOffsetInBuffer;
+	auto& currentSemantic  = outDxVbInfo.iaSemantic;
+
+	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, buflength, bufferStrideInBytes, attributeName.c_str());
+
+	currentSemantic.format = vbFormat;
+	FillIaLayoutInfo(currentSemantic, attributeName);
+}
+
+VOID DxGltfLoader::ParsePrimitiveIndexBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimIndexData& outDxIbInfo)
+{
+	const int bufferViewIdx                 = inGltfAccessorDesc.bufferView;
+	const tinygltf::BufferView& bufViewDesc = GetBufferView(bufferViewIdx);
+
+	const size_t accessorByteOffset = inGltfAccessorDesc.byteOffset;
+	assert(accessorByteOffset == 0);
+
+	const size_t bufferViewOffset     = bufViewDesc.byteOffset;
+	const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
+	const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
+
+	BYTE* const bufferData        = m_model.buffers[bufViewDesc.buffer].data.data() + byteOffsetIntoBuffer;
+	DXGI_FORMAT indexBufferformat = GltfGetDxgiFormat(inGltfAccessorDesc.componentType, inGltfAccessorDesc.type);
+
+	///e.g. accessorDesc.componentType = TINYGLTF_PARAMETER_TYPE_FLOAT (5126)
+	///e.g. accessorDesc.type          = "type" : "VEC3"
+	UINT componentSizeInBytes = GetComponentTypeSizeInBytes(inGltfAccessorDesc.componentType);
+	UINT numComponentsInType  = GetNumComponentsInType(inGltfAccessorDesc.type);
+	const UINT bufferStrideInBytes = componentSizeInBytes * numComponentsInType;
+
+	///@note just to make sure it is not invalid
+	assert(componentSizeInBytes < 10);
+	assert(numComponentsInType < 10);
+
+	CreateIndexBufferResourceAndView(outDxIbInfo, bufferData, bufferSizeInBytes, bufferStrideInBytes, indexBufferformat, "indices");
+}
+
+VOID DxGltfLoader::ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxPrimitiveInfo& outDxPrimInfo)
+{
+	UINT indexOfSupportedAttributes = 0;
+
+	///@note block to parse vertex buffers, IA Layout and extents used in camera setup
+	{
+		outDxPrimInfo.vertexBufferInfo.clear();
+		for (auto attrName : m_supportedAttributes)
+		{
+			auto it = inGltfPrim.attributes.find(attrName);
+			if (it != inGltfPrim.attributes.end())
+			{
+				const std::string attributeName = it->first;
+				const int         accessorIdx   = it->second;
+
+				outDxPrimInfo.vertexBufferInfo.emplace_back();
+
+				auto&                     outDxVbInfo  = outDxPrimInfo.vertexBufferInfo.back();
+				const tinygltf::Accessor& accessorDesc = GetAccessor(accessorIdx);
+				ParsePrimitiveVertexInfo(accessorDesc, outDxVbInfo, attributeName);
+
+				///@note Attributes are filled in order of supported attributes and POSITION is at index 0
+				const BOOL isPositionAttrib = (indexOfSupportedAttributes == 0);
+
+				if (isPositionAttrib == TRUE)
+				{
+					outDxPrimInfo.modelDrawPrimitive.numVertices = accessorDesc.count;
+					auto& outDxExtents                           = outDxPrimInfo.primitiveExtents;
+					FillPrimitiveExtents(outDxExtents, accessorDesc);
+				}
+			}
+			indexOfSupportedAttributes++;
+		}
+	}
+
+
+	///@note fill in index buffer info
+	{
+		const int accessorIdx = inGltfPrim.indices;
+		if (accessorIdx != -1)
+		{
+		
+			auto& outDxIbInfo                       = outDxPrimInfo.indexBufferInfo;
+			const tinygltf::Accessor& accessorDesc  = GetAccessor(accessorIdx);
+
+			outDxPrimInfo.modelDrawPrimitive.isIndexedDraw = TRUE;
+			outDxPrimInfo.modelDrawPrimitive.numIndices    = accessorDesc.count;
+
+			ParsePrimitiveIndexBufferInfo(accessorDesc, outDxIbInfo);
+		}
+	}
+
+	//@note load material info
+	{
+		const int materialIdx = inGltfPrim.material;
+		if (materialIdx != -1)
+		{
+			const tinygltf::Material& materialDesc = GetMaterial(materialIdx);
+			outDxPrimInfo.doubleSided              = materialDesc.doubleSided;
+
+			auto& outDxInfo = outDxPrimInfo.materialTextures;
+
+			const auto& pbrRoughnessInfo = materialDesc.pbrMetallicRoughness;
+			BOOL hasPbrBaseColor = LoadGltfTextureInfo(outDxInfo.pbrBaseColorTexture, pbrRoughnessInfo.baseColorTexture.index, pbrRoughnessInfo.baseColorTexture.texCoord);
+			BOOL hasPbrRoughness = LoadGltfTextureInfo(outDxInfo.pbrMetallicRoughnessTexture, pbrRoughnessInfo.metallicRoughnessTexture.index, pbrRoughnessInfo.metallicRoughnessTexture.texCoord);
+			BOOL hasNormalTex    = LoadGltfTextureInfo(outDxInfo.normalTexture, materialDesc.normalTexture.index, materialDesc.normalTexture.texCoord);
+			BOOL hasOcclusionTex = LoadGltfTextureInfo(outDxInfo.occlusionTexture, materialDesc.occlusionTexture.index, materialDesc.occlusionTexture.texCoord);
+			BOOL hasEmissiveTex  = LoadGltfTextureInfo(outDxInfo.emissiveTexture, materialDesc.emissiveTexture.index, materialDesc.emissiveTexture.texCoord);
+
+
+			{
+				outDxPrimInfo.materialCbData.metallicFactor     = (FLOAT)materialDesc.pbrMetallicRoughness.metallicFactor;
+				outDxPrimInfo.materialCbData.roughnessFactor    = (FLOAT)materialDesc.pbrMetallicRoughness.roughnessFactor;
+				outDxPrimInfo.materialCbData.baseColorFactor[0] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[0];
+				outDxPrimInfo.materialCbData.baseColorFactor[1] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[1];
+				outDxPrimInfo.materialCbData.baseColorFactor[2] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[2];
+				outDxPrimInfo.materialCbData.baseColorFactor[3] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[3];
+
+				outDxPrimInfo.materialCbData.normalScale       = materialDesc.normalTexture.scale;
+				outDxPrimInfo.materialCbData.occlusionStrength = materialDesc.occlusionTexture.strength;
+				outDxPrimInfo.materialCbData.emissiveFactor[0] = materialDesc.emissiveFactor[0];
+				outDxPrimInfo.materialCbData.emissiveFactor[1] = materialDesc.emissiveFactor[1];
+				outDxPrimInfo.materialCbData.emissiveFactor[2] = materialDesc.emissiveFactor[2];
+
+				outDxPrimInfo.materialCbData.alphaCutoff       = materialDesc.alphaCutoff;
+
+				auto GetMaterialFlagValue = [](BOOL enabled, MaterialFlags flagValue)
+					{
+						UINT value = ((enabled == TRUE) ? flagValue : 0);
+						return value;
+					};
+
+				
+				//[DoubleSided | AlphaModeBlend | AlphaModeMask | HasEmissiveTexture | HasOcclusionTexture | HasMetallicRoughnessTex | HasNormalTexture | HasBaseColorTexture]
+				const UINT doubleSided    = GetMaterialFlagValue(materialDesc.doubleSided == TRUE, MaterialFlagsDoubleSided);
+				const UINT alphaModeBlend = GetMaterialFlagValue(materialDesc.alphaMode == "BLEND", MaterialFlagsAlphaModeBlend);
+				const UINT alphaModeMask  = GetMaterialFlagValue(materialDesc.alphaMode == "MASK", MaterialFlagsAlphaModeMask);
+				const UINT emissiveTex    = GetMaterialFlagValue(hasEmissiveTex, MaterialFlagsHasEmissiveTexture);
+				const UINT occlusionTex   = GetMaterialFlagValue(hasOcclusionTex, MaterialFlagsHasOcclusionTexture);
+				const UINT pbrRoughness   = GetMaterialFlagValue(hasPbrRoughness, MaterialFlagsHasMetallicRoughnessTex);
+				const UINT normalTex      = GetMaterialFlagValue(hasNormalTex, MaterialFlagsHasNormalTexture);
+				const UINT baseColor      = GetMaterialFlagValue(hasPbrBaseColor, MaterialFlagsHasBaseColorTexture);
+
+				outDxPrimInfo.materialCbData.flags = baseColor | normalTex | pbrRoughness | occlusionTex | emissiveTex | alphaModeMask | alphaModeBlend | doubleSided;
+			}
+
+			
+		}
+
+	}
+}
+
+
+
+///@note Mesh has name and one or more primitives
+VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, DxTransformInfo& nodeTransformInfo)
+{
+	///@todo use mesh name
+	//inGltfMesh.name;
+	outDxModelAssetInfo.name = inGltfMesh.name;
+	for (const auto& inPrim : inGltfMesh.primitives)
+	{
+		outDxModelAssetInfo.primitives.emplace_back();
+		auto& outDxPrim         = outDxModelAssetInfo.primitives.back();
+		outDxPrim.meshName      = inGltfMesh.name;
+		outDxPrim.transformInfo = nodeTransformInfo;
+		outDxPrim.primLinearIdxInModelAssets = m_modelAssetParsingInfo.primIndexInModelAsset;
+		ParsePrimitiveInfo(inPrim, outDxPrim);
+		m_modelAssetParsingInfo.primIndexInModelAsset += 1;
+	}
+
+}
+
+VOID DxGltfLoader::ParseNodes(std::queue<tinygltf::Node*>& nodeList, DxModelAsset& modelAsset)
+{
+	std::stack<XMMATRIX> worldMatrixList;
+
+	while (nodeList.empty() == FALSE)
+	{
+		tinygltf::Node* nodeDesc = nodeList.front();
+		nodeList.pop();
+
+		DxTransformInfo nodeTransformInfo;
+
+		///e.g. Deer has 1, Oaktree has 2, Lantern has 1 but that node has children nodes.
+		///     Node hierarchy starts here with each node optionally having
+		///        - TransformInfo
+		///        - Mesh
+		///        - Children
+		///    Everything above is optional, Node can just be a container without its own mesh.
+		const BOOL nodeHasMesh = (nodeDesc->mesh != -1);
+		const BOOL nodeHasChildren = (nodeDesc->children.size() > 1);
+		const BOOL hasTransform = GetNodeTransformInfo(nodeTransformInfo, nodeDesc);
+
+		if (nodeHasMesh)
+		{
+			auto& gltfMesh = m_model.meshes[nodeDesc->mesh];
+			ParseMeshInfo(gltfMesh, modelAsset, nodeTransformInfo);
+		}
+
+		if (nodeHasChildren)
+		{
+			const UINT numChildren = nodeDesc->children.size();
+			for (UINT i = 0; i < numChildren; i++)
+			{
+				UINT nodeIdx   = nodeDesc->children[i];
+				auto* childNodeDesc = &m_model.nodes[nodeIdx];
+				nodeList.push(childNodeDesc);
+			}
+		}
+
+		///@todo assumed node always has a transform to simplify pop logic
+		if (hasTransform)
+		{
+			auto worldMatrix = DxTransformHelper::GetWorldMatrix(nodeTransformInfo);
+
+			if (worldMatrixList.empty() == false)
+			{
+				auto parentWorldMatrix = worldMatrixList.top();
+				worldMatrix = worldMatrix * parentWorldMatrix;
+			}
+
+			worldMatrixList.push(worldMatrix);
+		}
+	}
+
+	
+}
+
+
+/*
+* DxModelAsset mainly has a list of primitives
+* Primitives need to be populated with VBs, IBs, MaterialInfo and flattened transform info
+*/
+VOID DxGltfLoader::LoadGltfModelAsset(DxModelAsset& modelAsset)
+{
+	//@todo support multiple scenes
+	assert(m_model.scenes.size() == 1);
+
+	auto& currentScene = m_model.scenes[0];
+	const UINT numNodesInScene = currentScene.nodes.size();
+
+	std::queue<tinygltf::Node*> nodeList;
+
+	for (UINT i = 0; i < numNodesInScene; i++)
+	{
+		///@note Scene has a list of nodes, node at 0th index can be 3rd in nodes array.
+		const UINT nodeIdx  = currentScene.nodes[i];
+		auto*      nodeDesc = &m_model.nodes[nodeIdx];
+		nodeList.push(nodeDesc);
+		ParseNodes(nodeList, modelAsset);
+	}
 }
 
 UINT DxGltfLoader::NumScenes()
@@ -30,293 +306,114 @@ UINT DxGltfLoader::NumScenes()
 	return 1;
 }
 
-VOID DxGltfLoader::GetNodeTransformInfo(DxTransformInfo& transformInfo, UINT nodeIndex)
+BOOL DxGltfLoader::GetNodeTransformInfo(DxTransformInfo& transformInfo, tinygltf::Node* nodeDesc)
 {
-	tinygltf::Node& nodeDesc = GetNode(nodeIndex);
 
-	BOOL hasScale       = (nodeDesc.scale.size() != 0);
-	BOOL hasTranslation = (nodeDesc.translation.size() != 0);
-	BOOL hasRotation    = (nodeDesc.rotation.size() != 0);
-	BOOL hasMatrix      = (nodeDesc.matrix.size() != 0);
+	BOOL hasScale       = (nodeDesc->scale.size() != 0);
+	BOOL hasTranslation = (nodeDesc->translation.size() != 0);
+	BOOL hasRotation    = (nodeDesc->rotation.size() != 0);
+	BOOL hasMatrix      = (nodeDesc->matrix.size() != 0);
 
-	//need to test this path
-	assert(hasMatrix == false);
+	///@todo returning identity if no transform, need to optimize
+	///      Challenge: see ParseNodes
+	BOOL hasTransform = TRUE;//(hasScale || hasTranslation || hasRotation || hasMatrix);
 
-	DxTransformHelper::SetTranslation(transformInfo, nodeDesc.translation, hasTranslation);
-	DxTransformHelper::SetScale(transformInfo, nodeDesc.scale, hasScale);
-	DxTransformHelper::SetQuaternionRotation(transformInfo, nodeDesc.rotation, hasRotation);
+	
+	if (hasTransform)
+	{
+		//need to test this path
+		assert(hasMatrix == false);
+		transformInfo.hasMatrix = hasMatrix;
+		DxTransformHelper::SetTranslation(transformInfo, nodeDesc->translation, hasTranslation);
+		DxTransformHelper::SetScale(transformInfo, nodeDesc->scale, hasScale);
+		DxTransformHelper::SetQuaternionRotation(transformInfo, nodeDesc->rotation, hasRotation);
+	}
+
+	return hasTransform;
 }
 
-
-/*
-* 
-* Loads
-* 1. IALayout - POSITION (always index 0), TEXCOORD_0 becomes TEXCOORD 0 etc, format e.g. R32G32B32_FLOAT
-* 2. Vertex Buffers - (size, stride) (bufferIndex, Offset)
-* 3. Index Buffers
-*/
-VOID DxGltfLoader::LoadMeshPrimitiveInfo(DxGltfPrimInfo& primInfo, UINT nodeIndex, UINT primitiveIndex)
+VOID DxGltfLoader::ParseSamplerDescription(const int samplerIdx, D3D12_SAMPLER_DESC& outdxSamplerDesc)
 {
-	const tinygltf::Mesh& mesh = GetMesh(nodeIndex);
-	const tinygltf::Primitive& primitive = GetPrimitive(nodeIndex, primitiveIndex);
-
-	const UINT totalAttributesInPrimitive = min(m_supportedAttributes.size(), primitive.attributes.size());
-	//primInfo.vbInfo.resize(totalAttributesInPrimitive);
-	primInfo.vbInfo.clear();
-	primInfo.name = mesh.name;
-	//@note load vertex buffers
-	{
-		UINT attrIndx = 0;
-		SIZE_T numTotalVertices = 0;
-		auto attributeIt = m_supportedAttributes.begin();
-		while (attributeIt != m_supportedAttributes.end())
-		{
-			auto it = primitive.attributes.find(*attributeIt);
-			if (it != primitive.attributes.end())
-			{
-				primInfo.vbInfo.emplace_back();
-				auto& vbInfo = primInfo.vbInfo.back();
-				const std::string attributeName        = it->first;
-				const int accessorIdx                  = it->second;
-				const tinygltf::Accessor& accessorDesc = GetAccessor(accessorIdx);
-				const UINT componentDataType           = accessorDesc.componentType;
-				const UINT componentVecType            = accessorDesc.type;
-				const UINT componentSizeInBytes        = GetComponentTypeSizeInBytes(componentDataType);
-				const UINT numComponents               = GetNumComponentsInType(componentVecType);
-
-				//@note for POSITION attriubte is always at zero index, placed at 0 in supported attributes
-				if (attrIndx == 0)
-				{
-					numTotalVertices += accessorDesc.count;
-
-					primInfo.extents.min[0] = (FLOAT)accessorDesc.minValues[0];
-					primInfo.extents.min[1] = (FLOAT)accessorDesc.minValues[1];
-					primInfo.extents.min[2] = (FLOAT)accessorDesc.minValues[2];
-
-					primInfo.extents.max[0] = (FLOAT)accessorDesc.maxValues[0];
-					primInfo.extents.max[1] = (FLOAT)accessorDesc.maxValues[1];
-					primInfo.extents.max[2] = (FLOAT)accessorDesc.maxValues[2];
-
-                    primInfo.extents.hasValidExtents = TRUE;
-
-				}
-				const int bufferViewIdx = accessorDesc.bufferView;
-				const tinygltf::BufferView bufViewDesc = GetBufferView(bufferViewIdx);
-
-				///@todo need to support interleaved data
-				assert(bufViewDesc.byteStride == 0);
-
-				const int    bufferIdx          = bufViewDesc.buffer;
-				const size_t buflength          = bufViewDesc.byteLength;
-				const size_t bufOffset          = bufViewDesc.byteOffset;
-				const size_t accessorByteOffset = accessorDesc.byteOffset;
-
-				vbInfo.iaLayoutInfo.format = GltfGetDxgiFormat(componentDataType, componentVecType);
-				vbInfo.bufferIndex         = bufferIdx;
-				vbInfo.bufferOffsetInBytes = accessorByteOffset + bufOffset;
-				vbInfo.bufferSizeInBytes   = buflength;
-				vbInfo.bufferStrideInBytes = componentSizeInBytes * numComponents;
-
-				auto& currentSemantic = vbInfo.iaLayoutInfo;
-				///@todo make a string utils class to check for stuff
-				auto pos = attributeName.find("_");
-
-				if (pos != std::string::npos)
-				{
-					std::string left = attributeName.substr(0, pos);
-					std::string right = attributeName.substr(pos + 1);
-					int index = std::stoi(right);
-					currentSemantic.name = left;
-					currentSemantic.index = index;
-					currentSemantic.isIndexValid = TRUE;
-				}
-				else
-				{
-					currentSemantic.name = attributeName;
-					currentSemantic.isIndexValid = FALSE;
-				}
-				attrIndx++;
-			}
-			attributeIt++;
-		}
-		primInfo.drawInfo.numVertices = (UINT)(numTotalVertices);
-	}
-
-
-	//@note load index buffer
-	{
-		const int accessorIdx = primitive.indices;
-		if (accessorIdx != -1)
-		{
-			const tinygltf::Accessor& accessorDesc  = GetAccessor(accessorIdx);
-			const int bufferViewIdx                 = accessorDesc.bufferView;
-			const tinygltf::BufferView& bufViewDesc = GetBufferView(bufferViewIdx);
-
-			const size_t accessorByteOffset = accessorDesc.byteOffset;
-			assert(accessorByteOffset == 0);
-
-			const size_t bufferViewOffset     = bufViewDesc.byteOffset;
-			const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
-			const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
-
-
-			//accessorDesc.componentType = TINYGLTF_PARAMETER_TYPE_FLOAT (5126)
-			//accessorDesc.type          = "type" : "VEC3"
-			UINT componentSizeInBytes = GetComponentTypeSizeInBytes(accessorDesc.componentType);
-			UINT numComponentsInType  = GetNumComponentsInType(accessorDesc.type);
-
-
-			///@note just to make sure it is not invalid
-			assert(componentSizeInBytes < 10);
-			assert(numComponentsInType < 10);
-
-			UINT numComponents                  = 
-			primInfo.ibInfo.indexFormat         = GltfGetDxgiFormat(accessorDesc.componentType, accessorDesc.type);
-			primInfo.ibInfo.bufferStrideInBytes  = componentSizeInBytes * numComponentsInType;
-			primInfo.ibInfo.name                = "indices";
-			primInfo.ibInfo.bufferIndex         = bufViewDesc.buffer;
-			primInfo.ibInfo.bufferOffsetInBytes = byteOffsetIntoBuffer;
-			primInfo.ibInfo.bufferSizeInBytes   = bufferSizeInBytes;
-			primInfo.drawInfo.numIndices        = (UINT)accessorDesc.count;
-			primInfo.drawInfo.isIndexedDraw     = TRUE;
-		}
-		else
-		{
-			primInfo.drawInfo.isIndexedDraw = FALSE;
-		}
-	}
-
-	//@note load material info
-	{
-		const int materialIdx = primitive.material;
-		if (materialIdx != -1)
-		{
-			const tinygltf::Material& materialDesc = GetMaterial(materialIdx);
-			primInfo.materialInfo.name             = materialDesc.name;
-			primInfo.materialInfo.doubleSided      = materialDesc.doubleSided;
-
-			{
-				auto& pbrRoughness              = primInfo.materialInfo.pbrMetallicRoughness;
-				pbrRoughness.metallicFactor     = (FLOAT)materialDesc.pbrMetallicRoughness.metallicFactor;
-				pbrRoughness.roughnessFactor    = (FLOAT)materialDesc.pbrMetallicRoughness.roughnessFactor;
-				pbrRoughness.baseColorFactor[0] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[0];
-				pbrRoughness.baseColorFactor[1] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[1];
-				pbrRoughness.baseColorFactor[2] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[2];
-				pbrRoughness.baseColorFactor[3] = (FLOAT)materialDesc.pbrMetallicRoughness.baseColorFactor[3];
-
-				LoadGltfTextureInfo(pbrRoughness.baseColorTexture, materialDesc.pbrMetallicRoughness.baseColorTexture);
-				LoadGltfTextureInfo(pbrRoughness.metallicRoughnessTexture, materialDesc.pbrMetallicRoughness.metallicRoughnessTexture);
-			}
-
-			{
-				auto& dxNormalInfo		   = primInfo.materialInfo.normalInfo;
-				const auto& gltfNormalInfo = materialDesc.normalTexture;
-				dxNormalInfo.scale         = gltfNormalInfo.scale;
-				LoadGltfTextureInfo(dxNormalInfo.normalTexture, { gltfNormalInfo.index, gltfNormalInfo.texCoord });
-			}
-
-			{
-				auto& dxOcclusionInfo         = primInfo.materialInfo.occlusionInfo;
-				const auto& gltfOcclusionInfo = materialDesc.occlusionTexture;
-				dxOcclusionInfo.strength      = gltfOcclusionInfo.strength;
-				LoadGltfTextureInfo(dxOcclusionInfo.occlusionTexture, { gltfOcclusionInfo.index, gltfOcclusionInfo.texCoord });
-			}
-
-			{
-				auto& dxEmissiveTextureInfo  = primInfo.materialInfo.emissiveInfo;
-				dxEmissiveTextureInfo.emissiveFactor[0] = (FLOAT)materialDesc.emissiveFactor[0];
-				dxEmissiveTextureInfo.emissiveFactor[1] = (FLOAT)materialDesc.emissiveFactor[1];
-				dxEmissiveTextureInfo.emissiveFactor[2] = (FLOAT)materialDesc.emissiveFactor[2];
-				LoadGltfTextureInfo(dxEmissiveTextureInfo.emissiveTexture, materialDesc.emissiveTexture);
-			}
-
-			if (materialDesc.alphaMode == "MASK")
-			{
-				primInfo.materialInfo.alphaMode = DxMask;
-			}
-			else if (materialDesc.alphaMode == "BLEND")
-			{
-				primInfo.materialInfo.alphaMode = DxBlend;
-			}
-			else
-			{
-				primInfo.materialInfo.alphaMode = DxOpaque;
-			}
-
-			primInfo.materialInfo.alphaCutOff = materialDesc.alphaCutoff;
-		}
-			
-	}
-
+	///@todo implement when used
+	//if (samplerIdx != -1)
+	//{
+	//	const tinygltf::Sampler& inGltfSamplerDesc = GetSampler(samplerIdx);
+	//
+	//	outdxSamplerDesc.Filter = 
+	//
+	//	samplerDesc.minFilter = samplerDesc.minFilter;
+	//	samplerDesc.magFilter = samplerDesc.magFilter;
+	//	samplerDesc.wrapS = samplerDesc.wrapS;
+	//	samplerDesc.wrapT = samplerDesc.wrapT;
+	//}
+	//else
+	//{
+	//	// Set default sampler values if not specified
+	//	dxTextureInfo.texture.samplerInfo.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+	//	dxTextureInfo.texture.samplerInfo.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+	//	dxTextureInfo.texture.samplerInfo.wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
+	//	dxTextureInfo.texture.samplerInfo.wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
+	//}
 }
 
-VOID DxGltfLoader::LoadGltfTextureInfo(DxGltfTextureInfo& dxTextureInfo, const tinygltf::TextureInfo& gltfTextureInfo)
+BOOL DxGltfLoader::LoadGltfTextureInfo(DxTextureSamplerInfo& dxTextureInfo, int textureIndex, int texcoord)
 {
 	dxTextureInfo = {};
-	const int textureIndex      = gltfTextureInfo.index;
-	dxTextureInfo.texCoordIndex = gltfTextureInfo.texCoord;
+
+	BOOL isTextureValid = FALSE;
 
 	if (textureIndex != -1)
 	{
 		const tinygltf::Texture& textureInfo = GetTexture(textureIndex);
-		const int samplerIdx                 = textureInfo.sampler;
-		const int imageIdx                   = textureInfo.source;
+		const int samplerIdx = textureInfo.sampler;
+		ParseSamplerDescription(samplerIdx, dxTextureInfo.samplerInfo);
 
-		// Load sampler info
-		if (samplerIdx != -1)
-		{
-			const tinygltf::Sampler& samplerDesc = GetSampler(samplerIdx);
-			dxTextureInfo.texture.samplerInfo.minFilter = samplerDesc.minFilter;
-			dxTextureInfo.texture.samplerInfo.magFilter = samplerDesc.magFilter;
-			dxTextureInfo.texture.samplerInfo.wrapS = samplerDesc.wrapS;
-			dxTextureInfo.texture.samplerInfo.wrapT = samplerDesc.wrapT;
-		}
-		else
-		{
-			// Set default sampler values if not specified
-			dxTextureInfo.texture.samplerInfo.minFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-			dxTextureInfo.texture.samplerInfo.magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
-			dxTextureInfo.texture.samplerInfo.wrapS     = TINYGLTF_TEXTURE_WRAP_REPEAT;
-			dxTextureInfo.texture.samplerInfo.wrapT     = TINYGLTF_TEXTURE_WRAP_REPEAT;
-		}
+		const int imageIdx = textureInfo.source;
 
 		// Load image buffer info
 		if (imageIdx != -1)
 		{
-			const tinygltf::Image& imageInfo               = GetImage(imageIdx);
-			dxTextureInfo.texture.imageBufferInfo.name     = imageInfo.name;
-			dxTextureInfo.texture.imageBufferInfo.mimeType = imageInfo.mimeType;
+			const tinygltf::Image& imageInfo = GetImage(imageIdx);
+
+			std::string imageName = imageInfo.name;
+			std::string mimeType  = imageInfo.mimeType;
+
+			BYTE* bufferData          = nullptr;
+			SIZE_T bufferSize         = 0;
+			std::string fullAssetPath = {};
 
 			if (imageInfo.bufferView != -1)
 			{
 				const tinygltf::BufferView& bufViewDesc = GetBufferView(imageInfo.bufferView);
 				assert(bufViewDesc.byteStride == 0);
 
-				dxTextureInfo.texture.imageBufferInfo.bufferIndex         = bufViewDesc.buffer;
-				dxTextureInfo.texture.imageBufferInfo.bufferOffsetInBytes = bufViewDesc.byteOffset;
-				dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes   = bufViewDesc.byteLength;
-				dxTextureInfo.texture.imageBufferInfo.bufferStrideInBytes = 0;
+				const int    bufferIdx  = bufViewDesc.buffer;
+				const SIZE_T byteOffset = bufViewDesc.byteOffset;
+
+				bufferSize = bufViewDesc.byteLength;
+				bufferData = m_model.buffers[bufferIdx].data.data() + byteOffset;
 			}
 			else
 			{
 				assert(imageInfo.uri.c_str() != nullptr);
-				dxTextureInfo.texture.imageBufferInfo.uri = imageInfo.uri;
-
+				fullAssetPath = m_pSampleBase->GetFullPathForAsset(imageInfo.uri);
 			}
-		}
-		else
-		{
-			dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes = 0;
+
+			WICImageLoader::ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(bufferData, bufferSize, fullAssetPath.c_str());
+
+			dxTextureInfo.textureInfo = m_pSampleBase->CreateTexture2DWithData(imageData.pixels.data(),
+																			   imageData.pixels.size(),
+																			   imageData.width,
+																			   imageData.height,
+																			   DXGI_FORMAT_R8G8B8A8_UNORM);
+
+			isTextureValid = TRUE;
 		}
 	}
-	else
-	{
-		dxTextureInfo.texture.imageBufferInfo.bufferSizeInBytes = 0;
-	}
-
-
-
+	return isTextureValid;
 }
+
+
 
 
 

@@ -236,6 +236,8 @@ private:
             assert(0);
             break;
         }
+
+        return 0;
     }
 
     inline VOID AddResourceDescriptorInfo(DxHeapType heapType, UINT heapOffset, ID3D12Resource* pResource)

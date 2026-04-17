@@ -16,6 +16,7 @@
 #include <backends/imgui_impl_dx12.h>
 #include <backends/imgui_impl_win32.cpp>
 #include "DxTransformHelper.h"
+#include "DxGltfLoader.h"
 
 using namespace WICImageLoader;
 using namespace GltfUtils;
@@ -35,7 +36,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
 	m_assetReader(std::make_unique<FileReader>()),
-	m_sceneElements({}),
+	m_modelAssets({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
 	m_gltfLoader(nullptr),
@@ -492,7 +493,7 @@ VOID Dx12SampleBase::CreateRenderTargetResources()
 */
 VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
 {
-	const UINT numSceneElements = NumSceneElementsLoaded();
+	const UINT numSceneElements = NumModelAssetsLoaded();
 	sceneDescription.resize(numSceneElements);
 
 	for (UINT idx = 0; idx < numSceneElements; idx++)
@@ -1060,9 +1061,9 @@ VOID Dx12SampleBase::RenderFrameGfxDraw()
 	assert(0);
 }
 
-VOID Dx12SampleBase::RenderGfxDrawInit(ID3D12RootSignature* rootSignature, UINT viewProjIndex)
+VOID Dx12SampleBase::RenderGfxDrawInit(ID3D12RootSignature* rootSignature, UINT viewProjIndex, D3D12_PRIMITIVE_TOPOLOGY primTopology)
 {
-	m_pCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_pCmdList->IASetPrimitiveTopology(primTopology);
 	m_pCmdList->SetGraphicsRootSignature(rootSignature);
 	ID3D12DescriptorHeap* descHeaps[] = { GetSrvDescriptorHeap() };
 	m_pCmdList->SetDescriptorHeaps(_countof(descHeaps), descHeaps);
@@ -1070,15 +1071,14 @@ VOID Dx12SampleBase::RenderGfxDrawInit(ID3D12RootSignature* rootSignature, UINT 
 
 VOID Dx12SampleBase::RenderSceneGfxDraw()
 {
-	ProcessSceneInstancesNodesPrims([this](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
+	ForEachModelAssetInstancesInScene([this](UINT modelAssetIdx, UINT primIdx, UINT instanceIdx, UINT flatInstanceIdx)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
-			auto  srvGpuHandle = m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(curPrimitive.primLinearIdxInSceneElements, 0);
+			auto& curPrimitive     = GetPrimitiveInfo(modelAssetIdx, primIdx);
+			auto  srvGpuHandle     = m_descriptorHeapManager->GetPerPrimSrvHeapHandle<CD3DX12_GPU_DESCRIPTOR_HANDLE>(curPrimitive.primLinearIdxInModelAssets, 0);
 			m_pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
 
 			//World matrix
-			m_pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
+			m_pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceIdx));
 
 			//SRVs
 			m_pCmdList->SetGraphicsRootDescriptorTable(2, srvGpuHandle);
@@ -1086,7 +1086,7 @@ VOID Dx12SampleBase::RenderSceneGfxDraw()
 			//Material props
 			m_pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
 
-			RenderModel(m_pCmdList.Get(), sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+			RenderModel(m_pCmdList.Get(), modelAssetIdx, primIdx);
 		});
 }
 
@@ -1241,23 +1241,17 @@ VOID Dx12SampleBase::InitializeDescriptorHeapManagerResourcesAndDescriptors()
 {
 	
 	const UINT numUAVsForApp = NumUAVsNeededForApp();
-	const UINT numRTVs = NumRTVsNeededForApp() + GetBackBufferCount();
+	const UINT numRTVs       = NumRTVsNeededForApp() + GetBackBufferCount();
 	const UINT numDSvsForApp = NumDSVsNeededForApp();
+	const UINT numSrvs       = NumSRVsInAllModelAssets();
 
-	//@todo store this on scene elements load?
-	UINT numSRVsForApp = 0;
-	const UINT numSceneElements = NumSceneElementsLoaded();
-	for (UINT idx = 0; idx < numSceneElements; idx++)
-	{
-		const UINT numSRVsForAppInSceneElement = NumSRVsInScene(idx);
-		numSRVsForApp += numSRVsForAppInSceneElement;
-	}
+
 
 	m_descriptorHeapManager = std::make_unique<DxDescriptorHeapManager>(m_pDevice.Get(),
 		                                                                numRTVs,
 		                                                                numDSvsForApp,
 		                                                                numUAVsForApp,
-		                                                                numSRVsForApp,
+		                                                                numSrvs,
 		                                                                NumSRVsPerPrimitive());
 
 	CreateRenderTargetResources();
@@ -1298,14 +1292,14 @@ VOID Dx12SampleBase::InitializeImgui()
 	ImGui_ImplDX12_Init(&init_info);
 }
 
-VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT sceneIdx, UINT nodeIndex, UINT primitiveIndex)
+VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx)
 {
-	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(sceneIdx, nodeIndex, primitiveIndex);
+	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(assetIdx, primIdx);
 
 	///need some generalization to support chinese dragon etc
 	//assert(numVertexBufferViews == 3);
 
-	const auto& curPrimInfo = GetPrimitiveInfo(sceneIdx, nodeIndex, primitiveIndex);
+	const auto& curPrimInfo = GetPrimitiveInfo(assetIdx, primIdx);
 
 	//@note Position and Normal are always there, at 0 and 1 index, chinesedragon as no texture so no UVs
 	const auto& positionVbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribPosition)->modelVbv;
@@ -1327,7 +1321,7 @@ VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT scene
         pCmdList->IASetVertexBuffers(2, 1, &dummyVbv);
 	}
 
-	auto& primitiveDrawInfo = GetModelDrawInfo(sceneIdx, nodeIndex, primitiveIndex);
+	auto& primitiveDrawInfo = GetModelAssetDrawInfo(assetIdx, primIdx);
 
 	if (primitiveDrawInfo.isIndexedDraw == TRUE)
 	{
@@ -1345,10 +1339,10 @@ HRESULT Dx12SampleBase::CreatePerPrimGfxPipelineState()
 {
 	HRESULT result = S_OK;
 
-	ForEachSceneElementLoadedSceneNodePrim([this](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
+	ForEachModelAssetPrimitive([this](UINT assetIdx, UINT primIdx)
 	{
 
-		auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+		auto& curPrimitive = GetPrimitiveInfo(assetIdx, primIdx);
 		ID3D12RootSignature* pRootSignature = GetRootSignature();
 
 		assert(GetRootSignature() != nullptr);
@@ -1364,8 +1358,8 @@ HRESULT Dx12SampleBase::CreatePerPrimGfxPipelineState()
 
 		D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = { modelIaSemantics.data(), numAttributes, };
 
-		const BOOL doubleSied = ((curPrimitive.materialCbData.flags & DoubleSided) == 0) ? FALSE : TRUE;
-		const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & AlphaModeBlend) == 0) ? FALSE : TRUE;
+		const BOOL doubleSied = ((curPrimitive.materialCbData.flags & MaterialFlagsDoubleSided) == 0) ? FALSE : TRUE;
+		const BOOL blendEnabled = ((curPrimitive.materialCbData.flags & MaterialFlagsAlphaModeBlend) == 0) ? FALSE : TRUE;
 
 		curPrimitive.pipelineState = GetGfxPipelineStateWithShaders(vertexShaderName,
 																	hullShaderName,
@@ -1441,13 +1435,13 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 
 	const UINT materialSize        = sizeof(DxMaterialCB);
 	const UINT alignedMaterialSize = dxhelper::DxAlign(materialSize, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+
+	///@todo simplify and store it in LoadGltf files
 	UINT totalPrimitivesInScene    = 0;
-
-	ForEachSceneElementLoadedSceneNode([&totalPrimitivesInScene, this](UINT sceneIdx, UINT nodeIdx)
+	ForEachModelAsset([&totalPrimitivesInScene, this](UINT assetIdx)
 	{
-			totalPrimitivesInScene += NumPrimitivesInNodeMesh(sceneIdx, nodeIdx);
+			totalPrimitivesInScene += NumPrimitivesInModelAsset(assetIdx);
 	});
-
 
 	const UINT alignedTotalMaterialBufferSize = alignedMaterialSize * totalPrimitivesInScene;
 
@@ -1471,10 +1465,10 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 		DxPrimitiveInfo* lastPrim = nullptr;
 		UINT absolutePrimIndex = 0;
 		D3D12_GPU_VIRTUAL_ADDRESS lastAddressWritten = 0;
-		ForEachSceneElementLoadedSceneNodePrim([this, baseGpuVa, alignedMaterialSize, alignedTotalMaterialBufferSize, &firstPrim, &lastPrim, &absolutePrimIndex, &lastAddressWritten](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
+		ForEachModelAssetPrimitive([this, baseGpuVa, alignedMaterialSize, alignedTotalMaterialBufferSize, &firstPrim, &lastPrim, &absolutePrimIndex, &lastAddressWritten](UINT assetIdx, UINT primIdx)
 		{
 			{
-				auto& prim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+				auto& prim = GetPrimitiveInfo(assetIdx, primIdx);
 				BYTE* pWritePtr = pMappedBytePtr + absolutePrimIndex * alignedMaterialSize;
 				memcpy(pWritePtr, &prim.materialCbData, materialSize);
 				if (firstPrim == nullptr)
@@ -1522,280 +1516,27 @@ UINT Dx12SampleBase::CreateInputElementDesc(const std::vector<DxPrimVertexData>&
 	return numAttributes;
 }
 
-/*
-* Node has is a container optionally having and proceed in this order
-* - transform
-* - mesh
-* - child nodes
-*/
-VOID Dx12SampleBase::ParseNode(DxModelAsset& currentNode, UINT fileIdx, UINT nodeIdx, UINT& primitiveIndex, UINT& globalPrimitiveIndex)
-{
-	currentNode.name = m_gltfLoader->GetNodeName(nodeIdx);
-	PrintUtils::DebugPrintf("Processing Node: %s\n", currentNode.name.c_str());
-
-	BOOL isMeshPrimInfoValid = m_gltfLoader->IsNodeMeshInfoValid(nodeIdx);
-	if (isMeshPrimInfoValid == TRUE)
-	{
-		const UINT numPrimitives = m_gltfLoader->NumPrimitives(nodeIdx);
-
-		for (UINT primitive = 0; primitive < numPrimitives; primitive++)
-		{
-			currentNode.primitives.emplace_back();
-			auto& currentPrim = currentNode.primitives.back();
-			///@note Load VB, IB and textures for each primitive.
-			DxGltfPrimInfo gltfPrimInfo;
-			m_gltfLoader->LoadMeshPrimitiveInfo(gltfPrimInfo, nodeIdx, primitive);
-
-			const UINT numVertexAttributes = gltfPrimInfo.vbInfo.size();
-			
-			const auto& gltfMaterial = gltfPrimInfo.materialInfo;
-			const auto& gltfPbrInfo = gltfMaterial.pbrMetallicRoughness;
-			const auto& gltfNormalInfo = gltfMaterial.normalInfo;
-			const auto& gltfOcclusion = gltfMaterial.occlusionInfo;
-			const auto& gltfEmissive = gltfMaterial.emissiveInfo;
-			auto& primMaterialCB = currentPrim.materialCbData;
-
-			///@note this is redundant and needs better implementation.
-			///      Might have a transform manager and just add pointers.
-			///      It might be easier than it seems to be.
-			DxTransformInfo& meshTransformInfo = currentPrim.transformInfo;
-			m_gltfLoader->GetNodeTransformInfo(meshTransformInfo, nodeIdx);
-
-			currentPrim.vertexBufferInfo.clear();
-
-			currentPrim.modelDrawPrimitive = gltfPrimInfo.drawInfo;
-			currentPrim.meshExtents = gltfPrimInfo.extents;
-			currentPrim.primLinearIdxInSceneElements = globalPrimitiveIndex;
-			globalPrimitiveIndex++;
-
-			///@Fill in vertex buffer info for each vertex buffer view in the primitive.
-			{
-				for (UINT k = 0; k < numVertexAttributes; k++)
-				{
-					currentPrim.vertexBufferInfo.emplace_back();
-					auto& vbInfo = currentPrim.vertexBufferInfo.back();
-					const auto& gltfVbInfo = gltfPrimInfo.vbInfo[k];
-
-					BOOL isVertexAttribNeeded = TRUE;
-
-					if ((gltfVbInfo.iaLayoutInfo.isIndexValid == TRUE) &&
-						(dxhelper::IsSemanticNameTexCoord(gltfVbInfo.iaLayoutInfo.name) == TRUE))
-					{
-						isVertexAttribNeeded = FALSE;
-						const UINT semanticIndex = gltfVbInfo.iaLayoutInfo.index;
-						auto IsIndexUsedInMaterial = [semanticIndex](const DxGltfTextureInfo& textureInfo) -> BOOL
-							{
-								const BOOL isInlineTexure = ((textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0) ? TRUE : FALSE);
-								const BOOL isFileTexture = ((textureInfo.texture.imageBufferInfo.uri.length() > 0) ? TRUE : FALSE);
-								const BOOL isTextureValid = (isInlineTexure == TRUE || isFileTexture == TRUE);
-								return (isTextureValid == TRUE &&
-									textureInfo.texCoordIndex == semanticIndex);
-							};
-
-						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.baseColorTexture);
-						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfPbrInfo.metallicRoughnessTexture);
-						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfNormalInfo.normalTexture);
-						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfOcclusion.occlusionTexture);
-						isVertexAttribNeeded |= IsIndexUsedInMaterial(gltfEmissive.emissiveTexture);
-					}
-
-					if (isVertexAttribNeeded == TRUE)
-					{
-						const UINT64 offsetInBytesInBuffer = gltfVbInfo.bufferOffsetInBytes;
-						const UINT64 bufferSizeInBytes = gltfVbInfo.bufferSizeInBytes;
-						const UINT   bufferIndex = gltfVbInfo.bufferIndex;
-						const UINT   bufferStrideInBytes = gltfVbInfo.bufferStrideInBytes;
-						BYTE* bufferData = m_gltfLoader->GetBufferData(gltfVbInfo.bufferIndex);
-
-						vbInfo.modelVbBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-							(UINT)bufferSizeInBytes,
-							gltfVbInfo.iaLayoutInfo.name.c_str());
-
-						vbInfo.modelVbv.BufferLocation = vbInfo.modelVbBuffer->GetGPUVirtualAddress();
-						vbInfo.modelVbv.SizeInBytes = bufferSizeInBytes;
-						vbInfo.modelVbv.StrideInBytes = bufferStrideInBytes;
-						vbInfo.iaSemantic = gltfVbInfo.iaLayoutInfo;
-					}
-					else
-					{
-						currentPrim.vertexBufferInfo.pop_back();
-					}
-				}
-			}
-
-			///@Fill in index buffer info if indexed draw
-			{
-				if (gltfPrimInfo.drawInfo.isIndexedDraw == TRUE)
-				{
-					auto& ibInfo = currentPrim.indexBufferInfo;
-					const UINT64 offsetInBytesInBuffer = gltfPrimInfo.ibInfo.bufferOffsetInBytes;
-					const UINT64 bufferSizeInBytes = gltfPrimInfo.ibInfo.bufferSizeInBytes;
-					const UINT   bufferIndex = gltfPrimInfo.ibInfo.bufferIndex;
-					BYTE* bufferData = m_gltfLoader->GetBufferData(gltfPrimInfo.ibInfo.bufferIndex);
-					ibInfo.indexBuffer = CreateBufferWithData(&bufferData[offsetInBytesInBuffer],
-						(UINT)bufferSizeInBytes,
-						gltfPrimInfo.ibInfo.name.c_str());
-					ibInfo.modelIbv.BufferLocation = ibInfo.indexBuffer->GetGPUVirtualAddress();
-					ibInfo.modelIbv.SizeInBytes = bufferSizeInBytes;
-					ibInfo.modelIbv.Format = gltfPrimInfo.ibInfo.indexFormat;
-
-					//@note this is required for SRV access and min alignment is 4 bytes
-					ibInfo.bufferStrideInBytes = dxhelper::DxAlign(gltfPrimInfo.ibInfo.bufferStrideInBytes, 4);
-				}
-			}
-
-
-			///@Fill in material and texture info if material is defined for the primitive
-			{
-				const UINT tessMask = ((IsTessEnabled() == TRUE ? ~0 : 0) & RenderFlagsTessEnabled);
-				const UINT pbrMask = ((EnablePBRShading() == TRUE ? ~0 : 0) & RenderFlagsUsePBR);
-				dxhelper::DxMemCpy(primMaterialCB.baseColorFactor, gltfPbrInfo.baseColorFactor);
-				dxhelper::DxMemCpy(primMaterialCB.emissiveFactor, gltfEmissive.emissiveFactor);
-				primMaterialCB.alphaCutoff = gltfMaterial.alphaCutOff;
-				primMaterialCB.metallicFactor = gltfMaterial.pbrMetallicRoughness.metallicFactor;
-				primMaterialCB.normalScale = gltfNormalInfo.scale;
-				primMaterialCB.occlusionStrength = gltfOcclusion.strength;
-				primMaterialCB.roughnessFactor = gltfPbrInfo.roughnessFactor;
-				primMaterialCB.renderFlags = (tessMask | pbrMask);
-
-				// Lambda to load texture from DxGltfTextureInfo
-				auto LoadTextureFromGltfInfo = [this](const DxGltfTextureInfo& textureInfo, DxTextureSamplerInfo& texSamplerInfo)
-					{
-						BYTE* bufferData = nullptr;
-						UINT64      bufferSizeInBytes = 0;
-						UINT64      bufferOffsetInBytes = 0;
-						std::string textureUri = {};
-						BOOL        isTextureValid = false;
-
-
-						if (textureInfo.texture.imageBufferInfo.bufferSizeInBytes > 0)
-						{
-							const auto& imageBufferInfo = textureInfo.texture.imageBufferInfo;
-							bufferData = m_gltfLoader->GetBufferData(imageBufferInfo.bufferIndex);
-							bufferSizeInBytes = imageBufferInfo.bufferSizeInBytes;
-							bufferOffsetInBytes = imageBufferInfo.bufferOffsetInBytes;
-
-							assert(bufferData != nullptr);
-							bufferData += bufferOffsetInBytes;
-							isTextureValid = true;
-						}
-						else if (textureInfo.texture.imageBufferInfo.uri.length() != 0)
-						{
-							std::string assetName = textureInfo.texture.imageBufferInfo.uri;
-
-							textureUri = m_assetReader->GetFullModelFilePath(assetName);
-							isTextureValid = true;
-						}
-
-						if (isTextureValid == true)
-						{
-							assert(bufferData != nullptr || textureUri.length() > 0);
-
-							ImageData imageData = WICImageLoader::LoadImageFromMemory_WIC(
-								bufferData,
-								bufferSizeInBytes,
-								textureUri.c_str()
-							);
-
-							texSamplerInfo.textureInfo = CreateTexture2DWithData(imageData.pixels.data(),
-								imageData.pixels.size(),
-								imageData.width,
-								imageData.height,
-								DXGI_FORMAT_R8G8B8A8_UNORM);
-						}
-						else
-						{
-							assert(textureInfo.texture.imageBufferInfo.bufferSizeInBytes == 0);
-							assert(textureInfo.texture.imageBufferInfo.uri.length() == 0);
-						}
-					};
-
-				auto& primTextureInfo = currentPrim.materialTextures;
-
-				LoadTextureFromGltfInfo(gltfPbrInfo.baseColorTexture, primTextureInfo.pbrBaseColorTexture);
-				LoadTextureFromGltfInfo(gltfNormalInfo.normalTexture, primTextureInfo.normalTexture);
-				LoadTextureFromGltfInfo(gltfPbrInfo.metallicRoughnessTexture, primTextureInfo.pbrMetallicRoughnessTexture);
-				LoadTextureFromGltfInfo(gltfOcclusion.occlusionTexture, primTextureInfo.occlusionTexture);
-				LoadTextureFromGltfInfo(gltfEmissive.emissiveTexture, primTextureInfo.emissiveTexture);
-
-				auto SetFlag = [](UINT& flags, UINT bit, const void* texture) {
-					flags |= (texture != nullptr) ? bit : 0;
-					};
-
-				primMaterialCB.flags = 0;
-
-
-				//HasBaseColorTexture = 1 << 0,
-				//HasNormalTexture = 1 << 1,
-				//HasMetallicRoughnessTex = 1 << 2,
-				//HasOcclusionTexture = 1 << 3,
-				//HasEmissiveTexture = 1 << 4,
-				SetFlag(primMaterialCB.flags, HasBaseColorTexture, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());
-				SetFlag(primMaterialCB.flags, HasMetallicRoughnessTex, primTextureInfo.pbrMetallicRoughnessTexture.textureInfo.Get());
-				SetFlag(primMaterialCB.flags, HasEmissiveTexture, primTextureInfo.emissiveTexture.textureInfo.Get());
-				SetFlag(primMaterialCB.flags, HasNormalTexture, primTextureInfo.normalTexture.textureInfo.Get());
-				SetFlag(primMaterialCB.flags, HasOcclusionTexture, primTextureInfo.occlusionTexture.textureInfo.Get());
-
-				//DoubleSided = 1 << 7
-				primMaterialCB.flags |= (gltfMaterial.doubleSided == TRUE) ? DoubleSided : 0;
-
-				//AlphaModeMask = 1 << 5,
-				//AlphaModeBlend = 1 << 6,
-				//enum DxAlphaMode
-				//{
-				//	DxOpaque,
-				//	DxMask,
-				//	DxBlend
-				//};
-				switch (gltfMaterial.alphaMode)
-				{
-				case DxBlend:
-					primMaterialCB.flags |= AlphaModeBlend;
-					break;
-				case DxMask:
-					primMaterialCB.flags |= AlphaModeMask;
-					break;
-				case DxOpaque:
-					break;
-				}
-				IncrementMaterialDataCount(1);
-			}
-			primitiveIndex++;
-		}
-	}
-}
-
 VOID Dx12SampleBase::LoadGltfFiles()
 {
-	const std::vector<std::string> gltfFileNames = GltfFileName();
-	const UINT numgltfFiles = gltfFileNames.size();
+	const std::vector<std::string> gltfFileNames        = GltfFileName();
+	const UINT                     numgltfFiles         = gltfFileNames.size();
+	UINT                           globalPrimitiveIndex = 0;
 
-	m_sceneElements.clear();
-	m_sceneElements.resize(numgltfFiles);
+	m_modelAssets.modelAssetList.clear();
+	m_gltfLoader = std::make_unique<DxGltfLoader>(this);
+	m_modelAssets.numTotalPrimitivesInAllAssets = 0;
 
-	UINT globalPrimitiveIndex = 0;
 	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
-		auto& curFileInfo = m_sceneElements[fileIdx];
 		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx]);
-		m_gltfLoader = std::make_unique<DxGltfLoader>(modelPath);
 
-		m_gltfLoader->LoadModel();
-		const UINT numNodesInScene = m_gltfLoader->NumNodesInScene();
+		m_gltfLoader->LoadModel(modelPath);
 
-		curFileInfo.modelAssets.clear();
+		m_modelAssets.modelAssetList.emplace_back();
+		auto& currentAsset = m_modelAssets.modelAssetList.back();
 
-		UINT primitiveIndex = 0;
-		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
-		{
-			curFileInfo.modelAssets.emplace_back();
-			auto& currentNode = curFileInfo.modelAssets.back();
-
-			ParseNode(currentNode, fileIdx, nodeIdx, primitiveIndex, globalPrimitiveIndex);
-
-			
-			SetNumTotalPrimitivesInScene(primitiveIndex, fileIdx);
-		}
+		m_gltfLoader->LoadGltfModelAsset(currentAsset);
+		m_modelAssets.numTotalPrimitivesInAllAssets += currentAsset.primitives.size();
 	}
 }
 
@@ -1803,10 +1544,10 @@ VOID Dx12SampleBase::LoadSceneMaterialInfo()
 {
     UINT primitiveIndex = 0;
 
-	ForEachSceneElementLoadedSceneNodePrim([this, &primitiveIndex](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
+	ForEachModelAssetPrimitive([this, &primitiveIndex](UINT assetIdx, UINT primIdx)
 	{
 		{
-			auto& currentPrim = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+			auto& currentPrim = GetPrimitiveInfo(assetIdx, primIdx);
 			auto& primTextureInfo = currentPrim.materialTextures;
 
 			CreateAppSrvDescriptorAtIndex(primitiveIndex, 0, primTextureInfo.pbrBaseColorTexture.textureInfo.Get());			//t0
@@ -1837,30 +1578,26 @@ VOID Dx12SampleBase::LoadScene()
 		const auto& currentSceneElementDesc = m_sceneDescription[idx];
 		auto& curElementSceneLoadInfo       = m_sceneInfo.sceneLoadInfo[idx];
 		const UINT numInstances             = currentSceneElementDesc.numInstances;
-		const UINT sceneElementIdx          = currentSceneElementDesc.sceneElementIdx;
-		const UINT numNodes                 = NumNodesInScene(sceneElementIdx);
-		curElementSceneLoadInfo.sceneElementIdx = sceneElementIdx;
+		const UINT modelAssetIdx            = currentSceneElementDesc.sceneElementIdx;
+
+		curElementSceneLoadInfo.sceneElementIdx = modelAssetIdx;
 		curElementSceneLoadInfo.numInstances = numInstances;
-		auto& sceneElement = m_sceneElements[sceneElementIdx];
 
 
-		IncrementPerInstanceDataCount(numInstances * numNodes);
+		auto& sceneElement = m_modelAssets.modelAssetList[modelAssetIdx];
+
+		const UINT numPrimitives = NumPrimitivesInModelAsset(modelAssetIdx);
+		IncrementPerInstanceDataCount(numInstances * numPrimitives);
 		for (UINT instance = 0; instance < numInstances; instance++)
 		{
-			
-			for (UINT nodeIdx = 0; nodeIdx < numNodes; nodeIdx++)
+			for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)
 			{
-				
-				const UINT numPrimitives = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
-				for (UINT primIdx = 0; primIdx < numPrimitives; primIdx++)
+				auto& curPrim = GetPrimitiveInfo(modelAssetIdx, primIdx);
+				///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
+				m_camera->AddTransformInfo(curPrim.transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
+				if (currentSceneElementDesc.addToExtents == TRUE)
 				{
-					auto& curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-					///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
-					m_camera->AddTransformInfo(curPrim.transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
-					if (currentSceneElementDesc.addToExtents == TRUE)
-					{
-						m_camera->AddMinMaxExtents(curPrim.meshExtents);
-					}
+					m_camera->AddMinMaxExtents(curPrim.primitiveExtents);
 				}
 			}
 		}

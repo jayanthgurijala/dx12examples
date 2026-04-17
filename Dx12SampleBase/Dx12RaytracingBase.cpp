@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Dx12RaytracingBase.h"
+#include "DxTransformHelper.h"
 
 
 static const wchar_t* const c_pSimpleRGShader = L"MyRaygenShader";
@@ -158,9 +159,9 @@ VOID Dx12RaytracingBase::CreatePerPrimSrvs()
 	const UINT appSrvOffset = AppSrvOffsetForPrim();
 
 	///create the extra two SRV descriptors for raytracing
-	ForEachSceneElementLoadedSceneNodePrim([this, appSrvOffset](UINT sceneIdx, UINT nodeIdx, UINT primIdx)
+	ForEachModelAssetPrimitive([this, appSrvOffset](UINT assetIdx, UINT primIdx)
 		{
-			const auto& curPrimitive = GetPrimitiveInfo(sceneIdx, nodeIdx, primIdx);
+			const auto& curPrimitive = GetPrimitiveInfo(assetIdx, primIdx);
 			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribPosition, appSrvOffset + 0);
 			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribNormal, appSrvOffset + 1);
 			CreateSrvBufferForPrimitive(curPrimitive, GltfVertexAttribTexcoord0, appSrvOffset + 2);
@@ -295,16 +296,14 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 	for (UINT sceneIdx = 0; sceneIdx < numSceneLoadElements; sceneIdx++)
 	{
         auto& info = SceneElementInstance(sceneIdx);
-		const UINT sceneElementIdx = info.sceneElementIdx;
-		UINT numNodesInSceneElement = NumNodesInScene(sceneElementIdx);
-		for (UINT nodeIdx = 0; nodeIdx < numNodesInSceneElement; nodeIdx++)
-		{
-			UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
+		const UINT modelAssetIndex = info.sceneElementIdx;
+		
+		
+			UINT numPrimsInNodeMesh = NumPrimitivesInModelAsset(modelAssetIndex);
 			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
 			{
-				primitiveInfo.push_back(&GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx));
+				primitiveInfo.push_back(&GetPrimitiveInfo(modelAssetIndex, primIdx));
 			}
-		}
 	}
 
 
@@ -352,7 +351,7 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 				auto* curPrimitive = primitiveInfo[primIdx];
 				BOOL  needsAnyHit = IsPrimitiveTransparent(*curPrimitive);
 				auto  gpuVAMaterialsCB = curPrimitive->materialTextures.meterialCb;
-				auto  gpuVAMatTex = GetPerPrimSrvGpuHandle(curPrimitive->primLinearIdxInSceneElements);
+				auto  gpuVAMatTex = GetPerPrimSrvGpuHandle(curPrimitive->primLinearIdxInModelAssets);
 
                 void* curHitGroupID = GetHitGroupShaderIdentifier(props, needsAnyHit, rayIndex);
 
@@ -417,6 +416,24 @@ VOID Dx12RaytracingBase::CreateUAVOutput()
 	CreateAppUavDescriptorAtIndex(0, m_uavOutputResource.Get());
 }
 
+/*
+* 
+* There are two approaches to build AS taking e.g. as Oaktree
+* In the flat hierarchy - ModelAsset -> primitives(have world transforms)
+*	1st Approach
+*		1. Each primitive is a BLAS e.g. Bark is on BLAS, Leaves is one BLAS
+*       2. One Final Tree will have 2 TLAS instances, one for bark and one for leaves
+*       3. While traversing the scene, for each modelasset, build N prims TLAS instances
+*	2nd Paaroach
+*		1. Build 1 BLAS for a model asset and use Transform3x4
+*       2. For each instance of the asset, build one TLAS instance with instance world transform
+* Node - Mesh hierarchy
+*	This is more natural but nodes having children can make it complicate (mentally)
+*		1. But looks like it is simple (lets explore)
+* 
+* Present implementation - flat hierarchy Scenario 1! (worst case)
+* 
+*/
 VOID Dx12RaytracingBase::BuildBlasAndTlas()
 {
 	StartBuildingAccelerationStructures();
@@ -426,104 +443,122 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	//@note should this be in UAV? Sample apps use UAV but there is DebugLayer warning
 	const D3D12_RESOURCE_STATES scratchState = D3D12_RESOURCE_STATE_COMMON;
 
-	const UINT numSceneElements = NumElementsInSceneLoad();
-	for (UINT sceneElemIdx = 0; sceneElemIdx < numSceneElements; sceneElemIdx++)
+	const UINT numModelAssets = NumModelAssetsLoaded();
+
+	for (UINT assetIdx = 0; assetIdx < numModelAssets; assetIdx++)
 	{
-		//------> for each node need a Tlas but Tlas needs to be built from scene description i.e. LoadScene() info
-		auto& info = SceneElementInstance(sceneElemIdx);
-        const UINT sceneElementIdx = info.sceneElementIdx;
-		const UINT numNodesInScene = NumNodesInScene(sceneElementIdx);
-		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+		const auto& modelAsset = GetModelAsset(assetIdx);
+		const UINT numPrimsInAsset = NumPrimitivesInModelAsset(assetIdx);
+
+		m_sceneBlas.modelAssetBlas.emplace_back();
+		auto& assetBlasList = m_sceneBlas.modelAssetBlas.back();
+
+
+
+		for (UINT primIdx = 0; primIdx < numPrimsInAsset; primIdx++)
 		{
-			//------> for each prim need a GeomDesc, all Geom Desc go into one Blas
-			const UINT numPrimsInNodeMesh = NumPrimitivesInNodeMesh(sceneElementIdx, nodeIdx);
-			m_sceneBlas.sceneElementsBlas.emplace_back();
-			DxASDesc& blasForNode = m_sceneBlas.sceneElementsBlas.back();
-			std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(numPrimsInNodeMesh);
-			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
-			{
-				auto& geomDesc = geomDescs[primIdx];
-				const auto curPrim = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-				const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetIndexBufferInfo(curPrim).modelIbv;
 
-				//@note we should always have position
-				const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetVertexBufferInfo(curPrim, GltfVertexAttribPosition)->modelVbv;
-				const DxDrawPrimitive         drawInfo = GetDrawInfo(sceneElementIdx, nodeIdx, primIdx);
-				const BOOL isPrimTransparent = IsPrimitiveTransparent(sceneElementIdx, nodeIdx, primIdx);
-				geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-				geomDesc.Triangles.IndexBuffer = drawInfo.isIndexedDraw ? indexBufferView.BufferLocation : 0;
-				geomDesc.Triangles.IndexCount = drawInfo.isIndexedDraw ? drawInfo.numIndices : 0;
-				geomDesc.Triangles.IndexFormat = drawInfo.isIndexedDraw ? indexBufferView.Format : DXGI_FORMAT_UNKNOWN;
+			assetBlasList.emplace_back();
+			auto& primBlas = assetBlasList.back();
 
-				geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
-				geomDesc.Triangles.VertexCount = drawInfo.numVertices;
-				geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(sceneElementIdx, nodeIdx, primIdx);
+			///@note Flat hierarchcy - one BLAS per prim
+			///@todo generalize this all approaches
+			std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(1);
+			auto& geomDesc = geomDescs[0];
 
-				//Object space -> new object space
-				geomDesc.Triangles.Transform3x4 = 0;
-				geomDesc.Flags = ((isPrimTransparent == FALSE) ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE);
-			}
+			const auto& currentPrim = GetPrimitiveInfo(assetIdx, primIdx);
+
+
+			const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetIndexBufferInfo(currentPrim).modelIbv;
+
+			DxDrawPrimitive         drawInfo = GetDrawInfo(assetIdx, primIdx);
+			const BOOL isPrimTransparent = IsPrimitiveTransparent(assetIdx, primIdx);
+
+			geomDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+			geomDesc.Triangles.IndexBuffer = drawInfo.isIndexedDraw ? indexBufferView.BufferLocation : 0;
+			geomDesc.Triangles.IndexCount = drawInfo.isIndexedDraw ? drawInfo.numIndices : 0;
+			geomDesc.Triangles.IndexFormat = drawInfo.isIndexedDraw ? indexBufferView.Format : DXGI_FORMAT_UNKNOWN;
+
+			//@note we should always have position
+			const D3D12_VERTEX_BUFFER_VIEW vertexBufferView = GetVertexBufferInfo(currentPrim, GltfVertexAttribPosition)->modelVbv;
+			geomDesc.Triangles.VertexBuffer = { vertexBufferView.BufferLocation, vertexBufferView.StrideInBytes };
+			geomDesc.Triangles.VertexCount = drawInfo.numVertices;
+			geomDesc.Triangles.VertexFormat = GetVertexPositionBufferFormat(assetIdx, primIdx);
+
+			//Object space -> new object space
+			geomDesc.Triangles.Transform3x4 = 0;
+			geomDesc.Flags = ((isPrimTransparent == FALSE) ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE);
+
 			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = {};
-			bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-			bottomLevelInputs.NumDescs = geomDescs.size();
-			bottomLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+			bottomLevelInputs.Type           = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+			bottomLevelInputs.NumDescs       = geomDescs.size();
+			bottomLevelInputs.DescsLayout    = D3D12_ELEMENTS_LAYOUT_ARRAY;
 			bottomLevelInputs.pGeometryDescs = geomDescs.data();
-			bottomLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+			bottomLevelInputs.Flags          = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+
 			// Get required sizes for an acceleration structure.
 			D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
 			m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &blasForNode.resultBuffer, "BlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
-			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &blasForNode.scratchBuffer, "BlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
+			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &primBlas.resultBuffer, "BlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
+			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &primBlas.scratchBuffer, "BlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
 
 			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-			bottomLevelBuildDesc.Inputs = bottomLevelInputs;
-			bottomLevelBuildDesc.DestAccelerationStructureData = blasForNode.resultBuffer->GetGPUVirtualAddress();
-			bottomLevelBuildDesc.ScratchAccelerationStructureData = blasForNode.scratchBuffer->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.Inputs                           = bottomLevelInputs;
+			bottomLevelBuildDesc.DestAccelerationStructureData    = primBlas.resultBuffer->GetGPUVirtualAddress();
+			bottomLevelBuildDesc.ScratchAccelerationStructureData = primBlas.scratchBuffer->GetGPUVirtualAddress();
 			m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
 			ExecuteBuildAccelerationStructures();
 		}
 	}
 
-
-	DxCamera* pCamera = GetCamera();
-	const UINT numNodeTransforms = pCamera->NumModelTransforms();
-	std::vector< D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs(numNodeTransforms);
 	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
-	UINT transformsLinearIdx = 0;
-	UINT sceneElementNodeLineadIdx = 0;
+
+
+	std::vector< D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
+	UINT instanceLinearIndex = 0;
+
+
 	for (UINT idx = 0; idx < numElementsInSceneLoad; idx++)
 	{
+		auto& info               = SceneElementInstance(idx);
+		auto& sceneElementInfo   = GetSceneElementInstance(idx); 
+		const UINT modelAssetIdx = info.sceneElementIdx;
+		const UINT numPrims      = NumPrimitivesInModelAsset(modelAssetIdx);
+
+		auto& assetBlasList = m_sceneBlas.modelAssetBlas[modelAssetIdx];
+		assert(assetBlasList.size() == numPrims);
+
 		
-		auto& info = SceneElementInstance(idx);
-		const UINT sceneElementIdx = info.sceneElementIdx;
-		const UINT numNodesInScene = NumNodesInScene(sceneElementIdx);
+
 		//one node can have 2 BLAS e.g. oaktree
-		for (UINT nodeIdx = 0; nodeIdx < numNodesInScene; nodeIdx++)
+		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
 		{
-			auto& blasDesc = m_sceneBlas.sceneElementsBlas[sceneElementNodeLineadIdx];
+			instanceDescs.emplace_back();
+			auto& instanceDesc = instanceDescs.back();
+			auto& curPrimitive = GetPrimitiveInfo(modelAssetIdx, primIdx);
+			auto& blasDesc = assetBlasList[primIdx];
 			const UINT numInstances = info.numInstances;
 			for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
 			{
-				D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = instanceDescs[transformsLinearIdx];
-				const XMFLOAT4X4 pData = pCamera->GetDxrModelTransposeMatrix(transformsLinearIdx);
+				DxTransformInfo& instanceTransform = sceneElementInfo.trsMatrix[instanceIdx];
+				const XMFLOAT4X4                pData = DxTransformHelper::GetCombinedWorldMatrixData(instanceTransform, curPrimitive.transformInfo);
 				memcpy(instanceDesc.Transform, &pData, sizeof(instanceDesc.Transform));
 				instanceDesc.InstanceMask = 1;
-				instanceDesc.InstanceContributionToHitGroupIndex = sceneElementNodeLineadIdx * 2;
+				instanceDesc.InstanceContributionToHitGroupIndex = (modelAssetIdx + primIdx) * 2;
 				instanceDesc.AccelerationStructure = blasDesc.resultBuffer->GetGPUVirtualAddress();
-				transformsLinearIdx++;
+				instanceLinearIndex++;
 			}
-			sceneElementNodeLineadIdx++;
 		}
 	}
 
 	//@note Important we use a fence and block on CPU, so this will not get deallocated till TLAS build is complete.
 	ComPtr<ID3D12Resource> instanceDesc = CreateBufferWithData(instanceDescs.data(),
-		instanceDescs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC),
-		"RayTracing_InstanceDesc",
-		D3D12_RESOURCE_FLAG_NONE,
-		D3D12_RESOURCE_STATE_COMMON,
-		TRUE);
+		                                                       instanceDescs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC),
+		                                                       "RayTracing_InstanceDesc",
+		                                                       D3D12_RESOURCE_FLAG_NONE,
+		                                                       D3D12_RESOURCE_STATE_COMMON,
+		                                                       TRUE);
 
 
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};

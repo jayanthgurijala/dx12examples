@@ -47,6 +47,8 @@ static const uint HasEmissiveTexture      = 1 << 4;
 static const uint AlphaModeMask           = 1 << 5;
 static const uint AlphaModeBlend          = 1 << 6;
 static const uint DoubleSided             = 1 << 7;
+
+
 static const uint RenderFlagsUsePBR       = 1 << 0;
 static const uint RenderFlagsTessEnabled  = 1 << 1;
 

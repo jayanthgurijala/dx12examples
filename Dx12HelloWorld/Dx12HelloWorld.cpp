@@ -23,7 +23,7 @@ VOID Dx12HelloWorld::OnInit()
 	const UINT numDescRanges = 1;
     std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-    const UINT numSrvsNeededForApp = NumSRVsInScene(0);
+    const UINT numSrvsNeededForApp = NumSRVsInAllModelAssets();
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto viewProj         = dxhelper::GetRootCbv(0);
@@ -76,16 +76,15 @@ VOID Dx12HelloWorld::RenderFrameGfxDraw()
 	const UINT numSrvsPerPrim = NumSRVsPerPrimitive();
 
 
-	ProcessSceneInstancesNodesPrims([this, pCmdList, numSrvsPerPrim](UINT sceneEleIdx, UINT instanceIdx, UINT nodeIdx, UINT primIdx, UINT flatInstanceNodeIdx, UINT sceneElementIdx)
+	ForEachModelAssetInstancesInScene([this, pCmdList, numSrvsPerPrim](UINT modelAssetIdx, UINT primIdx, UINT instanceIdx, UINT flatInstanceIdx)
 		{
-			auto& curPrimitive = GetPrimitiveInfo(sceneElementIdx, nodeIdx, primIdx);
-			auto& sceneLoadElement = SceneElementInstance(sceneEleIdx);
+			auto& curPrimitive = GetPrimitiveInfo(modelAssetIdx, primIdx);
 			pCmdList->SetPipelineState(curPrimitive.pipelineState.Get());
 			pCmdList->SetGraphicsRootConstantBufferView(0, GetViewProjGpuVa());
-			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceNodeIdx));
-			pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(curPrimitive.primLinearIdxInSceneElements));
+			pCmdList->SetGraphicsRootConstantBufferView(1, GetPerInstanceDataGpuVa(flatInstanceIdx));
+			pCmdList->SetGraphicsRootDescriptorTable(2, GetPerPrimSrvGpuHandle(curPrimitive.primLinearIdxInModelAssets));
 			pCmdList->SetGraphicsRootConstantBufferView(3, curPrimitive.materialTextures.meterialCb);
-			RenderModel(pCmdList, sceneLoadElement.sceneElementIdx, nodeIdx, primIdx);
+			RenderModel(pCmdList, modelAssetIdx, primIdx);
 		});
 
 	AddFrameInfo(0, DxDescriptorTypeRtvSrv);

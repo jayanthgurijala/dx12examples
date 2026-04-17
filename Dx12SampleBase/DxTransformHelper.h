@@ -19,10 +19,10 @@ namespace DxTransformHelper
     inline void SetQuaternionValues(DxTransformInfo& transformInfo, std::vector<double> rotation)
     {
         transformInfo.trsInfo.rotationMode = DxRotationModeQuaternion;
-        transformInfo.trsInfo.quaterion.x = rotation[0];
-        transformInfo.trsInfo.quaterion.y = rotation[1];
-        transformInfo.trsInfo.quaterion.z = rotation[2];
-        transformInfo.trsInfo.quaterion.w = rotation[3];
+        transformInfo.trsInfo.quaterion.x = static_cast<FLOAT>(rotation[0]);
+        transformInfo.trsInfo.quaterion.y = static_cast<FLOAT>(rotation[1]);
+        transformInfo.trsInfo.quaterion.z = static_cast<FLOAT>(rotation[2]);
+        transformInfo.trsInfo.quaterion.w = static_cast<FLOAT>(rotation[3]);
     }
 
     inline void SetQuaternionRotation(DxTransformInfo& transformInfo, std::vector<double> rotation, BOOL hasRotation)
@@ -44,9 +44,9 @@ namespace DxTransformHelper
 
     inline void SetTranslationValues(DxTransformInfo& transformInfo, std::vector<double> translation)
     {
-        transformInfo.trsInfo.translation[0] = translation[0];
-        transformInfo.trsInfo.translation[1] = translation[1];
-        transformInfo.trsInfo.translation[2] = translation[2];
+        transformInfo.trsInfo.translation[0] = static_cast<FLOAT>(translation[0]);
+        transformInfo.trsInfo.translation[1] = static_cast<FLOAT>(translation[1]);
+        transformInfo.trsInfo.translation[2] = static_cast<FLOAT>(translation[2]);
     }
 
     inline void SetTranslation(DxTransformInfo& transformInfo, std::vector<double> translation, BOOL hasTranslation)
@@ -68,9 +68,9 @@ namespace DxTransformHelper
 
     inline void SetScaleValues(DxTransformInfo& transformInfo, std::vector<double> scale)
     {
-        transformInfo.trsInfo.scale[0] = scale[0];
-        transformInfo.trsInfo.scale[1] = scale[1];
-        transformInfo.trsInfo.scale[2] = scale[2];
+        transformInfo.trsInfo.scale[0] = static_cast<FLOAT>(scale[0]);
+        transformInfo.trsInfo.scale[1] = static_cast<FLOAT>(scale[1]);
+        transformInfo.trsInfo.scale[2] = static_cast<FLOAT>(scale[2]);
     }
 
     inline void SetScale(DxTransformInfo& transformInfo, std::vector<double> scale, BOOL hasScale)
@@ -212,6 +212,33 @@ namespace DxTransformHelper
 
         return worldMatrix;
 
+    }
+
+    inline XMMATRIX GetCombinedWorldMatrix(const DxTransformInfo& worldTransform, const DxTransformInfo& transformToApply)
+    {
+        XMMATRIX worldTransformMatrix   = GetWorldMatrix(worldTransform);
+        XMMATRIX transformToApplyMatrix = GetWorldMatrix(transformToApply);
+        return worldTransformMatrix* transformToApplyMatrix;
+    }
+
+    inline XMFLOAT4X4 GetWorldMatrixData(const DxTransformInfo& transformInfo)
+    {
+        auto worldMatrix = GetWorldMatrix(transformInfo);
+        XMFLOAT4X4 matrixData;
+        XMStoreFloat4x4(&matrixData, worldMatrix);
+        return matrixData;
+    }
+
+    inline XMFLOAT4X4 GetWorldMatrixData(XMMATRIX transformMatrix)
+    {
+        XMFLOAT4X4 matrixData;
+        XMStoreFloat4x4(&matrixData, transformMatrix);
+        return matrixData;
+    }
+
+    inline XMFLOAT4X4 GetCombinedWorldMatrixData(const DxTransformInfo& worldTransform, const DxTransformInfo& transformToApply)
+    {
+        return GetWorldMatrixData(GetCombinedWorldMatrix(worldTransform, transformToApply));
     }
 };
 

@@ -140,7 +140,7 @@ VOID Dx12RayTracedForest::LoadSceneDescription(std::vector<DxSceneElementInstanc
 {
 
 
-	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
+	const UINT numSceneElementsLoaded = NumModelAssetsLoaded();
 
     const UINT numTerrainElements = 1;
     const UINT numDeerElements    = _countof(DeerPositions);

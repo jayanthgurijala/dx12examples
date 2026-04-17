@@ -29,7 +29,7 @@ VOID Dx12HelloForest::OnInit()
 	const UINT numDescRanges = 1;
     std::vector<CD3DX12_DESCRIPTOR_RANGE> descRanges(numDescRanges);
 
-    const UINT numSrvsNeededForApp = NumSRVsInScene(0);
+    const UINT numSrvsNeededForApp = NumSRVsInAllModelAssets();
 	descRanges[0] = dxhelper::GetSRVDescRange(numSrvsNeededForApp);
 
 	auto sceneData        = dxhelper::GetRootCbv(0);
@@ -78,9 +78,7 @@ VOID Dx12HelloForest::RenderFrameGfxDraw()
 VOID Dx12HelloForest::LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription)
 {
 
-
-	const UINT numSceneElementsLoaded = NumSceneElementsLoaded();
-	const UINT numSceneElements = NumSceneElementsLoaded();
+	const UINT numSceneElements = NumModelAssetsLoaded();
 	sceneDescription.resize(numSceneElements);
 
 	UINT terrainIdx = 0;
