@@ -444,11 +444,17 @@ struct DxASDesc
 	ComPtr<ID3D12Resource> scratchBuffer;
 };
 
+struct DxModelAssetBlasInfo
+{
+	UINT linearBlasFirstPrimIndex;
+	std::vector<DxASDesc> modelAssetBlas;
+};
+
 ///@note In present implementation, each primitive is a node with a transform
 ///      But we do need to group them together as an asset used while scene construction
 struct DxSceneBlasDesc
 {
-	std::vector<std::vector<DxASDesc>> modelAssetBlas;
+	std::vector<DxModelAssetBlasInfo> modelAssetBlas;
 };
 
 

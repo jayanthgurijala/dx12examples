@@ -292,18 +292,14 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 	/// so even if we have X,Y,Z Deers, OakTrees and Terrains, we will ever need only 4 SBT entries, i.e. as many prims.
 
 	std::vector<DxPrimitiveInfo*> primitiveInfo;
-	UINT numSceneLoadElements = NumElementsInSceneLoad();
-	for (UINT sceneIdx = 0; sceneIdx < numSceneLoadElements; sceneIdx++)
-	{
-        auto& info = SceneElementInstance(sceneIdx);
-		const UINT modelAssetIndex = info.sceneElementIdx;
-		
-		
-			UINT numPrimsInNodeMesh = NumPrimitivesInModelAsset(modelAssetIndex);
-			for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
-			{
-				primitiveInfo.push_back(&GetPrimitiveInfo(modelAssetIndex, primIdx));
-			}
+	UINT numSceneLoadElements = NumModelAssetsLoaded();
+	for (UINT assetIdx = 0; assetIdx < numSceneLoadElements; assetIdx++)
+	{		
+		UINT numPrimsInNodeMesh = NumPrimitivesInModelAsset(assetIdx);
+		for (UINT primIdx = 0; primIdx < numPrimsInNodeMesh; primIdx++)
+		{
+			primitiveInfo.push_back(&GetPrimitiveInfo(assetIdx, primIdx));
+		}
 	}
 
 
@@ -445,6 +441,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 	const UINT numModelAssets = NumModelAssetsLoaded();
 
+	UINT linearBlasCount = 0;
 	for (UINT assetIdx = 0; assetIdx < numModelAssets; assetIdx++)
 	{
 		const auto& modelAsset = GetModelAsset(assetIdx);
@@ -452,14 +449,14 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 		m_sceneBlas.modelAssetBlas.emplace_back();
 		auto& assetBlasList = m_sceneBlas.modelAssetBlas.back();
-
+		assetBlasList.linearBlasFirstPrimIndex = linearBlasCount;
 
 
 		for (UINT primIdx = 0; primIdx < numPrimsInAsset; primIdx++)
 		{
 
-			assetBlasList.emplace_back();
-			auto& primBlas = assetBlasList.back();
+			assetBlasList.modelAssetBlas.emplace_back();
+			auto& primBlas = assetBlasList.modelAssetBlas.back();
 
 			///@note Flat hierarchcy - one BLAS per prim
 			///@todo generalize this all approaches
@@ -509,6 +506,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
 
 			ExecuteBuildAccelerationStructures();
+			linearBlasCount++;
 		}
 	}
 
@@ -527,9 +525,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 		const UINT numPrims      = NumPrimitivesInModelAsset(modelAssetIdx);
 
 		auto& assetBlasList = m_sceneBlas.modelAssetBlas[modelAssetIdx];
-		assert(assetBlasList.size() == numPrims);
-
-		
+		assert(assetBlasList.modelAssetBlas.size() == numPrims);
 
 		//one node can have 2 BLAS e.g. oaktree
 		for (UINT primIdx = 0; primIdx < numPrims; primIdx++)
@@ -537,15 +533,15 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			instanceDescs.emplace_back();
 			auto& instanceDesc = instanceDescs.back();
 			auto& curPrimitive = GetPrimitiveInfo(modelAssetIdx, primIdx);
-			auto& blasDesc = assetBlasList[primIdx];
+			auto& blasDesc = assetBlasList.modelAssetBlas[primIdx];
 			const UINT numInstances = info.numInstances;
 			for (UINT instanceIdx = 0; instanceIdx < numInstances; instanceIdx++)
 			{
 				DxTransformInfo& instanceTransform = sceneElementInfo.trsMatrix[instanceIdx];
-				const XMFLOAT4X4                pData = DxTransformHelper::GetCombinedWorldMatrixData(curPrimitive.transformInfo, instanceTransform);
+				const XMFLOAT4X4                pData = DxTransformHelper::GetCombinedWorldMatrixData(instanceTransform, curPrimitive.transformInfo);
 				memcpy(instanceDesc.Transform, &pData, sizeof(instanceDesc.Transform));
 				instanceDesc.InstanceMask = 1;
-				instanceDesc.InstanceContributionToHitGroupIndex = (modelAssetIdx + primIdx) * 2;
+				instanceDesc.InstanceContributionToHitGroupIndex = (assetBlasList.linearBlasFirstPrimIndex + primIdx) * 2;
 				instanceDesc.AccelerationStructure = blasDesc.resultBuffer->GetGPUVirtualAddress();
 				instanceLinearIndex++;
 			}
