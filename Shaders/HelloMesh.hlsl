@@ -165,9 +165,9 @@ void MSMain(uint3 gid       : SV_GroupID,
         float4 worldPosition1 = mul(vertexData[1], g_modelMatrixT);
         float4 worldPosition2 = mul(vertexData[2], g_modelMatrixT);
         
-        float4 position0 = mul(worldPosition0, g_viewProjT);
-        float4 position1 = mul(worldPosition1, g_viewProjT);
-        float4 position2 = mul(worldPosition2, g_viewProjT);
+        float4 position0 = mul(worldPosition0, sceneConstants.g_viewProjT);
+        float4 position1 = mul(worldPosition1, sceneConstants.g_viewProjT);
+        float4 position2 = mul(worldPosition2, sceneConstants.g_viewProjT);
         
         vertices[vertexIndex.x].position = position0;
         vertices[vertexIndex.y].position = position1;

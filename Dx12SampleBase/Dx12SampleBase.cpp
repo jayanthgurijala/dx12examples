@@ -1390,6 +1390,7 @@ HRESULT Dx12SampleBase::CreateSceneMVPMatrix()
 		sceneData.cameraPosition = m_camera->GetCameraPosition();
 		sceneData.cameraFovY.x   = m_camera->GetFovYInRadians();
 		sceneData.cameraFovY.y   = sceneData.cameraFovY.z = sceneData.cameraFovY.w = 0;
+		sceneData.renderflags    = (((IsTessEnabled() == TRUE) ? RenderFlagsTessEnabled : 0) | ((EnablePBRShading() == TRUE) ? RenderFlagsUsePBR : 0));
 	
 		m_camLightsMaterialsManager->WriteViewProjDataAtIndex(0, sceneData);
 	}

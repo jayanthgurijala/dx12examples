@@ -1,12 +1,23 @@
 #define PI 3.14159265359
 
-cbuffer ViewProjection : register(b0)
+struct SceneConstants
 {
     float4x4 g_viewProjT;
+    
     float4x4 g_vpInv;
-    float4   g_cameraPosition;
-    float    g_fovInRadians;
-    float3   camBufferpadding;
+    
+    float4 g_cameraPosition;
+    
+    float g_fovInRadians;
+    float3 camBufferpadding;
+    
+    uint renderFlags;
+    float3 padding;
+};
+
+cbuffer SceneCB : register(b0)
+{
+    SceneConstants sceneConstants;
 }
 
 
@@ -30,8 +41,7 @@ struct MaterialProperties
     float alphaCutoff;
    
     uint materialFlags;
-    uint g_renderFlags;
-    float2 padding;
+    float3 padding;
 };
 
 cbuffer MaterialData : register(b0, space3)

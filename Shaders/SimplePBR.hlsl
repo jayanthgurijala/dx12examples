@@ -8,7 +8,7 @@ struct HSConstantsTriOutput
 
 #define COMPUTE_POSITION(inputPos, worldPos, clipPos) \
     worldPos = mul(float4(inputPos, 1.0f), g_modelMatrixT); \
-    clipPos = mul(worldPos, g_viewProjT);
+    clipPos = mul(worldPos, sceneConstants.g_viewProjT);
 
 struct VSInput_1
 {
@@ -57,7 +57,7 @@ VSOutput_5 VSMain_1( VSInput_1 input )
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
     {
         COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     }
@@ -80,7 +80,7 @@ VSOutput_5 VSMain_2(VSInput_2 input)
 {
     VSOutput_5 output;
  
-    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
     {
         COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     }
@@ -103,7 +103,7 @@ VSOutput_5 VSMain_3(VSInput_3 input)
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
     {
         COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     }
@@ -126,7 +126,7 @@ VSOutput_5 VSMain_4(VSInput_4 input)
     
     //if transposed on CPU then hlsl reads this as row-major
     //in row-major, v' = v * M
-    if ((materialProperties.g_renderFlags & RenderFlagsTessEnabled) == 0)
+    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
     {
         COMPUTE_POSITION(input.position, output.worldPosition, output.position);
     }
@@ -362,7 +362,7 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     if ((input.flags & HasNormal) != 0)
     {
         float3 N    = normalize(input.normal);
-        float3 V    = normalize(g_cameraPosition.xyz - input.worldPosition.xyz);
+        float3 V    = normalize(sceneConstants.g_cameraPosition.xyz - input.worldPosition.xyz);
         float3 L    = normalize(-lightDir.xyz);
         float3 H    = normalize(V + L);
         float NdotL = saturate(dot(N, L));
@@ -389,7 +389,7 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     
     baseColor = baseColor * lightColor * lightIntensity;
     
-    if ((materialProperties.g_renderFlags & RenderFlagsUsePBR) == 0)
+    if ((sceneConstants.renderFlags & RenderFlagsUsePBR) == 0)
     {
         baseColor = materialProperties.baseColorFactor;
         if ((input.flags & HasTexCoord) != 0)

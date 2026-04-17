@@ -26,10 +26,10 @@ inline void GenerateCameraRay(uint2 index, out float3 origin, out float3 directi
     screenPos.y = -screenPos.y;
 
     // Unproject the pixel coordinate into a ray.
-    float4 world = mul(float4(screenPos, 0, 1), g_vpInv);
+    float4 world = mul(float4(screenPos, 0, 1), sceneConstants.g_vpInv);
 
     world.xyz /= world.w;
-    origin = g_cameraPosition.xyz;
+    origin = sceneConstants.g_cameraPosition.xyz;
     direction = normalize(world.xyz - origin);
 }
 
@@ -188,7 +188,7 @@ float CalculateRayConeUVFootPrint(float3 p[3], float2 uv[3])
     // Compute tangent of half the camera field of view.
     // This is used to estimate how much the ray cone spreads
     // as the ray travels through space.
-    float tanValue = tan(g_fovInRadians * 0.5f);
+    float tanValue = tan(sceneConstants.g_fovInRadians * 0.5f);
     
     // Estimate the radius of the ray cone at the hit distance.
     // As the ray travels farther from the camera, the cone widens.

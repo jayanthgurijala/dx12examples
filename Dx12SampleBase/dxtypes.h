@@ -250,10 +250,14 @@ struct DxSceneLoadInfo
 struct DxCBSceneData
 {
 	XMFLOAT4X4 viewProjMatrix;
+
 	XMFLOAT4X4 invViewProj;
+
 	XMFLOAT4   cameraPosition;
 	XMFLOAT4   cameraFovY;
+
 	UINT       renderflags;
+	FLOAT      padding[3];
 };
 
 struct DxCBPerInstanceData
