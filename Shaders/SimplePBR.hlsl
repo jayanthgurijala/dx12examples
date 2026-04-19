@@ -343,8 +343,9 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     float4 baseColor       = materialProperties.baseColorFactor;
     float  roughnessFactor = materialProperties.roughnessFactor;
     float  metallicFactor  = materialProperties.metallicFactor;
+    float  emissiveFactor  = materialProperties.emissiveFactor;
     
-    if ((input.flags & HasMetallicRoughnessTex)  != 0)
+    if ((materialProperties.materialFlags & HasMetallicRoughnessTex)  != 0)
     {
         float3 mrSample = pbrMetallicRoughnessTexture.Sample(gSampler, input.texcoord0).rgb;
 
@@ -388,6 +389,12 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     }
     
     baseColor = baseColor * lightColor * lightIntensity;
+    
+    if ((materialProperties.materialFlags & HasEmissiveTexture) != 0)
+    {
+        float4 emissiveColor = emissiveTexture.Sample(gSampler, input.texcoord0) * emissiveFactor;
+        baseColor += emissiveColor;
+    }
     
     if ((sceneConstants.renderFlags & RenderFlagsUsePBR) == 0)
     {

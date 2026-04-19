@@ -63,7 +63,7 @@ namespace DxTransformHelper
 
     inline void ScaleIdentity(DxTransformInfo& transformInfo)
     {
-        transformInfo.trsInfo.scale[0] = transformInfo.trsInfo.scale[1] = transformInfo.trsInfo.scale[2] = 0;
+        transformInfo.trsInfo.scale[0] = transformInfo.trsInfo.scale[1] = transformInfo.trsInfo.scale[2] = 1;
     }
 
     inline void SetScaleValues(DxTransformInfo& transformInfo, std::vector<double> scale)

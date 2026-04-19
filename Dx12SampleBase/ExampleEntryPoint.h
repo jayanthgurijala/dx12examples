@@ -13,11 +13,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,                        \
 {                                                                       \
     UNREFERENCED_PARAMETER(hPrevInstance);                              \
     UNREFERENCED_PARAMETER(lpCmdLine);                                   \
+_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF); \
                                                                         \
     AppClass* pSample = new AppClass(1280, 720);                        \
     int retval = pSample->RunApp(hInstance, nCmdShow);                  \
     delete pSample;                                                     \
     return retval;                                                      \
 }
-\
 
