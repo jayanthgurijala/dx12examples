@@ -6,10 +6,6 @@ struct HSConstantsTriOutput
     float TessLevelInner : SV_InsideTessFactor;
 };
 
-#define COMPUTE_POSITION(inputPos, worldPos, clipPos) \
-    worldPos = mul(float4(inputPos, 1.0f), g_modelMatrixT); \
-    clipPos = mul(worldPos, sceneConstants.g_viewProjT);
-
 struct VSInput_1
 {
     float3 position         : POSITION;
@@ -49,23 +45,33 @@ struct VSOutput_5
     uint   flags            : FLAGS;
 };
 
+void ComputePositionOutput(float3 inPosition, out float4 worldPosition, out float4 svPosition)
+{
+    worldPosition = mul(float4(inPosition, 1.0f), g_modelMatrixT);
+    svPosition = mul(worldPosition, sceneConstants.g_viewProjT);
+}
+
+void CheckComputePositionOutput(float3 inPosition, out float4 worldPosition, out float4 svPosition)
+{
+    //if transposed on CPU then hlsl reads this as row-major
+    //in row-major, v' = v * M
+    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
+    {
+        ComputePositionOutput(inPosition, worldPosition, svPosition);
+    }
+    else
+    {
+        svPosition = float4(inPosition, 1.0f);
+    }
+}
+
 
 VSOutput_5 VSMain_1( VSInput_1 input )
 {
     VSOutput_5 output;
    
-    
-    //if transposed on CPU then hlsl reads this as row-major
-    //in row-major, v' = v * M
-    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
-    {
-        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
-    }
-    else
-    {
-        output.position = float4(input.position, 1.0f);
-    }
-    
+    CheckComputePositionOutput(input.position, output.worldPosition, output.position);
+
     output.normal     = float3(0, 0, 0);
     output.tangent    = float3(0, 0, 0);
     output.texcoord0  = float2(0, 0);
@@ -80,14 +86,8 @@ VSOutput_5 VSMain_2(VSInput_2 input)
 {
     VSOutput_5 output;
  
-    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
-    {
-        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
-    }
-    else
-    {
-        output.position = float4(input.position, 1.0f);
-    }
+    CheckComputePositionOutput(input.position, output.worldPosition, output.position);
+    
     output.normal     = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.tangent    = float3(0, 0, 0);
     output.texcoord0  = float2(0, 0);
@@ -100,17 +100,9 @@ VSOutput_5 VSMain_2(VSInput_2 input)
 VSOutput_5 VSMain_3(VSInput_3 input)
 {
     VSOutput_5 output;
-    
-    //if transposed on CPU then hlsl reads this as row-major
-    //in row-major, v' = v * M
-    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
-    {
-        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
-    }
-    else
-    {
-        output.position = float4(input.position, 1.0f);
-    }
+
+    CheckComputePositionOutput(input.position, output.worldPosition, output.position);
+ 
     output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.texcoord0 = input.texcoord0;
     output.tangent   = float3(0, 0, 0);
@@ -124,16 +116,8 @@ VSOutput_5 VSMain_4(VSInput_4 input)
 {
     VSOutput_5 output;
     
-    //if transposed on CPU then hlsl reads this as row-major
-    //in row-major, v' = v * M
-    if ((sceneConstants.renderFlags & RenderFlagsTessEnabled) == 0)
-    {
-        COMPUTE_POSITION(input.position, output.worldPosition, output.position);
-    }
-    else
-    {
-        output.position = float4(input.position, 1.0f);
-    }
+    CheckComputePositionOutput(input.position, output.worldPosition, output.position);
+ 
     output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.texcoord0 = input.texcoord0;
     output.tangent   = input.tangent;
@@ -189,7 +173,7 @@ VSOutput_5 DSMain_Pass(HSConstantsTriOutput tessFactors, float3 bary : SV_Domain
     output.position = (bary.x * patch[0].position) +
                       (bary.y * patch[1].position) +
                       (bary.z * patch[2].position);
-    COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
+    ComputePositionOutput(output.position.xyz, output.worldPosition, output.position);
    
     output.texcoord0 = patch[0].texcoord0 * bary.x + patch[1].texcoord0 * bary.y + patch[2].texcoord0 * bary.z;
     output.normal    = patch[0].normal    * bary.x + patch[1].normal    * bary.y + patch[2].normal    * bary.z;
@@ -280,7 +264,7 @@ VSOutput_5 DSMain_PN(HSConstantsTriOutput input, const OutputPatch<VSOutput_5, 3
     output.normal = normal;
     output.texcoord0 = patch[0].texcoord0 * bary.x + patch[1].texcoord0 * bary.y + patch[2].texcoord0 * bary.z;
     
-    COMPUTE_POSITION(output.position.xyz, output.worldPosition, output.position);
+    ComputePositionOutput(output.position.xyz, output.worldPosition, output.position);
     
     output.flags = patch[0].flags;
 
@@ -343,7 +327,7 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     float4 baseColor       = materialProperties.baseColorFactor;
     float  roughnessFactor = materialProperties.roughnessFactor;
     float  metallicFactor  = materialProperties.metallicFactor;
-    float  emissiveFactor  = materialProperties.emissiveFactor;
+    float3 emissiveFactor  = materialProperties.emissiveFactor;
     
     if ((materialProperties.materialFlags & HasMetallicRoughnessTex)  != 0)
     {
@@ -392,7 +376,7 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
     
     if ((materialProperties.materialFlags & HasEmissiveTexture) != 0)
     {
-        float4 emissiveColor = emissiveTexture.Sample(gSampler, input.texcoord0) * emissiveFactor;
+        float4 emissiveColor = emissiveTexture.Sample(gSampler, input.texcoord0) * float4(emissiveFactor, 1.0f);
         baseColor += emissiveColor;
     }
     
