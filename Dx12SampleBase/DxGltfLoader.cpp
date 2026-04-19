@@ -201,7 +201,7 @@ VOID DxGltfLoader::ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxP
 
 
 ///@note Mesh has name and one or more primitives
-VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, DxTransformInfo& nodeTransformInfo)
+VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, const XMMATRIX& worldMatrix)
 {
 	///@todo use mesh name
 	//inGltfMesh.name;
@@ -211,7 +211,7 @@ VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset&
 		outDxModelAssetInfo.primitives.emplace_back();
 		auto& outDxPrim         = outDxModelAssetInfo.primitives.back();
 		outDxPrim.meshName      = inGltfMesh.name;
-		outDxPrim.transformInfo = nodeTransformInfo;
+		outDxPrim.worldMatrix   = worldMatrix;
 		outDxPrim.primLinearIdxInModelAssets = m_modelAssetParsingInfo.primIndexInModelAsset;
 		ParsePrimitiveInfo(inPrim, outDxPrim);
 		m_modelAssetParsingInfo.primIndexInModelAsset += 1;
@@ -219,13 +219,11 @@ VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset&
 
 }
 
-VOID DxGltfLoader::ParseNodes(std::queue<tinygltf::Node*>& nodeList, DxModelAsset& modelAsset)
+VOID DxGltfLoader::ParseNodes(std::stack<GltfNodeTransformInfo*>& nodeList, DxModelAsset& modelAsset)
 {
-	std::stack<XMMATRIX> worldMatrixList;
-
 	while (nodeList.empty() == FALSE)
 	{
-		tinygltf::Node* nodeDesc = nodeList.front();
+		auto* nodeDesc = nodeList.top();
 		nodeList.pop();
 
 		DxTransformInfo nodeTransformInfo;
@@ -236,43 +234,27 @@ VOID DxGltfLoader::ParseNodes(std::queue<tinygltf::Node*>& nodeList, DxModelAsse
 		///        - Mesh
 		///        - Children
 		///    Everything above is optional, Node can just be a container without its own mesh.
-		const BOOL nodeHasMesh = (nodeDesc->mesh != -1);
-		const BOOL nodeHasChildren = (nodeDesc->children.size() > 1);
-		const BOOL hasTransform = GetNodeTransformInfo(nodeTransformInfo, nodeDesc);
+		const BOOL nodeHasMesh = (nodeDesc->nodeInfo->mesh != -1);
+		const BOOL nodeHasChildren = (nodeDesc->nodeInfo->children.size() > 1);
+
 
 		if (nodeHasMesh)
 		{
-			auto& gltfMesh = m_model.meshes[nodeDesc->mesh];
-			ParseMeshInfo(gltfMesh, modelAsset, nodeTransformInfo);
+			auto& gltfMesh = m_model.meshes[nodeDesc->nodeInfo->mesh];
+			ParseMeshInfo(gltfMesh, modelAsset, nodeDesc->nodeTransformWorldMatrix);
 		}
 
 		if (nodeHasChildren)
 		{
-			const UINT numChildren = nodeDesc->children.size();
+			const UINT numChildren = nodeDesc->nodeInfo->children.size();
 			for (UINT i = 0; i < numChildren; i++)
 			{
-				UINT nodeIdx   = nodeDesc->children[i];
+				UINT nodeIdx   = nodeDesc->nodeInfo->children[i];
 				auto* childNodeDesc = &m_model.nodes[nodeIdx];
-				nodeList.push(childNodeDesc);
+				PushNodeTransformInfo(nodeList, childNodeDesc);
 			}
-		}
-
-		///@todo assumed node always has a transform to simplify pop logic
-		if (hasTransform)
-		{
-			auto worldMatrix = DxTransformHelper::GetWorldMatrix(nodeTransformInfo);
-
-			if (worldMatrixList.empty() == false)
-			{
-				auto parentWorldMatrix = worldMatrixList.top();
-				worldMatrix = worldMatrix * parentWorldMatrix;
-			}
-
-			worldMatrixList.push(worldMatrix);
 		}
 	}
-
-	
 }
 
 
@@ -288,16 +270,16 @@ VOID DxGltfLoader::LoadGltfModelAsset(DxModelAsset& modelAsset)
 	auto& currentScene = m_model.scenes[0];
 	const UINT numNodesInScene = currentScene.nodes.size();
 
-	std::queue<tinygltf::Node*> nodeList;
+	std::stack<GltfNodeTransformInfo*> nodeList;
 
 	for (UINT i = 0; i < numNodesInScene; i++)
 	{
 		///@note Scene has a list of nodes, node at 0th index can be 3rd in nodes array.
 		const UINT nodeIdx  = currentScene.nodes[i];
 		auto*      nodeDesc = &m_model.nodes[nodeIdx];
-		nodeList.push(nodeDesc);
-		ParseNodes(nodeList, modelAsset);
+		PushNodeTransformInfo(nodeList, nodeDesc);
 	}
+	ParseNodes(nodeList, modelAsset);
 }
 
 UINT DxGltfLoader::NumScenes()

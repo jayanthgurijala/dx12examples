@@ -10,6 +10,8 @@
 #include "DxPrintUtils.h"
 #include <queue>
 #include "Dx12SampleBase.h"
+#include <stack>
+#include "DxTransformHelper.h"
 
 
 struct DxGltfStatus
@@ -61,6 +63,12 @@ public:
 	}
 
 private:
+
+	struct GltfNodeTransformInfo
+	{
+		tinygltf::Node* nodeInfo;
+		XMMATRIX nodeTransformWorldMatrix;
+	};
 
 
 	///@note deprecate, this is too complex, need to simplify and directly Get the Node with plain index.
@@ -187,11 +195,25 @@ private:
 		}
 	}
 
+	inline void PushNodeTransformInfo(std::stack<GltfNodeTransformInfo*>& nodeInfoStack, tinygltf::Node* gltfNode)
+	{
+		DxTransformInfo nodeTransformInfo;
+		GetNodeTransformInfo(nodeTransformInfo, gltfNode);
+
+		///@todo memory leak - fix
+		GltfNodeTransformInfo* newNodeInfo = new GltfNodeTransformInfo();
+		newNodeInfo->nodeInfo = gltfNode;
+
+		///@todo XMMATRIX is copied by value - optimize
+		newNodeInfo->nodeTransformWorldMatrix = DxTransformHelper::GetWorldMatrix(nodeTransformInfo);
+		nodeInfoStack.push(newNodeInfo);
+	}
+
 	BOOL LoadGltfTextureInfo(DxTextureSamplerInfo& dxTextureInfo, int textureIndex, int texcoord);
 
 
-	VOID ParseNodes(std::queue<tinygltf::Node*>& nodeList, DxModelAsset& modelAsset);
-	VOID ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, DxTransformInfo& nodeTransformInfo);
+	VOID ParseNodes(std::stack<GltfNodeTransformInfo*>& nodeList, DxModelAsset& modelAsset);
+	VOID ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, const XMMATRIX& worldMatrix);
 	VOID ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxPrimitiveInfo& outDxPrimInfo);
 	VOID ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName);
 	VOID ParsePrimitiveIndexBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimIndexData& outDxIbInfo);

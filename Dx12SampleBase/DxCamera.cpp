@@ -36,9 +36,9 @@ VOID DxCamera::UpdateCameraViewMatrix(XMVECTOR cameraPosition, XMVECTOR lookAt, 
 		up);
 }
 
-VOID DxCamera::AddTransformInfo(const DxTransformInfo& transformInfo, const DxTransformInfo* const sceneElementTRS)
+VOID DxCamera::AddTransformInfo(const XMMATRIX& transformInfo, const DxTransformInfo* const sceneElementTRS)
 {
-	XMMATRIX worldMatrix = CreateModelMatrix(transformInfo);
+	XMMATRIX worldMatrix = transformInfo;
 
 	if (sceneElementTRS != nullptr)
 	{
@@ -51,7 +51,7 @@ VOID DxCamera::AddTransformInfo(const DxTransformInfo& transformInfo, const DxTr
 	///@note no need to transpose here as we should be using Transpose of inverse.
 	///      DirectX to Hlsl needs a transpose, so transpose(transpose) cancel.
 	XMMATRIX normalMatrix = XMMatrixInverse(nullptr, worldMatrix);
-    m_transformInfoList.push_back({transformInfo, worldMatrix, normalMatrix});
+    m_transformInfoList.push_back({worldMatrix, normalMatrix});
 }
 
 VOID DxCamera::AddMinMaxExtents(DxExtents extents)

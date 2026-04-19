@@ -240,5 +240,13 @@ namespace DxTransformHelper
     {
         return GetWorldMatrixDataTransposed(GetCombinedWorldMatrix(worldTransform, transformToApply));
     }
+
+
+    inline XMFLOAT4X4 GetCombinedWorldMatrixData(const DxTransformInfo& worldTransform, const XMMATRIX& transformToApply)
+    {
+        return GetWorldMatrixDataTransposed(GetWorldMatrix(worldTransform) * transformToApply);
+    }
+
+
 };
 

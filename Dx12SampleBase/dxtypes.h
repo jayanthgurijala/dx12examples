@@ -204,7 +204,8 @@ struct DxPrimitiveInfo
 	DxMaterialCB                  materialCbData;
 	DxMaterialResourceInfo        materialTextures;
 	DxExtents                     primitiveExtents;
-	DxTransformInfo	              transformInfo;
+	//DxTransformInfo	              transformInfo;
+	XMMATRIX                      worldMatrix;
 	BOOL                          doubleSided;
 
 	///@note this is required to index into descriptor heap

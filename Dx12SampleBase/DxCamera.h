@@ -17,7 +17,6 @@ using namespace DirectX;
 
 struct DxModelMatrix
 {
-	DxTransformInfo transformInfo;
 	XMMATRIX modelMatrix;
 	XMMATRIX normalMatrix;
 };
@@ -25,7 +24,7 @@ struct DxModelMatrix
 class DxCamera
 {
 public:
-	VOID AddTransformInfo(const DxTransformInfo& transformInfo, const DxTransformInfo* const sceneElementTRS);
+	VOID AddTransformInfo(const XMMATRIX& transformInfo, const DxTransformInfo* const sceneElementTRS);
 	VOID AddMinMaxExtents(DxExtents extents);
 	XMFLOAT4X4 GetViewProjectionMatrixTranspose();
 	XMFLOAT4X4 GetWorldMatrixTranspose(UINT index);

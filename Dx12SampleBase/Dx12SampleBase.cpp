@@ -1595,7 +1595,7 @@ VOID Dx12SampleBase::LoadScene()
 			{
 				auto& curPrim = GetPrimitiveInfo(modelAssetIdx, primIdx);
 				///@note transform into is added as instance1 (node1, node2), instance2(node1, node2), GPUVA is stored in same order
-				m_camera->AddTransformInfo(curPrim.transformInfo, &m_sceneDescription[idx].trsMatrix[instance]);
+				m_camera->AddTransformInfo(curPrim.worldMatrix, &m_sceneDescription[idx].trsMatrix[instance]);
 				if (currentSceneElementDesc.addToExtents == TRUE)
 				{
 					m_camera->AddMinMaxExtents(curPrim.primitiveExtents);
