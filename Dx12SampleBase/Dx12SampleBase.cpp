@@ -1294,32 +1294,30 @@ VOID Dx12SampleBase::InitializeImgui()
 
 VOID Dx12SampleBase::RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx)
 {
-	const UINT numVertexBufferViews = NumVertexAttributesInPrimitive(assetIdx, primIdx);
-
-	///need some generalization to support chinese dragon etc
-	//assert(numVertexBufferViews == 3);
 
 	const auto& curPrimInfo = GetPrimitiveInfo(assetIdx, primIdx);
 
-	//@note Position and Normal are always there, at 0 and 1 index, chinesedragon as no texture so no UVs
-	const auto& positionVbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribPosition)->modelVbv;
-	const auto& normalVbv   = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribNormal)->modelVbv;
+	auto SetVertexBufferView = [this, pCmdList, curPrimInfo](GltfVertexAttribIndex attribIndex, UINT slot)
+		{
+			auto* primVertexAttribInfo = GetVertexBufferInfo(curPrimInfo, attribIndex);
 
-	pCmdList->IASetVertexBuffers(0, 1, &positionVbv);
-	pCmdList->IASetVertexBuffers(1, 1, &normalVbv);
+			if (primVertexAttribInfo != nullptr)
+			{
+				const auto& vbv = primVertexAttribInfo->modelVbv;
+				pCmdList->IASetVertexBuffers(slot, 1, &vbv);
+			}
+			else
+			{
+				//Set dummy buffer for UVs, shader should not read from it as it should check material textures count before reading UVs
+				D3D12_VERTEX_BUFFER_VIEW dummyVbv = {};
+				pCmdList->IASetVertexBuffers(slot, 1, &dummyVbv);
+			}
+		};
 
-	auto* uvVbData = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0);
-	if (uvVbData != nullptr)
-	{
-		const auto& uv0Vbv = GetVertexBufferInfo(curPrimInfo, GltfVertexAttribTexcoord0)->modelVbv;
-		pCmdList->IASetVertexBuffers(2, 1, &uv0Vbv);
-	}
-	else
-	{
-		//Set dummy buffer for UVs, shader should not read from it as it should check material textures count before reading UVs
-        D3D12_VERTEX_BUFFER_VIEW dummyVbv = {};
-        pCmdList->IASetVertexBuffers(2, 1, &dummyVbv);
-	}
+	SetVertexBufferView(GltfVertexAttribPosition, 0);
+	SetVertexBufferView(GltfVertexAttribNormal, 1);
+	SetVertexBufferView(GltfVertexAttribTexcoord0, 2);
+	SetVertexBufferView(GltfVertexAttributeTangent, 3);
 
 	auto& primitiveDrawInfo = GetModelAssetDrawInfo(assetIdx, primIdx);
 

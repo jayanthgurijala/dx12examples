@@ -31,7 +31,7 @@ struct VSInput_4
     float3 position         : POSITION;
     float3 normal           : NORMAL;
     float2 texcoord0        : TEXCOORD0;
-    float3 tangent          : TANGENT;
+    float4 tangent          : TANGENT;
 };
 
 
@@ -42,6 +42,7 @@ struct VSOutput_5
     float3 normal           : NORMAL;
     float2 texcoord0        : TEXCOORD0;
     float3 tangent          : TANGENT;
+    float3 bitangent        : BITANGENT;
     uint   flags            : FLAGS;
 };
 
@@ -118,9 +119,16 @@ VSOutput_5 VSMain_4(VSInput_4 input)
     
     CheckComputePositionOutput(input.position, output.worldPosition, output.position);
  
-    output.normal = normalize(mul(input.normal, (float3x3) g_normalMatrix));
+    
     output.texcoord0 = input.texcoord0;
-    output.tangent   = input.tangent;
+    
+    float3 N = normalize(mul(input.normal, (float3x3) g_normalMatrix));
+    float3 T = normalize(mul(input.tangent.xyz, (float3x3) g_normalMatrix));
+    float3 B = cross(T, N) * input.tangent.w;
+
+    output.normal    = N;
+    output.tangent   = T;
+    output.bitangent = B;
     
     output.flags = HasNormal | HasTexCoord | HasTangent;
     
@@ -344,9 +352,36 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
         baseColor *= pbrBaseColorTexture.Sample(gSampler, uv);
     }
     
+    
+    
     if ((input.flags & HasNormal) != 0)
     {
         float3 N    = normalize(input.normal);
+        
+        if ((input.flags & HasTangent) != 0)
+        {
+            if ((materialProperties.materialFlags & HasNormalTexture)  != 0)
+            {
+                float3 normalTex = normalTexture.Sample(gSampler, input.texcoord0).xyz;
+                
+                //convert from [0,1] to [0,2] to [-1, -1]
+                normalTex = (normalTex * 2.0) - 1.0;
+                
+                // Build TBN matrix
+                float3x3 TBN = float3x3(
+                               normalize(input.tangent),
+                               normalize(input.bitangent),
+                               normalize(input.normal));
+                
+                // Transform to world space
+                float3 normalWS = normalize(mul(normalTex, TBN));
+                N = normalWS;
+
+            }
+
+        }
+        
+        
         float3 V    = normalize(sceneConstants.g_cameraPosition.xyz - input.worldPosition.xyz);
         float3 L    = normalize(-lightDir.xyz);
         float3 H    = normalize(V + L);

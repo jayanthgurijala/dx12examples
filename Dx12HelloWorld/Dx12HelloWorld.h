@@ -19,10 +19,11 @@ protected:
 	virtual inline UINT NumRTVsNeededForApp() override { return 1; }
 	virtual inline UINT NumSRVsPerPrimNeededForApp() override { return 0; }
 	virtual inline UINT NumDSVsNeededForApp() override { return 1; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return { "deer.gltf" }; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "Avocado.gltf" }; }
 	virtual inline ID3D12RootSignature* GetRootSignature() override { return m_pRootSignature.Get(); }
 	virtual VOID OnInit() override;
 	virtual inline VOID RenderFrame() override { RenderFrameGfxDraw(); }
+	virtual inline BOOL EnablePBRShading() override { return TRUE; }
 
 private:
 	ComPtr<ID3D12RootSignature> m_pRootSignature;

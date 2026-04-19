@@ -108,9 +108,10 @@ struct DxDrawPrimitive
 ///@todo remove this and use a map
 enum GltfVertexAttribIndex
 {
-	GltfVertexAttribPosition  = 0,
-	GltfVertexAttribNormal    = 1,
-	GltfVertexAttribTexcoord0 = 2,
+	GltfVertexAttribPosition   = 0,
+	GltfVertexAttribNormal     = 1,
+	GltfVertexAttribTexcoord0  = 2,
+	GltfVertexAttributeTangent = 3,
 	GltfVertexAttribMax       = UINT_MAX
 };
 
