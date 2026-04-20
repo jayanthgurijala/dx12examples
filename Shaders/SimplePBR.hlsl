@@ -69,7 +69,7 @@ void CheckComputePositionOutput(float3 inPosition, out float4 worldPosition, out
 
 VSOutput_5 VSMain_1( VSInput_1 input )
 {
-    VSOutput_5 output;
+    VSOutput_5 output = (VSOutput_5) 0;
    
     CheckComputePositionOutput(input.position, output.worldPosition, output.position);
 
@@ -85,7 +85,7 @@ VSOutput_5 VSMain_1( VSInput_1 input )
 
 VSOutput_5 VSMain_2(VSInput_2 input)
 {
-    VSOutput_5 output;
+    VSOutput_5 output = (VSOutput_5) 0;
  
     CheckComputePositionOutput(input.position, output.worldPosition, output.position);
     
@@ -100,7 +100,7 @@ VSOutput_5 VSMain_2(VSInput_2 input)
 
 VSOutput_5 VSMain_3(VSInput_3 input)
 {
-    VSOutput_5 output;
+    VSOutput_5 output = (VSOutput_5) 0;
 
     CheckComputePositionOutput(input.position, output.worldPosition, output.position);
  
@@ -115,7 +115,7 @@ VSOutput_5 VSMain_3(VSInput_3 input)
 
 VSOutput_5 VSMain_4(VSInput_4 input)
 {
-    VSOutput_5 output;
+    VSOutput_5 output = (VSOutput_5) 0;
     
     CheckComputePositionOutput(input.position, output.worldPosition, output.position);
  
@@ -162,7 +162,7 @@ VSOutput_5 HSMain(
     uint i : SV_OutputControlPointID,
     uint patchId : SV_PrimitiveID)
 {
-    VSOutput_5 output;
+    VSOutput_5 output = (VSOutput_5) 0;
 
     // Pass through control point position
     output.position      = patch[i].position;

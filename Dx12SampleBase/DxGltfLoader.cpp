@@ -36,8 +36,7 @@ VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAcce
 	const int bufferViewIdx = inGltfAccessorDesc.bufferView;
 	const tinygltf::BufferView bufViewDesc = GetBufferView(bufferViewIdx);
 
-	///@todo need to support interleaved data
-	assert(bufViewDesc.byteStride == 0);
+	
 
 	const DXGI_FORMAT vbFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
 
@@ -45,14 +44,20 @@ VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAcce
 	const size_t buflength = bufViewDesc.byteLength;
 	const size_t bufOffset = bufViewDesc.byteOffset;
 
-	const size_t accessorByteOffset = inGltfAccessorDesc.byteOffset;
-	const size_t dataOffsetInBuffer = accessorByteOffset + bufOffset;
-	const UINT  bufferStrideInBytes = componentSizeInBytes * numComponents;
+	const size_t accessorByteOffset     = inGltfAccessorDesc.byteOffset;
+	const size_t dataOffsetInBuffer     = accessorByteOffset + bufOffset;
+	const UINT  bufferStrideInBytes     = componentSizeInBytes * numComponents;
+	const UINT  bufferViewStrideInBytes = bufViewDesc.byteStride;
+	const UINT  finalStrideInBytes      = ((bufferStrideInBytes == 0) ? bufferViewStrideInBytes : bufferStrideInBytes);
 
 	BYTE* const bufferData = m_model.buffers[bufferIdx].data.data() + dataOffsetInBuffer;
 	auto& currentSemantic  = outDxVbInfo.iaSemantic;
+	bufViewDesc.target;
 
-	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, buflength, bufferStrideInBytes, attributeName.c_str());
+	///@todo need to support interleaved data
+	//assert(bufViewDesc.byteStride == 0);
+
+	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, buflength, finalStrideInBytes, attributeName.c_str());
 
 	currentSemantic.format = vbFormat;
 	FillIaLayoutInfo(currentSemantic, attributeName);
@@ -64,7 +69,7 @@ VOID DxGltfLoader::ParsePrimitiveIndexBufferInfo(const tinygltf::Accessor& inGlt
 	const tinygltf::BufferView& bufViewDesc = GetBufferView(bufferViewIdx);
 
 	const size_t accessorByteOffset = inGltfAccessorDesc.byteOffset;
-	assert(accessorByteOffset == 0);
+	//assert(accessorByteOffset == 0);
 
 	const size_t bufferViewOffset     = bufViewDesc.byteOffset;
 	const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
