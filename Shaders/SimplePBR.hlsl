@@ -329,8 +329,10 @@ float GeometrySmith(float3 N, float3 V, float3 L, float roughness)
 float4 PSMain(VSOutput_5 input) : SV_TARGET
 {
     float3 lightDir   = float3(1, -1, 1);
-    float4 lightColor = float4(1, 0.8, 0.6, 1.0f); // warm sunlight
-    float lightIntensity = 2.0; //
+    
+    //@todo hack
+    float4 lightColor = float4(1, 1, 1, 1.0f); // warm sunlight
+    float lightIntensity = 5.0; //
     
     float4 baseColor       = materialProperties.baseColorFactor;
     float  roughnessFactor = materialProperties.roughnessFactor;
@@ -385,7 +387,10 @@ float4 PSMain(VSOutput_5 input) : SV_TARGET
         float3 V    = normalize(sceneConstants.g_cameraPosition.xyz - input.worldPosition.xyz);
         float3 L    = normalize(-lightDir.xyz);
         float3 H    = normalize(V + L);
-        float NdotL = saturate(dot(N, L));
+        
+        //@todo hack
+        float NdotL = clamp(saturate(dot(N, L)), 0.2f, 1.0f);
+        
         float NdotV = saturate(dot(N, V));
         float3 F0   = lerp(float3(0.04f, 0.04f, 0.04f), baseColor.rgb, metallicFactor);
         
