@@ -224,11 +224,11 @@ VOID DxGltfLoader::ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset&
 
 }
 
-VOID DxGltfLoader::ParseNodes(std::stack<GltfNodeTransformInfo*>& nodeList, DxModelAsset& modelAsset)
+VOID DxGltfLoader::ParseNodes(std::stack<std::unique_ptr<GltfNodeTransformInfo>>& nodeList, DxModelAsset& modelAsset)
 {
 	while (nodeList.empty() == FALSE)
 	{
-		auto* nodeDesc = nodeList.top();
+		auto nodeDesc = std::move(nodeList.top());
 		nodeList.pop();
 
 		DxTransformInfo nodeTransformInfo;
@@ -275,7 +275,7 @@ VOID DxGltfLoader::LoadGltfModelAsset(DxModelAsset& modelAsset)
 	auto& currentScene = m_model.scenes[0];
 	const UINT numNodesInScene = currentScene.nodes.size();
 
-	std::stack<GltfNodeTransformInfo*> nodeList;
+	std::stack<std::unique_ptr<GltfNodeTransformInfo>> nodeList;
 
 	for (UINT i = 0; i < numNodesInScene; i++)
 	{

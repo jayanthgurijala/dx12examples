@@ -195,24 +195,24 @@ private:
 		}
 	}
 
-	inline void PushNodeTransformInfo(std::stack<GltfNodeTransformInfo*>& nodeInfoStack, tinygltf::Node* gltfNode)
+	inline void PushNodeTransformInfo(std::stack<std::unique_ptr<GltfNodeTransformInfo>>& nodeInfoStack, tinygltf::Node* gltfNode)
 	{
 		DxTransformInfo nodeTransformInfo;
 		GetNodeTransformInfo(nodeTransformInfo, gltfNode);
 
 		///@todo memory leak - fix
-		GltfNodeTransformInfo* newNodeInfo = new GltfNodeTransformInfo();
+		auto newNodeInfo = std::make_unique<GltfNodeTransformInfo>();
 		newNodeInfo->nodeInfo = gltfNode;
 
 		///@todo XMMATRIX is copied by value - optimize
 		newNodeInfo->nodeTransformWorldMatrix = DxTransformHelper::GetWorldMatrix(nodeTransformInfo);
-		nodeInfoStack.push(newNodeInfo);
+		nodeInfoStack.push(std::move(newNodeInfo));
 	}
 
 	BOOL LoadGltfTextureInfo(DxTextureSamplerInfo& dxTextureInfo, int textureIndex, int texcoord);
 
 
-	VOID ParseNodes(std::stack<GltfNodeTransformInfo*>& nodeList, DxModelAsset& modelAsset);
+	VOID ParseNodes(std::stack<std::unique_ptr<GltfNodeTransformInfo>>& nodeList, DxModelAsset& modelAsset);
 	VOID ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, const XMMATRIX& worldMatrix);
 	VOID ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxPrimitiveInfo& outDxPrimInfo);
 	VOID ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName);
