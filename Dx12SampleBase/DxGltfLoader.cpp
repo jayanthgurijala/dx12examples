@@ -32,6 +32,8 @@ VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAcce
 	const UINT componentVecType     = inGltfAccessorDesc.type;
 	const UINT componentSizeInBytes = GetComponentTypeSizeInBytes(componentDataType);
 	const UINT numComponents        = GetNumComponentsInType(componentVecType);
+	const UINT accessorDescStride   = componentSizeInBytes * numComponents;
+	const size_t dataLengthInBytes = inGltfAccessorDesc.count * accessorDescStride; //bufViewDesc.byteLength;
 
 	const int bufferViewIdx = inGltfAccessorDesc.bufferView;
 	const tinygltf::BufferView bufViewDesc = GetBufferView(bufferViewIdx);
@@ -41,23 +43,19 @@ VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAcce
 	const DXGI_FORMAT vbFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
 
 	const int    bufferIdx = bufViewDesc.buffer;
-	const size_t buflength = bufViewDesc.byteLength;
 	const size_t bufOffset = bufViewDesc.byteOffset;
 
 	const size_t accessorByteOffset     = inGltfAccessorDesc.byteOffset;
 	const size_t dataOffsetInBuffer     = accessorByteOffset + bufOffset;
-	const UINT  bufferStrideInBytes     = componentSizeInBytes * numComponents;
-	const UINT  bufferViewStrideInBytes = bufViewDesc.byteStride;
-	const UINT  finalStrideInBytes      = ((bufferStrideInBytes == 0) ? bufferViewStrideInBytes : bufferStrideInBytes);
 
 	BYTE* const bufferData = m_model.buffers[bufferIdx].data.data() + dataOffsetInBuffer;
 	auto& currentSemantic  = outDxVbInfo.iaSemantic;
 	bufViewDesc.target;
 
 	///@todo need to support interleaved data
-	//assert(bufViewDesc.byteStride == 0);
+	assert(accessorDescStride == bufViewDesc.byteStride);
 
-	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, buflength, finalStrideInBytes, attributeName.c_str());
+	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, dataLengthInBytes, accessorDescStride, attributeName.c_str());
 
 	currentSemantic.format = vbFormat;
 	FillIaLayoutInfo(currentSemantic, attributeName);
