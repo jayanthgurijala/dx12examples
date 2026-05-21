@@ -53,7 +53,7 @@ VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAcce
 	bufViewDesc.target;
 
 	///@todo need to support interleaved data
-	assert(accessorDescStride == bufViewDesc.byteStride);
+	assert(bufViewDesc.byteStride == 0 || accessorDescStride == bufViewDesc.byteStride);
 
 	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, dataLengthInBytes, accessorDescStride, attributeName.c_str());
 
