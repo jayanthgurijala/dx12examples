@@ -315,26 +315,41 @@ VOID DxCamera::OnMouseMove(UINT x, UINT y)
 
 VOID DxCamera::MoveForward()
 {
-	float speed = 5.5f;
-	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
-	FLOAT moveDistance = speed * frameDeltaTime;
-	FLOAT camZ = XMVectorGetZ(m_cameraPosition);
-	camZ += moveDistance;
-	m_cameraPosition = XMVectorSetZ(m_cameraPosition, camZ);
-	UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
-
+	TranslateCamera(XMVectorSet(0,0,1,1));
 }
 
 VOID DxCamera::MoveBack()
 {
-	float speed = -3.5f;
-	FLOAT frameDeltaTime = Dx12SampleBase::s_frameDeltaTime;
-	FLOAT moveDistance = speed * frameDeltaTime;
-	FLOAT camZ = XMVectorGetZ(m_cameraPosition);
-	camZ += moveDistance;
-	m_cameraPosition = XMVectorSetZ(m_cameraPosition, camZ);
-	UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
+	TranslateCamera(XMVectorSet(0, 0, -1, 1));
 
+}
+
+VOID DxCamera::MoveRight()
+{
+	TranslateCamera(XMVectorSet(1, 0, 0, 1));
+}
+
+VOID DxCamera::MoveLeft()
+{
+	TranslateCamera(XMVectorSet(-1, 0, 0, 1));
+}
+
+VOID DxCamera::MoveUp()
+{
+	TranslateCamera(XMVectorSet(0, -1, 0, 1));
+}
+
+VOID DxCamera::MoveDown()
+{
+	TranslateCamera(XMVectorSet(0, 1, 0, 1));
+}
+
+VOID DxCamera::TranslateCamera(const XMVECTOR& translateMask)
+{
+	XMVECTOR moveVector = translateMask * XMVectorSet(5.0f, 5.0f, 5.0f, 1.0f) * Dx12SampleBase::s_frameDeltaTime;
+	m_cameraPosition += moveVector;
+	m_lookAt += moveVector;
+	UpdateCameraViewMatrix(m_cameraPosition, m_lookAt, m_up);
 }
 
 

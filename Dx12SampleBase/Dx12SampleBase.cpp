@@ -117,9 +117,25 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 		{
 			s_sampleBase->m_camera->MoveForward();
         }
-		if (wParam == 'S')
+		else if (wParam == 'S')
 		{
 			s_sampleBase->m_camera->MoveBack();
+		}
+		else if (wParam == 'A')
+		{
+			s_sampleBase->m_camera->MoveLeft();
+		}
+		else if (wParam == 'D')
+		{
+			s_sampleBase->m_camera->MoveRight();
+		}
+		else if (wParam == VK_UP)
+		{
+			s_sampleBase->m_camera->MoveUp();
+		}
+		else if (wParam == VK_DOWN)
+		{
+			s_sampleBase->m_camera->MoveDown();
 		}
 		break;
 

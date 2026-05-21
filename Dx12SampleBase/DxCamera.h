@@ -55,6 +55,11 @@ public:
 	VOID OnMouseMove(UINT x, UINT y);
 	VOID MoveForward();
 	VOID MoveBack();
+	VOID MoveLeft();
+	VOID MoveRight();
+	VOID MoveUp();
+	VOID MoveDown();
+	VOID TranslateCamera(const XMVECTOR& translateMask);
 
 	//inline XMVECTOR GetCameraPosition()
 	//{
