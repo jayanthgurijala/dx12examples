@@ -26,67 +26,57 @@ HRESULT DxGltfLoader::LoadModel(std::string modelPath)
 	return (ret == TRUE) ? S_OK : E_FAIL;
 }
 
-VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName)
+
+///Accessor has info like count, numComponent, componentType which give meaning to raw bufferview data.
+///So from accessor we get sizeInBytes, strideInBytes for that particular attribute like IB or VB Position
+/// Accessors also include a byte offset into the bufferView
+/// 
+/// BufferView's stride if non-zero, indicates interleaved data.
+/// 
+VOID DxGltfLoader::GetGltfBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, GltfBufferInfo& gltfBufferInfo)
 {
+	const int   bufferViewIdx = inGltfAccessorDesc.bufferView;
+	const auto& bufView       = GetBufferView(bufferViewIdx);
+	const int   bufferIdx     = bufView.buffer;
+	const auto& buffer        = GetBuffer(bufferIdx);
+
+	size_t byteOffsetIntoData = bufView.byteOffset + inGltfAccessorDesc.byteOffset;
+	gltfBufferInfo.bufferData = buffer.data.data() + byteOffsetIntoData;
+
 	const UINT componentDataType    = inGltfAccessorDesc.componentType;
 	const UINT componentVecType     = inGltfAccessorDesc.type;
 	const UINT componentSizeInBytes = GetComponentTypeSizeInBytes(componentDataType);
 	const UINT numComponents        = GetNumComponentsInType(componentVecType);
-	const UINT accessorDescStride   = componentSizeInBytes * numComponents;
-	const size_t dataLengthInBytes = inGltfAccessorDesc.count * accessorDescStride; //bufViewDesc.byteLength;
+	const UINT strideInBytes        = componentSizeInBytes * numComponents;
 
-	const int bufferViewIdx = inGltfAccessorDesc.bufferView;
-	const tinygltf::BufferView bufViewDesc = GetBufferView(bufferViewIdx);
+	///@todo Need to support interleaved data
+	assert(bufView.byteStride == 0 || bufView.byteStride == strideInBytes);
+	gltfBufferInfo.bufferStride      = strideInBytes;
+	gltfBufferInfo.bufferSizeInBytes = strideInBytes * inGltfAccessorDesc.count;
 
-	
+	const DXGI_FORMAT dataFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
+	gltfBufferInfo.format = dataFormat;
+}
 
-	const DXGI_FORMAT vbFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
 
-	const int    bufferIdx = bufViewDesc.buffer;
-	const size_t bufOffset = bufViewDesc.byteOffset;
 
-	const size_t accessorByteOffset     = inGltfAccessorDesc.byteOffset;
-	const size_t dataOffsetInBuffer     = accessorByteOffset + bufOffset;
+VOID DxGltfLoader::ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName)
+{
+	GltfBufferInfo gltfBufferInfo;
+	GetGltfBufferInfo(inGltfAccessorDesc, gltfBufferInfo);
 
-	BYTE* const bufferData = m_model.buffers[bufferIdx].data.data() + dataOffsetInBuffer;
+	CreateVertexBufferResourceAndView(outDxVbInfo, gltfBufferInfo, attributeName.c_str());
 	auto& currentSemantic  = outDxVbInfo.iaSemantic;
-	bufViewDesc.target;
-
-	///@todo need to support interleaved data
-	assert(bufViewDesc.byteStride == 0 || accessorDescStride == bufViewDesc.byteStride);
-
-	CreateVertexBufferResourceAndView(outDxVbInfo, bufferData, dataLengthInBytes, accessorDescStride, attributeName.c_str());
-
-	currentSemantic.format = vbFormat;
+	currentSemantic.format = gltfBufferInfo.format;
 	FillIaLayoutInfo(currentSemantic, attributeName);
 }
 
 VOID DxGltfLoader::ParsePrimitiveIndexBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimIndexData& outDxIbInfo)
 {
-	const int bufferViewIdx                 = inGltfAccessorDesc.bufferView;
-	const tinygltf::BufferView& bufViewDesc = GetBufferView(bufferViewIdx);
+	GltfBufferInfo gltfBufferInfo;
+	GetGltfBufferInfo(inGltfAccessorDesc, gltfBufferInfo);
 
-	const size_t accessorByteOffset = inGltfAccessorDesc.byteOffset;
-	//assert(accessorByteOffset == 0);
-
-	const size_t bufferViewOffset     = bufViewDesc.byteOffset;
-	const size_t bufferSizeInBytes    = bufViewDesc.byteLength;
-	const size_t byteOffsetIntoBuffer = accessorByteOffset + bufferViewOffset;
-
-	BYTE* const bufferData        = m_model.buffers[bufViewDesc.buffer].data.data() + byteOffsetIntoBuffer;
-	DXGI_FORMAT indexBufferformat = GltfGetDxgiFormat(inGltfAccessorDesc.componentType, inGltfAccessorDesc.type);
-
-	///e.g. accessorDesc.componentType = TINYGLTF_PARAMETER_TYPE_FLOAT (5126)
-	///e.g. accessorDesc.type          = "type" : "VEC3"
-	UINT componentSizeInBytes = GetComponentTypeSizeInBytes(inGltfAccessorDesc.componentType);
-	UINT numComponentsInType  = GetNumComponentsInType(inGltfAccessorDesc.type);
-	const UINT bufferStrideInBytes = componentSizeInBytes * numComponentsInType;
-
-	///@note just to make sure it is not invalid
-	assert(componentSizeInBytes < 10);
-	assert(numComponentsInType < 10);
-
-	CreateIndexBufferResourceAndView(outDxIbInfo, bufferData, bufferSizeInBytes, bufferStrideInBytes, indexBufferformat, "indices");
+	CreateIndexBufferResourceAndView(outDxIbInfo, gltfBufferInfo, "indices");
 }
 
 VOID DxGltfLoader::ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxPrimitiveInfo& outDxPrimInfo)
@@ -301,20 +291,24 @@ BOOL DxGltfLoader::GetNodeTransformInfo(DxTransformInfo& transformInfo, tinygltf
 
 	///@todo returning identity if no transform, need to optimize
 	///      Challenge: see ParseNodes
-	BOOL hasTransform = TRUE;//(hasScale || hasTranslation || hasRotation || hasMatrix);
+	/// if there is no matrix, hasTransform will take care of all other cases by using identity operations
 
+	transformInfo.hasMatrix = hasMatrix;
 	
-	if (hasTransform)
+	if (hasMatrix == false)
 	{
-		//need to test this path
-		assert(hasMatrix == false);
-		transformInfo.hasMatrix = hasMatrix;
+
 		DxTransformHelper::SetTranslation(transformInfo, nodeDesc->translation, hasTranslation);
 		DxTransformHelper::SetScale(transformInfo, nodeDesc->scale, hasScale);
 		DxTransformHelper::SetQuaternionRotation(transformInfo, nodeDesc->rotation, hasRotation);
 	}
+	else
+	{
+		assert(nodeDesc->matrix.size() == 16);
+		DxTransformHelper::SetMatrix(transformInfo, nodeDesc->matrix);
+	}
 
-	return hasTransform;
+	return TRUE;
 }
 
 VOID DxGltfLoader::ParseSamplerDescription(const int samplerIdx, D3D12_SAMPLER_DESC& outdxSamplerDesc)

@@ -7,6 +7,16 @@ using namespace DirectX;
 
 namespace DxTransformHelper
 {
+    inline void SetMatrix(DxTransformInfo& transformInfo, std::vector<double>& gltfMatrix)
+    {
+        assert(gltfMatrix.size() == 16);
+        for (UINT i = 0; i < 16; i++)
+        {
+            transformInfo.matrix[i] = gltfMatrix[i];
+        }
+        
+    }
+
     inline void QuaternionIdentityRotation(DxTransformInfo& transformInfo)
     {
         transformInfo.trsInfo.rotationMode = DxRotationModeQuaternion;
@@ -204,11 +214,26 @@ namespace DxTransformHelper
 
     inline XMMATRIX GetWorldMatrix(const DxTransformInfo& transformInfo)
     {
-        auto T = GetXMTranslation(transformInfo);
-        auto S = GetXMScale(transformInfo);
-        auto R = GetXMRotation(transformInfo);
+        XMMATRIX worldMatrix;
 
-        XMMATRIX worldMatrix = S * R * T;
+        if (transformInfo.hasMatrix == false)
+        {
+            auto T = GetXMTranslation(transformInfo);
+            auto S = GetXMScale(transformInfo);
+            auto R = GetXMRotation(transformInfo);
+
+            worldMatrix = S * R * T;
+        }
+        else
+        {
+            // glTF stores matrices column-major
+            worldMatrix = XMMatrixTranspose(XMMATRIX(
+                transformInfo.matrix[0],  transformInfo.matrix[1],  transformInfo.matrix[2],  transformInfo.matrix[3],
+                transformInfo.matrix[4],  transformInfo.matrix[5],  transformInfo.matrix[6],  transformInfo.matrix[7],
+                transformInfo.matrix[8],  transformInfo.matrix[9],  transformInfo.matrix[10], transformInfo.matrix[11],
+                transformInfo.matrix[12], transformInfo.matrix[13], transformInfo.matrix[14], transformInfo.matrix[15]
+            ));
+        }
 
         return worldMatrix;
 

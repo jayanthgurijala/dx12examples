@@ -25,6 +25,14 @@ struct GltfParsingInfo
 	UINT primIndexInModelAsset;
 };
 
+struct GltfBufferInfo
+{
+	size_t      bufferSizeInBytes;
+	const void* bufferData;
+	size_t      bufferStride;
+	DXGI_FORMAT format;
+};
+
 class DxGltfLoader
 {
 public:
@@ -124,6 +132,11 @@ private:
 		return m_model.bufferViews[index];
 	}
 
+	inline tinygltf::Buffer& GetBuffer(UINT index)
+	{
+		return m_model.buffers[index];
+	}
+
 	inline tinygltf::Material& GetMaterial(UINT index)
 	{
 		return m_model.materials[index];
@@ -156,21 +169,21 @@ private:
 		outDxExtents.max[2] = (FLOAT)accessorDesc.maxValues[2];
 	}
 
-	inline VOID CreateVertexBufferResourceAndView(DxPrimVertexData& outDxPrim, BYTE* const data, SIZE_T bufferSizeInBytes, UINT strideInBytes, const char* name)
+	inline VOID CreateVertexBufferResourceAndView(DxPrimVertexData& outDxPrim, const GltfBufferInfo& gltfBufferInfo, const char* name)
 	{
-		outDxPrim.modelVbBuffer           = m_pSampleBase->CreateBufferWithData(data, bufferSizeInBytes, name);
+		outDxPrim.modelVbBuffer           = m_pSampleBase->CreateBufferWithData(gltfBufferInfo.bufferData, gltfBufferInfo.bufferSizeInBytes, name);
 		outDxPrim.modelVbv.BufferLocation = outDxPrim.modelVbBuffer->GetGPUVirtualAddress();
-		outDxPrim.modelVbv.SizeInBytes    = bufferSizeInBytes;
-		outDxPrim.modelVbv.StrideInBytes  = strideInBytes;
+		outDxPrim.modelVbv.SizeInBytes    = gltfBufferInfo.bufferSizeInBytes;;
+		outDxPrim.modelVbv.StrideInBytes  = gltfBufferInfo.bufferStride;
 	}
 
-	inline VOID CreateIndexBufferResourceAndView(DxPrimIndexData& outDxIbInfo, BYTE* const data, SIZE_T bufferSizeInBytes, UINT strideInBytes, DXGI_FORMAT format, const char* name)
+	inline VOID CreateIndexBufferResourceAndView(DxPrimIndexData& outDxIbInfo, const GltfBufferInfo& gltfBufferInfo, const char* name)
 	{
-		outDxIbInfo.indexBuffer             = m_pSampleBase->CreateBufferWithData(data, bufferSizeInBytes, name);
-		outDxIbInfo.bufferStrideInBytes     = strideInBytes;
+		outDxIbInfo.indexBuffer             = m_pSampleBase->CreateBufferWithData(gltfBufferInfo.bufferData, gltfBufferInfo.bufferSizeInBytes, name);
+		outDxIbInfo.bufferStrideInBytes     = gltfBufferInfo.bufferStride;
 		outDxIbInfo.modelIbv.BufferLocation = outDxIbInfo.indexBuffer->GetGPUVirtualAddress();
-		outDxIbInfo.modelIbv.Format         = format;
-		outDxIbInfo.modelIbv.SizeInBytes    = bufferSizeInBytes;
+		outDxIbInfo.modelIbv.Format         = gltfBufferInfo.format;
+		outDxIbInfo.modelIbv.SizeInBytes    = gltfBufferInfo.bufferSizeInBytes;
 	}
 
 	inline VOID FillIaLayoutInfo(DxIASemantic& iaSemantic, std::string attributeName)
@@ -215,9 +228,13 @@ private:
 	VOID ParseNodes(std::stack<std::unique_ptr<GltfNodeTransformInfo>>& nodeList, DxModelAsset& modelAsset);
 	VOID ParseMeshInfo(const tinygltf::Mesh& inGltfMesh, DxModelAsset& outDxModelAssetInfo, const XMMATRIX& worldMatrix);
 	VOID ParsePrimitiveInfo(const tinygltf::Primitive& inGltfPrim, DxPrimitiveInfo& outDxPrimInfo);
+
+
 	VOID ParsePrimitiveVertexInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimVertexData& outDxVbInfo, const std::string& attributeName);
 	VOID ParsePrimitiveIndexBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, DxPrimIndexData& outDxIbInfo);
 	VOID ParseSamplerDescription(const int samplerIdx, D3D12_SAMPLER_DESC& samplerDesc);
+
+	VOID GetGltfBufferInfo(const tinygltf::Accessor& inGltfAccessorDesc, GltfBufferInfo& gltfBufferInfo);
 
 	std::vector<std::string> m_supportedAttributes;
 

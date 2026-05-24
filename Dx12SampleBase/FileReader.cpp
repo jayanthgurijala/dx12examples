@@ -32,16 +32,31 @@ void FileReader::GetExecutablePath(_Out_writes_(pathSize) CHAR* path, UINT pathS
 
 }
 
-FileReader::FileReader()
+FileReader::FileReader(std::string modelsBasePath)
 {
 	CHAR executableFilePath[MaxPathSize];
 	FileReader::GetExecutablePath(executableFilePath, MaxPathSize);
 	m_exePath = executableFilePath;
+	m_modelsBasePath = (modelsBasePath.length() == 0) ? m_exePath : modelsBasePath;
+	m_modelsRelativePath = "";
 }
 
-std::string FileReader::GetFullModelFilePath(const std::string& assetName)
+std::string FileReader::GetFullModelFilePath(const std::string& assetName, BOOL storeRelativePath)
 {
-	return m_exePath + "Models\\" + assetName;
+	if (storeRelativePath == TRUE)
+	{
+		m_modelsRelativePath = "";
+	}
+
+	std::string fullPath = m_modelsBasePath + m_modelsRelativePath + assetName;
+
+	if (storeRelativePath == TRUE)
+	{
+		size_t pos = assetName.find_last_of("\\/");
+		m_modelsRelativePath = (pos == std::string::npos) ? "" : (assetName.substr(0, pos) + "\\");
+	}
+
+	return fullPath;
 }
 
 std::string FileReader::GetFullCompiledShaderFilePath(const std::string& assetName)

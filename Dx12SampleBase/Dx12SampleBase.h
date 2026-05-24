@@ -66,7 +66,7 @@ public:
         return m_assetReader->GetFullModelFilePath(assetName);
     }
 
-    ComPtr<ID3D12Resource> CreateBufferWithData(void* cpuData,
+    ComPtr<ID3D12Resource> CreateBufferWithData(const void* cpuData,
                                                 UINT sizeInBytes,
                                                 const char* resourceName,
                                                 D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
@@ -92,7 +92,7 @@ protected:
                                                                BOOL doubleSided     = FALSE,
                                                                BOOL useDepthStencil = FALSE,
                                                                BOOL enableBlend     = FALSE);
-    HRESULT UploadCpuDataAndWaitForCompletion(void* cpuData,
+    HRESULT UploadCpuDataAndWaitForCompletion(const void* cpuData,
         UINT                       dataSizeInBytes,
         ID3D12GraphicsCommandList* pcmdList,
         ID3D12CommandQueue* pcmdQueue,

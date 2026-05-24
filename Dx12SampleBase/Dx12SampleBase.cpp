@@ -35,7 +35,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
-	m_assetReader(std::make_unique<FileReader>()),
+	m_assetReader(std::make_unique<FileReader>("")),
 	m_modelAssets({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
@@ -819,7 +819,7 @@ VOID Dx12SampleBase::GenerateMipLevels(ID3D12Resource* tex2D, UINT width, UINT h
 	WaitForFenceCompletion(m_pComputeCmdQueue.Get());
 }
 
-ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(void* cpuData,
+ComPtr<ID3D12Resource> Dx12SampleBase::CreateBufferWithData(const void* cpuData,
 															UINT sizeInBytes,
 														    const char* resourceName,
 													        D3D12_RESOURCE_FLAGS flags,
@@ -895,7 +895,7 @@ ComPtr<ID3D12Resource> Dx12SampleBase::CreateTexture2DWithData(void* cpuData, SI
 	return texture2D;
 }
 
-HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
+HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(const void* cpuData,
 	UINT                       dataSizeInBytes,
 	ID3D12GraphicsCommandList* pCmdList,
 	ID3D12CommandQueue* pCmdQueue,
@@ -966,7 +966,7 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(void* cpuData,
 		for (UINT row = 0; row < numRows; row++)
 		{
 			BYTE* pMappedBytePtr = static_cast<BYTE*>(pMappedPtr);
-			BYTE* pCpuBytePtr = static_cast<BYTE*>(cpuData);
+			const BYTE* pCpuBytePtr = static_cast<const BYTE*>(cpuData);
 			memcpy(pMappedBytePtr + footprint.Offset + row * footprint.Footprint.RowPitch, pCpuBytePtr + row * rowSizeInBytes, rowSizeInBytes);
 		}
 	}
@@ -1543,7 +1543,7 @@ VOID Dx12SampleBase::LoadGltfFiles()
 
 	for (UINT fileIdx = 0; fileIdx < numgltfFiles; fileIdx++)
 	{
-		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx]);
+		std::string modelPath = m_assetReader->GetFullModelFilePath(gltfFileNames[fileIdx], TRUE);
 
 		m_gltfLoader->LoadModel(modelPath);
 

@@ -14,10 +14,10 @@ using namespace Microsoft::WRL;
 class FileReader
 {
 public:
-	FileReader();
+	FileReader(std::string modelsBasePath);
 	static void GetExecutablePath(_Out_writes_(pathSize) CHAR* path, UINT pathSize);
 
-	std::string GetFullModelFilePath(const std::string& assetName);
+	std::string GetFullModelFilePath(const std::string& assetName, BOOL storeRelativePath = FALSE);
 	std::string GetFullCompiledShaderFilePath(const std::string& assetName);
 	ComPtr<ID3DBlob> LoadShaderBlobFromAssets(std::string compiledShaderName);
 
@@ -25,6 +25,8 @@ protected:
 
 private:
 	std::string m_exePath;
+	std::string m_modelsBasePath;
+	std::string m_modelsRelativePath;
 
 };
 
