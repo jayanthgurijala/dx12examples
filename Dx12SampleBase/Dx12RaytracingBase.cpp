@@ -458,7 +458,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 		{
 			BOOL deserializeBlas = FALSE;
 			ComPtr<ID3D12Resource> blasBlobFromDisk = nullptr;
-			UINT deserializeSize = DeSerializeBlas(blasBlobFromDisk);
+			UINT deserializeSize = DeSerializeBlasTlas(blasBlobFromDisk, "serializedblas.bin", "deserializeblas");
 			deserializeBlas = (deserializeSize > 0);
 
 			assetBlasList.modelAssetBlas.emplace_back();
@@ -521,14 +521,17 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 			ExecuteBuildAccelerationStructures();
 
-			SerializeBlas(primBlas.resultBuffer->GetGPUVirtualAddress());
+			SerializeBlasTlas(primBlas.resultBuffer->GetGPUVirtualAddress(), "serializedblas.bin", "BlasSerialization");
 
 			linearBlasCount++;
 		}
 	}
 
-	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
+	ComPtr<ID3D12Resource> tlasBlobFromDisk = nullptr;
+	UINT tlasSizeInBytes = 0;
+	tlasSizeInBytes = DeSerializeBlasTlas(tlasBlobFromDisk, "serializedtlas.bin", "deserializetlas");
 
+	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
 
 	std::vector< D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
 	UINT instanceLinearIndex = 0;
@@ -589,14 +592,26 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	topLevelBuildDesc.Inputs = topLevelInputs;
 	topLevelBuildDesc.DestAccelerationStructureData = m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress();
 	topLevelBuildDesc.ScratchAccelerationStructureData = m_sceneTlas.sceneTlas.scratchBuffer->GetGPUVirtualAddress();
-	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+
+	if (tlasSizeInBytes > 0)
+	{
+		m_dxrCommandList->CopyRaytracingAccelerationStructure(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(),
+			                                                  tlasBlobFromDisk->GetGPUVirtualAddress(),
+															  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
+	}
+	else
+	{
+		m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+	}
 
 	//@note IMPORTANT, depending on CPU wait in this call, else instance descs buffer will get deallocated
 	ExecuteBuildAccelerationStructures();
 
+	//SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), "serializedtlas.bin", "SerializeTlas");
+
 }
 
-VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
+VOID Dx12RaytracingBase::SerializeBlasTlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa, const char* fileName, const char* resourceName)
 {
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC postBuildInfo = {};
 
@@ -604,8 +619,8 @@ VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
 		ComPtr<ID3D12Resource> postBuildInfoResource;
 		ComPtr<ID3D12Resource> postBuildInfoResourceReadBackResource;
 		UINT postBuildInfoBufferSize = sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC);
-		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResource, "PostBuildSizeBuffer", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResourceReadBackResource, "PostBuildSizeBufferReadBack", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
+		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResource, resourceName, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResourceReadBackResource, resourceName, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC desc;
 		desc.DestBuffer = postBuildInfoResource->GetGPUVirtualAddress();
@@ -651,8 +666,8 @@ VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
 
 	ComPtr<ID3D12Resource> serializedAS = nullptr;
 	ComPtr<ID3D12Resource> serializedASReadback = nullptr;
-	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedAS, "SerializedAS", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedASReadback, "SerializedASReadback", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedAS, resourceName, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedASReadback, resourceName, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
 
 	{
 		CD3DX12_RESOURCE_BARRIER preASCopy[1];
@@ -681,7 +696,7 @@ VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
 		HRESULT hr = serializedASReadback->Map(0, &readRange, &mappedData);
 		if (hr == S_OK)
 		{
-			std::ofstream outFile("serializedblas.bin", std::ios::binary);
+			std::ofstream outFile(fileName, std::ios::binary);
 			if (outFile.is_open())
 			{
 				outFile.write(reinterpret_cast<const char*>(mappedData), postBuildInfo.SerializedSizeInBytes);
@@ -692,11 +707,11 @@ VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
 	}
 }
 
-UINT Dx12RaytracingBase::DeSerializeBlas(ComPtr<ID3D12Resource>& pResource)
+UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, const char* fileName, const char* resourceName)
 {
 	UINT deserializeSize = 0;
 	{
-		std::ifstream file("serializedblas.bin", std::ios::binary | std::ios::ate);
+		std::ifstream file(fileName, std::ios::binary | std::ios::ate);
 		if (file.is_open())
 		{
 			size_t fileSize = file.tellg();
@@ -708,7 +723,7 @@ UINT Dx12RaytracingBase::DeSerializeBlas(ComPtr<ID3D12Resource>& pResource)
 				file.seekg(0, std::ios::beg);
 				file.read(buffer.data(), fileSize);
 
-				dxhelper::AllocateBufferResource(m_dxrDevice.Get(), fileSize, &pResource, "DeserializedBlas", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+				dxhelper::AllocateBufferResource(m_dxrDevice.Get(), fileSize, &pResource, resourceName, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
 				HRESULT hr = UploadCpuDataAndWaitForCompletion(buffer.data(), fileSize, m_dxrCommandList.Get(), GetCommandQueue(), pResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
 				assert(hr == S_OK);
 			}

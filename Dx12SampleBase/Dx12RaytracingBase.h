@@ -46,8 +46,8 @@ protected:
 	DxSceneTlasDesc m_sceneTlas;
 private:
 
-	VOID SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa);
-	UINT DeSerializeBlas(ComPtr<ID3D12Resource>& pResource);
+	VOID SerializeBlasTlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa, const char* fileName, const char* resourceName);
+	UINT DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, const char* fileName, const char* resourceName);
 	
 };
 
