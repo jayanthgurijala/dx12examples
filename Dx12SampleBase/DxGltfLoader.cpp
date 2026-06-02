@@ -55,6 +55,7 @@ VOID DxGltfLoader::GetGltfBufferInfo(const tinygltf::Accessor& inGltfAccessorDes
 	gltfBufferInfo.bufferSizeInBytes = strideInBytes * inGltfAccessorDesc.count;
 
 	const DXGI_FORMAT dataFormat = GltfGetDxgiFormat(componentDataType, componentVecType);
+	assert(dataFormat != DXGI_FORMAT_UNKNOWN);
 	gltfBufferInfo.format = dataFormat;
 }
 
@@ -228,7 +229,7 @@ VOID DxGltfLoader::ParseNodes(std::stack<std::unique_ptr<GltfNodeTransformInfo>>
 		///        - Children
 		///    Everything above is optional, Node can just be a container without its own mesh.
 		const BOOL nodeHasMesh = (nodeDesc->nodeInfo->mesh != -1);
-		const BOOL nodeHasChildren = (nodeDesc->nodeInfo->children.size() > 1);
+		const BOOL nodeHasChildren = (nodeDesc->nodeInfo->children.size() >= 1);
 
 
 		if (nodeHasMesh)

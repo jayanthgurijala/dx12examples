@@ -28,6 +28,27 @@ namespace GltfUtils
 			dxgiFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 			break;
 		default:
+			assert(false);
+			break;
+		}
+
+		return dxgiFormat;
+	}
+
+	DXGI_FORMAT GetDxgiUnsignedIntFormat(int numComponents)
+	{
+		DXGI_FORMAT dxgiFormat = DXGI_FORMAT_UNKNOWN;
+
+		switch (numComponents)
+		{
+		case TINYGLTF_TYPE_SCALAR:
+			dxgiFormat = DXGI_FORMAT_R32_UINT;
+			break;
+		case TINYGLTF_TYPE_VEC2:
+			dxgiFormat = DXGI_FORMAT_R32G32_UINT;
+			break;
+		default:
+			assert(false);
 			break;
 		}
 
@@ -47,6 +68,7 @@ namespace GltfUtils
 			dxgiFormat = DXGI_FORMAT_R16G16_UINT;
 			break;
 		default:
+			assert(false);
 			break;
 		}
 
@@ -66,7 +88,11 @@ namespace GltfUtils
 		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
 			dxgiFormat = GetDxgiUnsignedShortFormat(components);
 			break;
+		case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+			dxgiFormat = GetDxgiUnsignedIntFormat(components);
+			break;
 		default:
+			assert(false);
 			break;
 		}
 

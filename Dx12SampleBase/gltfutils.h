@@ -10,6 +10,7 @@ namespace GltfUtils
 {
 	DXGI_FORMAT GetDxgiFloatFormat(int numComponents);
 	DXGI_FORMAT GetDxgiUnsignedShortFormat(int numComponents);
+	DXGI_FORMAT GetDxgiUnsignedIntFormat(int numComponents);
 	DXGI_FORMAT GltfGetDxgiFormat(int tinyGltfComponentType, int components);
 
 	//e.g. FLOAT has 4 bytes
