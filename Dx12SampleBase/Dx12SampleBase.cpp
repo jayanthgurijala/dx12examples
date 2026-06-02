@@ -522,7 +522,7 @@ VOID Dx12SampleBase::LoadSceneDescription(std::vector<DxSceneElementInstance>& s
 		auto& trsMatrix = sceneDescription[idx].trsMatrix[0];
 
 		DxTransformHelper::SetTranslationValues(trsMatrix, 0, 0, 0);
-		DxTransformHelper::SetRotationInDegrees(trsMatrix, 0, 0, 0);
+		DxTransformHelper::SetRotationInDegrees(trsMatrix, 0, 215, 0);
 		DxTransformHelper::SetScaleValues(trsMatrix, 1, 1, 1);
 	}
 }

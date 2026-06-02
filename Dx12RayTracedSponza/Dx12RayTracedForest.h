@@ -29,7 +29,7 @@ protected:
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
 	virtual inline UINT MaxRecursionDepth()           override { return 2; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return { "Sponza.gltf" }; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "Models\\Sponza.gltf" }; }
 	virtual VOID LoadSceneDescription(std::vector<DxSceneElementInstance>& sceneDescription) override;
 
 
