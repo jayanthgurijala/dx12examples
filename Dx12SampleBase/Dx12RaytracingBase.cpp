@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Dx12RaytracingBase.h"
 #include "DxTransformHelper.h"
+#include <fstream>
+#include <iostream>
 
 
 static const wchar_t* const c_pSimpleRGShader = L"MyRaygenShader";
@@ -454,6 +456,10 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 		for (UINT primIdx = 0; primIdx < numPrimsInAsset; primIdx++)
 		{
+			BOOL deserializeBlas = FALSE;
+			ComPtr<ID3D12Resource> blasBlobFromDisk = nullptr;
+			UINT deserializeSize = DeSerializeBlas(blasBlobFromDisk);
+			deserializeBlas = (deserializeSize > 0);
 
 			assetBlasList.modelAssetBlas.emplace_back();
 			auto& primBlas = assetBlasList.modelAssetBlas.back();
@@ -499,13 +505,24 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &primBlas.resultBuffer, "BlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
 			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &primBlas.scratchBuffer, "BlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
 
-			D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
-			bottomLevelBuildDesc.Inputs                           = bottomLevelInputs;
-			bottomLevelBuildDesc.DestAccelerationStructureData    = primBlas.resultBuffer->GetGPUVirtualAddress();
-			bottomLevelBuildDesc.ScratchAccelerationStructureData = primBlas.scratchBuffer->GetGPUVirtualAddress();
-			m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+			if (deserializeBlas == TRUE)
+			{
+				assert(deserializeSize > 0);
+				m_dxrCommandList->CopyRaytracingAccelerationStructure(primBlas.resultBuffer->GetGPUVirtualAddress(), blasBlobFromDisk->GetGPUVirtualAddress(), D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
+			}
+			else
+			{
+				D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+				bottomLevelBuildDesc.Inputs = bottomLevelInputs;
+				bottomLevelBuildDesc.DestAccelerationStructureData = primBlas.resultBuffer->GetGPUVirtualAddress();
+				bottomLevelBuildDesc.ScratchAccelerationStructureData = primBlas.scratchBuffer->GetGPUVirtualAddress();
+				m_dxrCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+			}
 
 			ExecuteBuildAccelerationStructures();
+
+			SerializeBlas(primBlas.resultBuffer->GetGPUVirtualAddress());
+
 			linearBlasCount++;
 		}
 	}
@@ -576,4 +593,127 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 	//@note IMPORTANT, depending on CPU wait in this call, else instance descs buffer will get deallocated
 	ExecuteBuildAccelerationStructures();
+
+}
+
+VOID Dx12RaytracingBase::SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa)
+{
+	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC postBuildInfo = {};
+
+	{
+		ComPtr<ID3D12Resource> postBuildInfoResource;
+		ComPtr<ID3D12Resource> postBuildInfoResourceReadBackResource;
+		UINT postBuildInfoBufferSize = sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC);
+		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResource, "PostBuildSizeBuffer", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		dxhelper::AllocateBufferResource(m_dxrDevice.Get(), postBuildInfoBufferSize, &postBuildInfoResourceReadBackResource, "PostBuildSizeBufferReadBack", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
+
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC desc;
+		desc.DestBuffer = postBuildInfoResource->GetGPUVirtualAddress();
+		desc.InfoType = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION;
+
+		{
+			CD3DX12_RESOURCE_BARRIER preSizeQueryResBarrier[2];
+			preSizeQueryResBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(postBuildInfoResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			preSizeQueryResBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(postBuildInfoResourceReadBackResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+			m_dxrCommandList->ResourceBarrier(2, preSizeQueryResBarrier);
+		}
+
+		D3D12_GPU_VIRTUAL_ADDRESS srcASList[] = { blasGpuVa };
+		m_dxrCommandList->EmitRaytracingAccelerationStructurePostbuildInfo(&desc, 1, srcASList);
+
+		{
+			CD3DX12_RESOURCE_BARRIER postSizeQueryResBarrier[1];
+			postSizeQueryResBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(postBuildInfoResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			m_dxrCommandList->ResourceBarrier(1, postSizeQueryResBarrier);
+		}
+
+		m_dxrCommandList->CopyResource(postBuildInfoResourceReadBackResource.Get(), postBuildInfoResource.Get());
+
+
+		ExecuteBuildAccelerationStructures();
+
+		{
+			void* mappedData = nullptr;
+			D3D12_RANGE readRange = { 0, postBuildInfoBufferSize };
+			HRESULT hr = postBuildInfoResourceReadBackResource->Map(0, &readRange, &mappedData);
+			if (hr == S_OK)
+			{
+				auto data = static_cast<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC*>(mappedData);
+				postBuildInfo = *data;
+				postBuildInfoResourceReadBackResource->Unmap(0, nullptr);
+			}
+		}
+	}
+
+	assert(postBuildInfo.SerializedSizeInBytes > 0);
+
+	const UINT serializedASSize = postBuildInfo.SerializedSizeInBytes;
+
+	ComPtr<ID3D12Resource> serializedAS = nullptr;
+	ComPtr<ID3D12Resource> serializedASReadback = nullptr;
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedAS, "SerializedAS", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+	dxhelper::AllocateBufferResource(m_dxrDevice.Get(), serializedASSize, &serializedASReadback, "SerializedASReadback", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, FALSE, TRUE);
+
+	{
+		CD3DX12_RESOURCE_BARRIER preASCopy[1];
+		preASCopy[0] = CD3DX12_RESOURCE_BARRIER::Transition(serializedAS.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		m_dxrCommandList->ResourceBarrier(1, preASCopy);
+	}
+
+	m_dxrCommandList->CopyRaytracingAccelerationStructure(serializedAS->GetGPUVirtualAddress(), blasGpuVa, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_SERIALIZE);
+
+	{
+		CD3DX12_RESOURCE_BARRIER postAsBarrier[2];
+		postAsBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(serializedAS.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		postAsBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(serializedASReadback.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+		m_dxrCommandList->ResourceBarrier(1, postAsBarrier);
+	}
+
+	m_dxrCommandList->CopyResource(serializedASReadback.Get(), serializedAS.Get());
+
+	///@todo change the name
+	ExecuteBuildAccelerationStructures();
+
+	{
+		void* mappedData = nullptr;
+		D3D12_RANGE readRange = { 0, serializedASSize };
+
+		HRESULT hr = serializedASReadback->Map(0, &readRange, &mappedData);
+		if (hr == S_OK)
+		{
+			std::ofstream outFile("serializedblas.bin", std::ios::binary);
+			if (outFile.is_open())
+			{
+				outFile.write(reinterpret_cast<const char*>(mappedData), postBuildInfo.SerializedSizeInBytes);
+				outFile.close();
+				serializedASReadback->Unmap(0, nullptr);
+			}
+		}
+	}
+}
+
+UINT Dx12RaytracingBase::DeSerializeBlas(ComPtr<ID3D12Resource>& pResource)
+{
+	UINT deserializeSize = 0;
+	{
+		std::ifstream file("serializedblas.bin", std::ios::binary | std::ios::ate);
+		if (file.is_open())
+		{
+			size_t fileSize = file.tellg();
+
+			if (fileSize > 0)
+			{
+				deserializeSize = fileSize;
+				std::vector<char> buffer(fileSize);
+				file.seekg(0, std::ios::beg);
+				file.read(buffer.data(), fileSize);
+
+				dxhelper::AllocateBufferResource(m_dxrDevice.Get(), fileSize, &pResource, "DeserializedBlas", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+				HRESULT hr = UploadCpuDataAndWaitForCompletion(buffer.data(), fileSize, m_dxrCommandList.Get(), GetCommandQueue(), pResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
+				assert(hr == S_OK);
+			}
+		}
+	}
+
+	return deserializeSize;
 }

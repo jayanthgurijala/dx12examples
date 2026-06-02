@@ -98,9 +98,14 @@ namespace dxhelper
 		                               const char* resourceName = nullptr,
 									   D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
 		                               D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON,
-									   BOOL isUploadHeap = FALSE)
+									   BOOL isUploadHeap   = FALSE,
+		                               BOOL isReadBackHeap = FALSE)
 	{
 		D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
+		if (isReadBackHeap == TRUE)
+		{
+			heapType = D3D12_HEAP_TYPE_READBACK;
+		}
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
 		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSizeInBytes, flags);
 

@@ -45,6 +45,9 @@ protected:
 	DxSceneBlasDesc m_sceneBlas;
 	DxSceneTlasDesc m_sceneTlas;
 private:
+
+	VOID SerializeBlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa);
+	UINT DeSerializeBlas(ComPtr<ID3D12Resource>& pResource);
 	
 };
 
