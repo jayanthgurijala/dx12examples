@@ -607,7 +607,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	//@note IMPORTANT, depending on CPU wait in this call, else instance descs buffer will get deallocated
 	ExecuteBuildAccelerationStructures();
 
-	//SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), "serializedtlas.bin", "SerializeTlas");
+	SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), "serializedtlas.bin", "SerializeTlas");
 
 }
 
