@@ -947,7 +947,7 @@ HRESULT Dx12SampleBase::UploadCpuDataAndWaitForCompletion(const void* cpuData,
 		result = m_pDevice->CreateCommittedResource(&heapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
-			D3D12_RESOURCE_STATE_COPY_SOURCE,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&stagingResource));
 	}
@@ -1467,7 +1467,7 @@ VOID Dx12SampleBase::CreateSceneMaterialCb()
 	static BYTE* pMappedBytePtr = nullptr;
 	if (pMappedPtr == nullptr)
 	{
-		m_materialConstantBuffer = CreateBufferWithData(nullptr, alignedTotalMaterialBufferSize, "Material CB", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+		m_materialConstantBuffer = CreateBufferWithData(nullptr, alignedTotalMaterialBufferSize, "Material CB", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, TRUE);
 		CD3DX12_RANGE readRange(0, 0);
 		//@note specifying nullptr as read range indicates CPU can read entire resource
 		m_materialConstantBuffer->Map(0, &readRange, &pMappedPtr);

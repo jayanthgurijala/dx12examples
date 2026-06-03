@@ -24,7 +24,7 @@ VOID CameraLightsMaterialsBuffer::Finalize(ID3D12Device *pDevice)
 {
     //Loading Scene Elements determine number of world matrices required
     FinalizeCalcTotalSize();
-    dxhelper::AllocateBufferResource(pDevice, m_totalBufferSize, &m_bufferResource, "CameraLightsMaterialBuffer", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COMMON, TRUE);
+    dxhelper::AllocateBufferResource(pDevice, m_totalBufferSize, &m_bufferResource, "CameraLightsMaterialBuffer", D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, TRUE);
     MapAndInitializeBaseAddress();
 }
 

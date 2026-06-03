@@ -101,13 +101,24 @@ namespace dxhelper
 									   BOOL isUploadHeap   = FALSE,
 		                               BOOL isReadBackHeap = FALSE)
 	{
-		D3D12_HEAP_TYPE heapType = (isUploadHeap == FALSE) ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_GPU_UPLOAD;
-		if (isReadBackHeap == TRUE)
+		D3D12_HEAP_TYPE heapType = D3D12_HEAP_TYPE_DEFAULT;
+		if (isUploadHeap == TRUE)
+		{
+			heapType = D3D12_HEAP_TYPE_UPLOAD;
+		}
+		else if (isReadBackHeap == TRUE)
 		{
 			heapType = D3D12_HEAP_TYPE_READBACK;
 		}
+		else
+		{
+			heapType = D3D12_HEAP_TYPE_DEFAULT;
+		}
+
 		auto heapProps = CD3DX12_HEAP_PROPERTIES(heapType);
 		auto resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSizeInBytes, flags);
+
+		assert(heapType != D3D12_HEAP_TYPE_UPLOAD || initialResourceState == D3D12_RESOURCE_STATE_GENERIC_READ);
 
 		pDevice->CreateCommittedResource(&heapProps,
 			D3D12_HEAP_FLAG_NONE,
