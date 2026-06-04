@@ -724,8 +724,20 @@ UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, 
 				file.read(buffer.data(), fileSize);
 
 				dxhelper::AllocateBufferResource(m_dxrDevice.Get(), fileSize, &pResource, resourceName, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, TRUE);
-				HRESULT hr = UploadCpuDataAndWaitForCompletion(buffer.data(), fileSize, m_dxrCommandList.Get(), GetCommandQueue(), pResource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE);
-				assert(hr == S_OK);
+
+				// UPLOAD heap - directly map and write data
+				VOID* pMappedPtr = nullptr;
+				CD3DX12_RANGE readRange(0, 0);
+				if (pResource->Map(0, &readRange, &pMappedPtr) == S_OK)
+				{
+					memcpy(pMappedPtr, buffer.data(), fileSize);
+					D3D12_RANGE writtenRange = { 0, fileSize };
+					pResource->Unmap(0, &writtenRange);
+				}
+				else
+				{
+					assert(0);
+				}
 			}
 		}
 	}
