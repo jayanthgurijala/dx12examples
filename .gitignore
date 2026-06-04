@@ -369,3 +369,4 @@ FodyWeavers.xsd
 *.cso
 /Shaders/Simple1_PS.cso
 /Dx12HelloWorld/imgui.ini
+/Dx12Raytracing/serializedtlas.bin
