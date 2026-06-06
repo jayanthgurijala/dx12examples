@@ -47,7 +47,11 @@ protected:
 private:
 
 	VOID SerializeBlasTlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa, const char* fileName, const char* resourceName);
-	UINT DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, const char* fileName, const char* resourceName);
+	UINT DeSerializeBlasTlas(ComPtr<ID3D12Resource>&                      pResource,
+						     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE accelType,
+						     D3D12_GPU_VIRTUAL_ADDRESS                    blasGpuVa,
+						     const char*                                  fileName,
+						     const char*                                  resourceName);
 	
 };
 

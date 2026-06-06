@@ -444,6 +444,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	const UINT numModelAssets = NumModelAssetsLoaded();
 
 	UINT linearBlasCount = 0;
+	D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa = 0;
 	for (UINT assetIdx = 0; assetIdx < numModelAssets; assetIdx++)
 	{
 		const auto& modelAsset = GetModelAsset(assetIdx);
@@ -453,12 +454,13 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 		auto& assetBlasList = m_sceneBlas.modelAssetBlas.back();
 		assetBlasList.linearBlasFirstPrimIndex = linearBlasCount;
 
+		
 
 		for (UINT primIdx = 0; primIdx < numPrimsInAsset; primIdx++)
 		{
 			BOOL deserializeBlas = FALSE;
 			ComPtr<ID3D12Resource> blasBlobFromDisk = nullptr;
-			UINT deserializeSize = DeSerializeBlasTlas(blasBlobFromDisk, "serializedblas.bin", "deserializeblas");
+			UINT deserializeSize = DeSerializeBlasTlas(blasBlobFromDisk, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL, 0, "serializedblas.bin", "deserializeblas");
 			deserializeBlas = (deserializeSize > 0);
 
 			assetBlasList.modelAssetBlas.emplace_back();
@@ -509,6 +511,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			{
 				assert(deserializeSize > 0);
 				m_dxrCommandList->CopyRaytracingAccelerationStructure(primBlas.resultBuffer->GetGPUVirtualAddress(), blasBlobFromDisk->GetGPUVirtualAddress(), D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
+				blasGpuVa = primBlas.resultBuffer->GetGPUVirtualAddress();
 			}
 			else
 			{
@@ -521,7 +524,10 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 			ExecuteBuildAccelerationStructures();
 
-			SerializeBlasTlas(primBlas.resultBuffer->GetGPUVirtualAddress(), "serializedblas.bin", "BlasSerialization");
+			if (deserializeBlas == FALSE)
+			{
+				SerializeBlasTlas(primBlas.resultBuffer->GetGPUVirtualAddress(), "serializedblas.bin", "BlasSerialization");
+			}
 
 			linearBlasCount++;
 		}
@@ -529,7 +535,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 	ComPtr<ID3D12Resource> tlasBlobFromDisk = nullptr;
 	UINT tlasSizeInBytes = 0;
-	tlasSizeInBytes = DeSerializeBlasTlas(tlasBlobFromDisk, "serializedtlas.bin", "deserializetlas");
+	tlasSizeInBytes = DeSerializeBlasTlas(tlasBlobFromDisk, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL, blasGpuVa,  "serializedtlas.bin", "deserializetlas");
 
 	const UINT numElementsInSceneLoad = NumElementsInSceneLoad();
 
@@ -607,7 +613,10 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	//@note IMPORTANT, depending on CPU wait in this call, else instance descs buffer will get deallocated
 	ExecuteBuildAccelerationStructures();
 
-	SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), "serializedtlas.bin", "SerializeTlas");
+	if (tlasSizeInBytes == 0)
+	{
+		SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), "serializedtlas.bin", "SerializeTlas");
+	}
 
 }
 
@@ -707,7 +716,11 @@ VOID Dx12RaytracingBase::SerializeBlasTlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa, 
 	}
 }
 
-UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, const char* fileName, const char* resourceName)
+UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>&                      pResource,
+	                                         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE accelType,
+	                                         D3D12_GPU_VIRTUAL_ADDRESS                    blasGpuVa,
+	                                         const char*                                  fileName,
+	                                         const char*                                  resourceName)
 {
 	UINT deserializeSize = 0;
 	{
@@ -722,6 +735,26 @@ UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, 
 				std::vector<char> buffer(fileSize);
 				file.seekg(0, std::ios::beg);
 				file.read(buffer.data(), fileSize);
+				file.close();
+
+				VOID* memPtr = buffer.data();
+				BYTE* byteMemPtr = reinterpret_cast<BYTE*>(memPtr);
+
+				auto header = reinterpret_cast<const D3D12_SERIALIZED_RAYTRACING_ACCELERATION_STRUCTURE_HEADER*>(memPtr);
+				UINT blasHandlesOffset = sizeof(D3D12_SERIALIZED_RAYTRACING_ACCELERATION_STRUCTURE_HEADER);
+
+				if (accelType == D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL)
+				{
+					assert(header->NumBottomLevelAccelerationStructurePointersAfterHeader > 0);
+					assert(blasGpuVa != 0);
+					D3D12_GPU_VIRTUAL_ADDRESS* pBlasHandlesAddr = reinterpret_cast<D3D12_GPU_VIRTUAL_ADDRESS*>(byteMemPtr + blasHandlesOffset);
+					*pBlasHandlesAddr = blasGpuVa;
+				}
+				else
+				{
+					assert(header->NumBottomLevelAccelerationStructurePointersAfterHeader == 0);
+					assert(blasGpuVa == 0);
+				}
 
 				dxhelper::AllocateBufferResource(m_dxrDevice.Get(), fileSize, &pResource, resourceName, D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_GENERIC_READ, TRUE);
 
@@ -730,7 +763,7 @@ UINT Dx12RaytracingBase::DeSerializeBlasTlas(ComPtr<ID3D12Resource>& pResource, 
 				CD3DX12_RANGE readRange(0, 0);
 				if (pResource->Map(0, &readRange, &pMappedPtr) == S_OK)
 				{
-					memcpy(pMappedPtr, buffer.data(), fileSize);
+					memcpy(pMappedPtr, memPtr, fileSize);
 					D3D12_RANGE writtenRange = { 0, fileSize };
 					pResource->Unmap(0, &writtenRange);
 				}
