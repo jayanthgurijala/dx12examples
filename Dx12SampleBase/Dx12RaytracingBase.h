@@ -3,16 +3,17 @@
 
 
 class Dx12RaytracingBase :
-    public Dx12SampleBase
+	public Dx12SampleBase
 {
 public:
-	
+
 	Dx12RaytracingBase(UINT width, UINT height);
 	virtual VOID OnInit() override;
 
 protected:
 
 	virtual inline UINT MaxRecursionDepth() { return 2; }
+	virtual inline std::string SerializedFilePrefix() { return "common"; }
 	VOID CreateGlobalRootSignature();
 	VOID CreateLocalRootSignature();
 	VOID CreatePerPrimSrvs();
@@ -45,11 +46,21 @@ protected:
 	DxSceneBlasDesc m_sceneBlas;
 	DxSceneTlasDesc m_sceneTlas;
 private:
+	inline std::string GetBlasSerializedFileName(UINT index)
+	{
+		return SerializedFilePrefix() + "_blas_" + std::to_string(index) + ".bin";
+	}
+
+	inline std::string GetTlasSerializedFileName(UINT index)
+	{
+		return SerializedFilePrefix() + "_tlas_" + std::to_string(index) + ".bin";
+	}
 
 	VOID SerializeBlasTlas(D3D12_GPU_VIRTUAL_ADDRESS blasGpuVa, const char* fileName, const char* resourceName);
 	UINT DeSerializeBlasTlas(ComPtr<ID3D12Resource>&                      pResource,
 						     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE accelType,
-						     D3D12_GPU_VIRTUAL_ADDRESS                    blasGpuVa,
+							 UINT                                         numGpuVas,
+						     D3D12_GPU_VIRTUAL_ADDRESS*                   pBlasGpuVa,
 						     const char*                                  fileName,
 						     const char*                                  resourceName);
 	

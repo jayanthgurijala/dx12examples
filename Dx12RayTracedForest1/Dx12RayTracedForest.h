@@ -23,7 +23,9 @@ protected:
 	virtual inline UINT NumSRVsPerPrimNeededForApp()         override 
 	{
         return NumSrvsForRaytracing();
-	} 
+	}
+
+	virtual inline std::string SerializedFilePrefix() override { return "raytracing"; }
 	
 	virtual inline UINT NumDSVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
