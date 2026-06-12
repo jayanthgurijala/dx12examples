@@ -42,6 +42,20 @@ enum DxRotationMode
 	DxRotationModeRadians
 };
 
+enum DxShaderTableType
+{
+	DxRayGenTable,
+	DxHitGroupTable,
+	DxMissTable,
+	DxShaderTablesMax
+};
+
+struct DxShaderTableOffsetAndStride
+{
+	UINT64 tableOffset;
+	UINT64 recordStride;
+};
+
 struct DxRotationQuaternion
 {
 	FLOAT x;

@@ -3,6 +3,7 @@
 #include "DxTransformHelper.h"
 #include <fstream>
 #include <iostream>
+#include "DxShaderBindingTable.h"
 #include "DxRayTracingShaderTable.h"
 
 
@@ -305,56 +306,23 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 		}
 	}
 
-
 	///@note Every primitive has a material and needs a HitGroup.
 	///      There are two hitgroups for now - opaque and transparent
 	const UINT totalPrimsInScene   = primitiveInfo.size();
 	const UINT numHitGroupsPerPrim = 2; //radiance and shadow ray
     const UINT numMissShaders      = 2; //radiance ray miss shader and shadow ray miss shader
 
-	DxRayTracingShaderTable rayGenShaderTable(1, 0, 0);
-	DxRayTracingShaderTable hitGroupShaderTable(totalPrimsInScene * numHitGroupsPerPrim, 1, 1);
-	DxRayTracingShaderTable missShaderTable(2, 0, 0);
+	DxShaderBindingTable shaderBindingTable;
+	shaderBindingTable.CreateShaderTable(DxRayGenTable, 1, 0, 0);
+	shaderBindingTable.CreateShaderTable(DxHitGroupTable, totalPrimsInScene * numHitGroupsPerPrim, 1, 1);
+	shaderBindingTable.CreateShaderTable(DxMissTable, 2, 0, 0);
 
-	UINT64 totalShaderTableSize = rayGenShaderTable.GetAlignedShaderTableSize()    +
-								  hitGroupShaderTable.GetAlignedShaderTableSize()  +
-								  missShaderTable.GetAlignedShaderTableSize();
+	auto* rayGenShaderTable   = shaderBindingTable.GetShaderTable(DxRayGenTable);
+	auto* hitGroupShaderTable = shaderBindingTable.GetShaderTable(DxHitGroupTable);
+	auto* missShaderTable     = shaderBindingTable.GetShaderTable(DxMissTable);
 
-	std::unique_ptr<BYTE[]> pCpuAllocPtr = std::make_unique<BYTE[]>(totalShaderTableSize);
+	rayGenShaderTable->AddShaderRecord(props->GetShaderIdentifier(c_pSimpleRGShader));
 
-	rayGenShaderTable.AddShaderRecord(props->GetShaderIdentifier(c_pSimpleRGShader));
-
-
-	const UINT shaderRecordSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES; // 32 bytes
-
-	UINT64 rayGenRecordSize = shaderRecordSize;
-	UINT64 rayGenAlignedSize = dxhelper::DxAlign(rayGenRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-	UINT64 rayGenTableAlignedSize = dxhelper::DxAlign(rayGenAlignedSize, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-	UINT64 hitGroupRecordSize = shaderRecordSize + sizeof(D3D12_GPU_VIRTUAL_ADDRESS) + sizeof(D3D12_GPU_DESCRIPTOR_HANDLE);
-	UINT64 hitGroupAlignedSize = dxhelper::DxAlign(hitGroupRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-	UINT64 hitGroupTotalSizeInBytes = hitGroupAlignedSize * totalPrimsInScene * numHitGroupsPerPrim;
-	UINT64 hitGroupTableAlignedSize = dxhelper::DxAlign(hitGroupTotalSizeInBytes, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-	UINT64 missRecordSize = shaderRecordSize;
-	UINT64 missRecordAlignedSize = dxhelper::DxAlign(missRecordSize, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-    UINT64 missTableTotalSizeInBytes = missRecordAlignedSize * numMissShaders;
-	UINT64 missTableAlignedSize = dxhelper::DxAlign(missTableTotalSizeInBytes, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
-
-
-	const UINT64 sbtTableTotalSize = rayGenTableAlignedSize + hitGroupTableAlignedSize + missTableAlignedSize;
-	assert(sbtTableTotalSize == totalShaderTableSize);
-	BYTE* const sbtDataStart = static_cast<BYTE*>(malloc(sbtTableTotalSize));
-	BYTE* sbtDataWritePtr = sbtDataStart;
-
-
-	void* raygenShaderID = props->GetShaderIdentifier(c_pSimpleRGShader);
-	assert(raygenShaderID != nullptr);
-	memcpy(sbtDataWritePtr, raygenShaderID, rayGenRecordSize);
-	sbtDataWritePtr += rayGenTableAlignedSize;
-
-	assert((sbtDataWritePtr - sbtDataStart) == rayGenTableAlignedSize);
-	BYTE* const pHitGroupStartWritePtr = sbtDataWritePtr;
 	{
 		for (UINT primIdx = 0; primIdx < totalPrimsInScene; primIdx++)
 		{
@@ -366,58 +334,33 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 				BOOL  needsAnyHit = IsPrimitiveTransparent(*curPrimitive);
 				auto  gpuVAMaterialsCB = curPrimitive->materialTextures.meterialCb;
 				auto  gpuVAMatTex = GetPerPrimSrvGpuHandle(curPrimitive->primLinearIdxInModelAssets);
-
                 void* curHitGroupID = GetHitGroupShaderIdentifier(props, needsAnyHit, rayIndex);
-
-				sbtDataWritePtr = pHitGroupStartWritePtr + hitGroupAlignedSize * hitgroupIndex;
-				memcpy(sbtDataWritePtr, curHitGroupID, shaderRecordSize);
-				sbtDataWritePtr += shaderRecordSize;
-				assert(pHitGroupStartWritePtr + hitgroupIndex * hitGroupAlignedSize + shaderRecordSize == sbtDataWritePtr);
-
-				memcpy(sbtDataWritePtr, &gpuVAMaterialsCB, sizeof(gpuVAMaterialsCB));
-				sbtDataWritePtr += sizeof(gpuVAMaterialsCB);
-				assert(pHitGroupStartWritePtr + hitgroupIndex * hitGroupAlignedSize + shaderRecordSize + sizeof(gpuVAMaterialsCB) == sbtDataWritePtr);
-
-
-				memcpy(sbtDataWritePtr, &gpuVAMatTex, sizeof(gpuVAMatTex));
-				sbtDataWritePtr += sizeof(gpuVAMatTex);
-
-				//@note we recalculate and align
-				assert(sbtDataWritePtr == pHitGroupStartWritePtr + hitgroupIndex * hitGroupAlignedSize + hitGroupRecordSize);
-
-				hitGroupShaderTable.AddShaderRecord(curHitGroupID, gpuVAMaterialsCB, gpuVAMatTex);
+				hitGroupShaderTable->AddShaderRecord(curHitGroupID, gpuVAMaterialsCB, gpuVAMatTex);
 			}
 		}
 	}
 
-	sbtDataWritePtr = pHitGroupStartWritePtr + hitGroupTableAlignedSize;
-	assert(sbtDataWritePtr == sbtDataStart + rayGenTableAlignedSize + hitGroupTableAlignedSize);
+	missShaderTable->AddShaderRecord(GetMissShaderIdentifier(props, 0));
+	missShaderTable->AddShaderRecord(GetMissShaderIdentifier(props, 1));
 
-	memcpy(sbtDataWritePtr, GetMissShaderIdentifier(props, 0), shaderRecordSize);
-    sbtDataWritePtr += missRecordAlignedSize;
-	memcpy(sbtDataWritePtr, GetMissShaderIdentifier(props, 1), shaderRecordSize);
-    sbtDataWritePtr += missRecordAlignedSize;
-
-	missShaderTable.AddShaderRecord(GetMissShaderIdentifier(props, 0));
-	missShaderTable.AddShaderRecord(GetMissShaderIdentifier(props, 1));
+	shaderBindingTable.FinalizeSBT();
+	const UINT64 shaderTableTotalSize = shaderBindingTable.GetTotalSbtSize();
 
 
-    assert(sbtDataWritePtr == sbtDataStart + rayGenTableAlignedSize + hitGroupTableAlignedSize + 2 * missRecordAlignedSize);
 
-	m_shaderBindingTable = CreateBufferWithData(sbtDataStart, sbtTableTotalSize, "ShaderBindingTable");
+	m_shaderBindingTable = CreateBufferWithData(shaderBindingTable.GetSbtData(), shaderTableTotalSize, "ShaderBindingTable");
 
 	m_rayGenBaseAddress.StartAddress = m_shaderBindingTable->GetGPUVirtualAddress();
-	m_rayGenBaseAddress.SizeInBytes = rayGenTableAlignedSize;
+	m_rayGenBaseAddress.SizeInBytes  = rayGenShaderTable->GetAlignedShaderTableSize();
 
-	m_hitTableBaseAddress.StartAddress = m_rayGenBaseAddress.StartAddress + rayGenTableAlignedSize;
-	m_hitTableBaseAddress.SizeInBytes = hitGroupTotalSizeInBytes;
-	m_hitTableBaseAddress.StrideInBytes = hitGroupAlignedSize;
+	m_hitTableBaseAddress.StartAddress  = m_rayGenBaseAddress.StartAddress + rayGenShaderTable->GetAlignedShaderTableSize();
+	m_hitTableBaseAddress.SizeInBytes   = hitGroupShaderTable->GetAlignedShaderTableSize();
+	m_hitTableBaseAddress.StrideInBytes = hitGroupShaderTable->GetAlignedShaderRecordSize();
 
-	m_missTableBaseAddress.StartAddress = m_hitTableBaseAddress.StartAddress + hitGroupTotalSizeInBytes;
-	m_missTableBaseAddress.SizeInBytes = missTableTotalSizeInBytes;
-	m_missTableBaseAddress.StrideInBytes = missRecordAlignedSize;
+	m_missTableBaseAddress.StartAddress  = m_hitTableBaseAddress.StartAddress + hitGroupShaderTable->GetAlignedShaderTableSize();
+	m_missTableBaseAddress.SizeInBytes   = missShaderTable->GetAlignedShaderTableSize();
+	m_missTableBaseAddress.StrideInBytes = missShaderTable->GetAlignedShaderRecordSize();
 
-	free(sbtDataStart);
 }
 
 VOID Dx12RaytracingBase::CreateUAVOutput()

@@ -170,6 +170,7 @@
     <ClInclude Include="DxPrintUtils.h" />
     <ClInclude Include="DxDescriptorHeapManager.h" />
     <ClInclude Include="DxRayTracingShaderTable.h" />
+    <ClInclude Include="DxShaderBindingTable.h" />
     <ClInclude Include="DxTransformHelper.h" />
     <ClInclude Include="dxtypes.h" />
     <ClInclude Include="ExampleEntryPoint.h" />
@@ -232,6 +233,7 @@
     <ClCompile Include="DxPrintUtils.cpp" />
     <ClCompile Include="DxDescriptorHeapManager.cpp" />
     <ClCompile Include="DxRayTracingShaderTable.cpp" />
+    <ClCompile Include="DxShaderBindingTable.cpp" />
     <ClCompile Include="FileReader.cpp" />
     <ClCompile Include="gltfutils.cpp" />
     <ClCompile Include="pch.cpp">

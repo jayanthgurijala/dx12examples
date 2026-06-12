@@ -74,5 +74,13 @@ VOID DxRayTracingShaderTable::AddShaderRecord(VOID* shaderIdentifier, D3D12_GPU_
 
 }
 
+UINT64 DxRayTracingShaderTable::CopyShaderTableData(VOID* dstPtr, UINT64 minDstBufferSize)
+{
+    assert(m_alignedShaderTableSize <= minDstBufferSize);
+    auto err = memcpy_s(dstPtr, minDstBufferSize, m_pCpuAllocPtr.get(), m_alignedShaderTableSize);
+    assert(err == S_OK);
+    return m_alignedShaderTableSize;
+}
+
 
 

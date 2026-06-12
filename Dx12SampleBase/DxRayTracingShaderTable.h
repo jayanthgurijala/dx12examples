@@ -8,10 +8,12 @@ public:
     DxRayTracingShaderTable(UINT numShaderRecords, UINT numGpuVAs, UINT numGpuDescHandles);
     VOID AddShaderRecord(VOID* shaderIdentifier);
     VOID AddShaderRecord(VOID* shaderIdentifier, D3D12_GPU_VIRTUAL_ADDRESS arg1, D3D12_GPU_DESCRIPTOR_HANDLE arg2);
+    UINT64 CopyShaderTableData(VOID* dstPtr, UINT64 minDstBufferSize);
 
 
     inline UINT64 GetAlignedShaderTableSize() { return m_alignedShaderTableSize; }
-    inline BYTE* GetShaderTableData() { return m_pCpuAllocPtr.get(); }
+    inline UINT64 GetAlignedShaderRecordSize() { return m_alignedShaderRecordSize; }
+    
 
 
 
