@@ -240,7 +240,7 @@ float CalculateRayConeUVFootPrint(float3 p[3], float2 uv[3])
     gTexture.GetDimensions(width, height);
     
     // Convert UV footprint into texel footprint.
-    // Multiplying by the larger texture dimension produces
+    // Multiplying by the larger texture dimension
     // an approximate footprint size in texel units.
     float rho = uvFootPrint * max(width, height);
     
@@ -291,19 +291,12 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     
         float rho = CalculateRayConeUVFootPrint(p, uv);
         float mipLevel = log2(rho);
+        
+        //@ Pass in mip range in CB?
+        mipLevel = clamp(mipLevel, 0, 5);
+        
         baseColor *= gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
     }
-    
-    //float metallic = metallicFactor;
-    //float roughness = roughnessFactor;
-    
-    //if (flags & HasMetallicRoughnessTex != 0)
-    //{
-    //    float4 mrSample = gTexture.SampleLevel(gSampler, uvInterpolated, mipLevel);
-    //    metallic *= mrSample.b;
-    //    roughness *= mrSample.g;
-    //}
-
     
 
     float3 hitPosition    = HitWorldPosition();
