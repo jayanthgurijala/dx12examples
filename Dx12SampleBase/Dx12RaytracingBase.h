@@ -14,6 +14,13 @@ protected:
 
 	virtual inline UINT MaxRecursionDepth() { return 2; }
 	virtual inline std::string SerializedFilePrefix() { return "common"; }
+
+	virtual inline BOOL SerializeBlas() { return FALSE; }
+	virtual inline BOOL SerializeTlas() { return FALSE; }
+
+	virtual inline BOOL DeSerializeBlas() { return FALSE; }
+	virtual inline BOOL DeSerializeTlas() { return FALSE; }
+
 	VOID CreateGlobalRootSignature();
 	VOID CreateLocalRootSignature();
 	VOID CreatePerPrimSrvs();

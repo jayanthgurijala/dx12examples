@@ -423,11 +423,15 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 		for (UINT primIdx = 0; primIdx < numPrimsInAsset; primIdx++)
 		{
+			BOOL blasDeserialized = FALSE;
 			auto serializedBlasFileName = GetBlasSerializedFileName(linearBlasCount);
-			BOOL deserializeBlas = FALSE;
 			ComPtr<ID3D12Resource> blasBlobFromDisk = nullptr;
-			UINT deserializeSize = DeSerializeBlasTlas(blasBlobFromDisk, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL, 0, nullptr, serializedBlasFileName.c_str(), serializedBlasFileName.c_str());
-			deserializeBlas = (deserializeSize > 0);
+
+			if (DeSerializeBlas() == TRUE)
+			{
+				UINT deserializeSize = DeSerializeBlasTlas(blasBlobFromDisk, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL, 0, nullptr, serializedBlasFileName.c_str(), serializedBlasFileName.c_str());
+				blasDeserialized = (deserializeSize > 0);
+			}
 
 			assetBlasList.modelAssetBlas.emplace_back();
 			auto& primBlas = assetBlasList.modelAssetBlas.back();
@@ -436,10 +440,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			///@todo generalize this all approaches
 			std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs(1);
 			auto& geomDesc = geomDescs[0];
-
 			const auto& currentPrim = GetPrimitiveInfo(assetIdx, primIdx);
-
-
 			const D3D12_INDEX_BUFFER_VIEW indexBufferView = GetIndexBufferInfo(currentPrim).modelIbv;
 
 			DxDrawPrimitive         drawInfo = GetDrawInfo(assetIdx, primIdx);
@@ -473,9 +474,9 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &primBlas.resultBuffer, "BlasResult", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, resultState);
 			dxhelper::AllocateBufferResource(m_dxrDevice.Get(), bottomLevelPrebuildInfo.ScratchDataSizeInBytes, &primBlas.scratchBuffer, "BlasScratch", D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratchState);
 
-			if (deserializeBlas == TRUE)
+			if (blasDeserialized == TRUE)
 			{
-				assert(deserializeSize > 0);
+				assert(blasDeserialized > 0);
 				m_dxrCommandList->CopyRaytracingAccelerationStructure(primBlas.resultBuffer->GetGPUVirtualAddress(), blasBlobFromDisk->GetGPUVirtualAddress(), D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
 			}
 			else
@@ -489,7 +490,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 
 			ExecuteBuildAccelerationStructures();
 
-			if (deserializeBlas == FALSE)
+			if (blasDeserialized == FALSE && SerializeBlas() == TRUE)
 			{
 				SerializeBlasTlas(primBlas.resultBuffer->GetGPUVirtualAddress(), serializedBlasFileName.c_str(), serializedBlasFileName.c_str());
 			}
@@ -539,7 +540,16 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	auto serializedTlasFileName = GetTlasSerializedFileName(0);
 	ComPtr<ID3D12Resource> tlasBlobFromDisk = nullptr;
 	UINT tlasSizeInBytes = 0;
-	tlasSizeInBytes = DeSerializeBlasTlas(tlasBlobFromDisk, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL, blasVAList.size(), blasVAList.data(), serializedTlasFileName.c_str(), serializedTlasFileName.c_str());
+
+	if (DeSerializeTlas() == TRUE)
+	{
+		tlasSizeInBytes = DeSerializeBlasTlas(tlasBlobFromDisk,
+			                                  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL,
+			                                  blasVAList.size(),
+			                                  blasVAList.data(),
+			                                  serializedTlasFileName.c_str(),
+			                                  serializedTlasFileName.c_str());
+	}
 
 	//@note Important we use a fence and block on CPU, so this will not get deallocated till TLAS build is complete.
 	ComPtr<ID3D12Resource> instanceDesc = CreateBufferWithData(instanceDescs.data(),
@@ -581,7 +591,7 @@ VOID Dx12RaytracingBase::BuildBlasAndTlas()
 	//@note IMPORTANT, depending on CPU wait in this call, else instance descs buffer will get deallocated
 	ExecuteBuildAccelerationStructures();
 
-	if (tlasSizeInBytes == 0)
+	if (tlasSizeInBytes == 0 && SerializeTlas() == TRUE)
 	{
 		SerializeBlasTlas(m_sceneTlas.sceneTlas.resultBuffer->GetGPUVirtualAddress(), serializedTlasFileName.c_str(), serializedTlasFileName.c_str());
 	}
