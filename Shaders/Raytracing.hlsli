@@ -6,6 +6,6 @@ struct RayPayload
 
 struct ShadowRayPayload
 {
-    bool isHit;
+    uint isHit;
     uint currentRecursionDepth;
 };

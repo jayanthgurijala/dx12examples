@@ -60,14 +60,14 @@ float3 HitWorldPosition()
     return WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
 }
 
-inline bool TraceShadowRay(float3 origin, float3 direction, uint recursionDepth)
+inline uint TraceShadowRay(float3 origin, float3 direction, uint recursionDepth)
 {
     if (recursionDepth > 1)
     {
-        return false;
+        return 0;
     }
     ShadowRayPayload payload;
-    payload.isHit = false;
+    payload.isHit = 0;
     
     
     uint missShaderIndex                   = 1;
@@ -300,8 +300,8 @@ void CHSBaseColorTexturing(inout RayPayload payload, in BuiltInTriangleIntersect
     
 
     float3 hitPosition    = HitWorldPosition();
-    bool shadowHit = TraceShadowRay(hitPosition, lightDirection, payload.currentRecursionDepth);
-    float shadowing = shadowHit ? 0.5f : 1.0f;
+    uint shadowHit = TraceShadowRay(hitPosition, lightDirection, payload.currentRecursionDepth);
+    float shadowing = (shadowHit == 1) ? 0.5f : 1.0f;
     payload.color = baseColor * shadowing;
 }
 
@@ -345,7 +345,7 @@ void CHSNormalMapping(inout RayPayload payload, in BuiltInTriangleIntersectionAt
 [shader("closesthit")]
 void CHSShadow(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    payload.isHit = true;
+    payload.isHit = 1;
 }
 
 [shader("miss")]
@@ -357,5 +357,5 @@ void MyMissShader(inout RayPayload payload)
 [shader("miss")]
 void ShadowMissShader(inout ShadowRayPayload payload)
 {
-    payload.isHit = false;
+    payload.isHit = 0;
 }
