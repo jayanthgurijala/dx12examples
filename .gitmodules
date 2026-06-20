@@ -4,3 +4,9 @@
 [submodule "third_party/imgui"]
 	path = third_party/imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "third_party/OMM"]
+	path = third_party/OMM
+	url = https://github.com/NVIDIA-RTX/OMM.git
+[submodule "third_party/meshoptimizer"]
+	path = third_party/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
