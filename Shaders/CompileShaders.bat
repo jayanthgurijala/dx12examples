@@ -9,7 +9,8 @@ dxc -T ps_6_0 -E PSMain -Fo FrameSimple_PS.cso -Zi -Od -Qembed_debug -Fd FrameSi
 dxc -T cs_6_0 -E GenerateMipCS -Fo CsGenerateMips.cso -Zi -Od -Qembed_debug -Fd CsGenerateMips.pdb CsGenerateMips.hlsl
 
 dxc -T vs_6_0 -E VSMain_1 -Fo Simple1_VS.cso -Zi -Od -Qembed_debug -Fd Simple1_VS.pdb %SHADERNAME%
-dxc -T vs_6_0 -E VSMain_2 -Fo Simple2_VS.cso -Zi -Od -Qembed_debug -Fd Simple2_VS.pdb %SHADERNAME%
+dxc -T vs_6_0 -E VSMain_2_NORMAL -Fo Simple2_VS_NORMAL.cso -Zi -Od -Qembed_debug -Fd Simple2_VS.pdb %SHADERNAME%
+dxc -T vs_6_0 -E VSMain_2_TEXCOORD0 -Fo Simple2_VS_TEXCOORD0.cso -Zi -Od -Qembed_debug -Fd Simple2_VS.pdb %SHADERNAME%
 dxc -T vs_6_0 -E VSMain_3 -Fo Simple3_VS.cso -Zi -Od -Qembed_debug -Fd Simple3_VS.pdb %SHADERNAME%
 dxc -T vs_6_0 -E VSMain_4 -Fo Simple4_VS.cso  -Zi -Od -Qembed_debug -Fd Simple4_VS.pdb %SHADERNAME%
 dxc -T ps_6_0 -E PSMain -Fo SimplePS.cso  -Zi -Od -Qembed_debug -Fd SimplePS.pdb %SHADERNAME%

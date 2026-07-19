@@ -11,10 +11,16 @@ struct VSInput_1
     float3 position         : POSITION;
 };
 
-struct VSInput_2
+struct VSInput_2_NORMAL
 {
     float3 position         : POSITION;
     float3 normal           : NORMAL;
+};
+
+struct VSInput_2_TEXCOORD0
+{
+    float3 position : POSITION;
+    float2 texcoord0 : TEXCOORD0;
 };
 
 
@@ -83,7 +89,7 @@ VSOutput_5 VSMain_1( VSInput_1 input )
 }
 
 
-VSOutput_5 VSMain_2(VSInput_2 input)
+VSOutput_5 VSMain_2_NORMAL(VSInput_2_NORMAL input)
 {
     VSOutput_5 output = (VSOutput_5) 0;
  
@@ -92,6 +98,22 @@ VSOutput_5 VSMain_2(VSInput_2 input)
     output.normal     = normalize(mul(input.normal, (float3x3) g_normalMatrix));
     output.tangent    = float3(0, 0, 0);
     output.texcoord0  = float2(0, 0);
+    
+    output.flags = HasNormal;
+    
+    return output;
+}
+
+VSOutput_5 VSMain_2_TEXCOORD0(VSInput_2_TEXCOORD0 input)
+{
+    VSOutput_5 output = (VSOutput_5) 0;
+ 
+    CheckComputePositionOutput(input.position, output.worldPosition, output.position);
+    output.texcoord0= input.texcoord0;
+    
+    output.normal = float3(0, 0, 0);
+    output.tangent = float3(0, 0, 0);
+
     
     output.flags = HasNormal;
     

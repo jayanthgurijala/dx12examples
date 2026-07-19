@@ -35,7 +35,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
-	m_assetReader(std::make_unique<FileReader>("")),
+	m_assetReader(std::make_unique<FileReader>("C:\\JDrive\\KhronosGltfModels\\glTF-Sample-Assets\\Models\\")),
 	m_modelAssets({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),
@@ -1365,7 +1365,7 @@ HRESULT Dx12SampleBase::CreatePerPrimGfxPipelineState()
 		const UINT numAttributes = CreateInputElementDesc(curPrimitive.vertexBufferInfo, modelIaSemantics);
 		assert(numAttributes == modelIaSemantics.size());
 
-		std::string vertexShaderName = GetVertexShaderName(numAttributes);
+		std::string vertexShaderName = GetVertexShaderName(modelIaSemantics);
 		std::string hullShaderName   = GetHullShaderName();
 		std::string domainShaderName = GetDomainShaderName();
 		std::string pixelShaderName  = GetPixelShaderName();

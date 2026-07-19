@@ -307,10 +307,19 @@ protected:
         return FALSE;
     }
 
-    virtual inline std::string GetVertexShaderName(SIZE_T numVertexAttributes)
+    virtual inline std::string GetVertexShaderName(const std::vector<D3D12_INPUT_ELEMENT_DESC>& attributes)
     {
         char shaderName[64];
-        snprintf(shaderName, 64, "Simple%zu_VS.cso", numVertexAttributes);
+
+        //@hacky: but needed for now
+        if (attributes.size() == 2)
+        {
+            snprintf(shaderName, 64, "Simple%zu_VS_%s%u.cso", attributes.size(), attributes[1].SemanticName, attributes[1].SemanticIndex);
+        }
+        else
+        {
+            snprintf(shaderName, 64, "Simple%zu_VS.cso", attributes.size());
+        }
         return std::string(shaderName);
     }
 
