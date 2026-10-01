@@ -219,5 +219,14 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="..\Shaders\PBRCalculationHelpers.hlsli" />
+    <None Include="..\Shaders\RayGen_Simple.hlsl">
+      <Filter>Shaders\RayTracing\hlsli</Filter>
+    </None>
+    <None Include="..\Shaders\RayGen_Bad.hlsl">
+      <Filter>Shaders\RayTracing</Filter>
+    </None>
+    <None Include="..\Shaders\RayGen_invert.hlsl">
+      <Filter>Shaders\RayTracing\hlsli</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -8,6 +8,8 @@
 
 
 static const wchar_t* const c_pSimpleRGShader = L"MyRaygenShader";
+static const wchar_t* const c_pSimpleBadRGShader = L"MyRaygenShader_Bad";
+static const wchar_t* const c_pSimpleInvertRGShader = L"MyRaygenShader_invert";
 
 static const wchar_t* const c_pCHSTexColShader = L"CHSBaseColorTexturing";
 static const wchar_t* const c_pCHSShadowShader = L"CHSShadow";
@@ -22,12 +24,6 @@ static const wchar_t* const c_pHitGroupAlphaCutOff = L"hitgroup_alphacutoff";
 
 static const wchar_t* const c_pHitGroupOpaqueShadow = L"hitgroup_opaque_shadow";
 static const wchar_t* const c_pHitGroupAlphaCutOffShadow = L"hitgroup_alphacutoff_shadow";
-
-struct RayPayload
-{
-	float color[4];
-	UINT currentRecursionDepth;
-};
 
 VOID Dx12RaytracingBase::OnInit()
 {
@@ -175,31 +171,77 @@ VOID Dx12RaytracingBase::CreatePerPrimSrvs()
 		});
 }
 
+VOID Dx12RaytracingBase::CompileShaderBlobs()
+{
+	m_blobChsAhsMiss      = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
+	m_blobRayGenSimple    = GetCompiledShaderBlob("RayGen_Simple.cso");
+	m_blobRayGenBadSimple = GetCompiledShaderBlob("RayGen_Bad.cso");
+	m_blobRayGenInvertSimple      = GetCompiledShaderBlob("RayGen_invert.cso");
+}
+
+VOID Dx12RaytracingBase::CreateCollectionStateObject(ComPtr<ID3DBlob>& shaderBlob, ComPtr<ID3D12StateObject>& stateObject)
+{
+	CD3DX12_STATE_OBJECT_DESC raygenSimpleCollDesc{ D3D12_STATE_OBJECT_TYPE_COLLECTION };
+
+	auto rayGenCollLibSubObj = raygenSimpleCollDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+
+	auto libdxil_2 = GetShaderByteCodeFromBlob(shaderBlob);
+
+	rayGenCollLibSubObj->SetDXILLibrary(&libdxil_2);
+
+	AddShaderConfigSubObject(raygenSimpleCollDesc);
+	AddPipelineConfigSubObject(raygenSimpleCollDesc);
+	AddGlobalRootSignatureSubObject(raygenSimpleCollDesc);
+
+	m_dxrDevice->CreateStateObject(raygenSimpleCollDesc, IID_PPV_ARGS(&stateObject));
+}
+
 
 VOID Dx12RaytracingBase::CreateRayTracingStateObject()
 {
-	ComPtr<ID3DBlob> compiledShaders = GetCompiledShaderBlob("RaytraceSimpleCHS.cso");
+	CompileShaderBlobs();
+	
+	
+	
+
+	auto libdxil_1 = GetShaderByteCodeFromBlob(m_blobChsAhsMiss);
 
 	CD3DX12_STATE_OBJECT_DESC rayTracingPipelineDesc{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
-	auto libSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE(compiledShaders->GetBufferPointer(), compiledShaders->GetBufferSize());
-	libSubObject->SetDXILLibrary(&libdxil);
+	{
+		CreateCollectionStateObject(m_blobRayGenSimple, m_rayGenSimpleSo);
+		auto collectionSubObj = rayTracingPipelineDesc.CreateSubobject<CD3DX12_EXISTING_COLLECTION_SUBOBJECT>();
+		collectionSubObj->SetExistingCollection(m_rayGenSimpleSo.Get());
+	}
 
-	auto AddExport = [&libSubObject](const wchar_t* name)
+	{
+		CreateCollectionStateObject(m_blobRayGenBadSimple, m_rayGenBadSo);
+		auto collectionSubObj = rayTracingPipelineDesc.CreateSubobject<CD3DX12_EXISTING_COLLECTION_SUBOBJECT>();
+		collectionSubObj->SetExistingCollection(m_rayGenBadSo.Get());
+	}
+
+	{
+		CreateCollectionStateObject(m_blobRayGenInvertSimple, m_rayGenInvertSo);
+		auto collectionSubObj = rayTracingPipelineDesc.CreateSubobject<CD3DX12_EXISTING_COLLECTION_SUBOBJECT>();
+		collectionSubObj->SetExistingCollection(m_rayGenInvertSo.Get());
+	}
+
+	auto libSubObject_1 = rayTracingPipelineDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+
+	libSubObject_1->SetDXILLibrary(&libdxil_1);
+
+	auto AddExport = [](CD3DX12_DXIL_LIBRARY_SUBOBJECT* libSubObject, const wchar_t* name)
 		{
 			libSubObject->DefineExport(name, nullptr, D3D12_EXPORT_FLAG_NONE);
 		};
 
-	AddExport(c_pSimpleRGShader);
+	AddExport(libSubObject_1, c_pCHSTexColShader);
+	AddExport(libSubObject_1, c_pCHSShadowShader);
 
-	AddExport(c_pCHSTexColShader);
-	AddExport(c_pCHSShadowShader);
+	AddExport(libSubObject_1, c_pAHSAlphaCutOff);
 
-	AddExport(c_pAHSAlphaCutOff);
-
-	AddExport(c_pSimpleMissShader);
-	AddExport(c_pShadowMissShader);
+	AddExport(libSubObject_1, c_pSimpleMissShader);
+	AddExport(libSubObject_1, c_pShadowMissShader);
 
 	auto AddHitGroupSubObject = [&rayTracingPipelineDesc](const wchar_t* hitgroupExportName, const wchar_t* intersectionShaderName, const wchar_t* chsName, const wchar_t* ahsName)
 		{
@@ -217,17 +259,10 @@ VOID Dx12RaytracingBase::CreateRayTracingStateObject()
 	AddHitGroupSubObject(c_pHitGroupAlphaCutOff, nullptr, c_pCHSTexColShader, c_pAHSAlphaCutOff);
 	AddHitGroupSubObject(c_pHitGroupAlphaCutOffShadow, nullptr, c_pCHSShadowShader, c_pAHSAlphaCutOff);
 
-	auto shaderConfigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	const UINT payloadSize = sizeof(RayPayload); //ray payload
-	const UINT attributeSize = sizeof(FLOAT) * 2; //bary centrics
-	shaderConfigSubObject->Config(payloadSize, attributeSize);
 
-	auto globalRootSigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-	globalRootSigSubObject->SetRootSignature(m_rootSignature.Get());
-
-	auto pipelineConfigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-	const UINT maxRecursionDepth = MaxRecursionDepth();
-	pipelineConfigSubObject->Config(maxRecursionDepth);
+	AddShaderConfigSubObject(rayTracingPipelineDesc);
+	AddPipelineConfigSubObject(rayTracingPipelineDesc);
+	AddGlobalRootSignatureSubObject(rayTracingPipelineDesc);
 
 	auto localRootSigSubObject = rayTracingPipelineDesc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
 	localRootSigSubObject->SetRootSignature(m_localRootSignature.Get());
@@ -321,7 +356,7 @@ VOID Dx12RaytracingBase::BuildShaderTables()
 	auto* hitGroupShaderTable = shaderBindingTable.GetShaderTable(DxHitGroupTable);
 	auto* missShaderTable     = shaderBindingTable.GetShaderTable(DxMissTable);
 
-	rayGenShaderTable->AddShaderRecord(props->GetShaderIdentifier(c_pSimpleRGShader));
+	rayGenShaderTable->AddShaderRecord(props->GetShaderIdentifier(c_pSimpleInvertRGShader));
 
 	{
 		for (UINT primIdx = 0; primIdx < totalPrimsInScene; primIdx++)

@@ -35,7 +35,7 @@ Dx12SampleBase::Dx12SampleBase(UINT width, UINT height) :
 	m_rtvDescriptorSize(0),
 	m_dsvDescriptorSize(0),
 	m_samplerDescriptorSize(0),
-	m_assetReader(std::make_unique<FileReader>("C:\\JDrive\\KhronosGltfModels\\glTF-Sample-Assets\\Models\\")),
+	m_assetReader(std::make_unique<FileReader>("")),
 	m_modelAssets({}),
 	m_hwnd(nullptr),
 	m_appFrameInfo({}),

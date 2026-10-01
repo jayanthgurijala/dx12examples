@@ -116,19 +116,6 @@ inline void TraceRadianceRay(float3 origin, float3 direction, out RayPayload pay
     payload = payload_;
 }
 
-[shader("raygeneration")]
-void MyRaygenShader()
-{
-    float3 direction;
-    float3 origin;
-    RayPayload payload;
-    GenerateCameraRay(DispatchRaysIndex().xy, origin, direction);
-    TraceRadianceRay(origin, direction, payload, 0);
-
-     // Write the raytraced color to the output texture.
-    UAVOutput[DispatchRaysIndex().xy] = payload.color;
-}
-
 float2 InterpolateBarycentrics(float2 bary, float2 uv[3])
 {
     float b0 = (1 - bary.x - bary.y);

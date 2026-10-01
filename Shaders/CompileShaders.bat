@@ -23,6 +23,9 @@ dxc -T ds_6_0 -E DSMain_PN -Fo TessFactor3_DS.cso %SHADERNAME%
 
 
 dxc /T lib_6_6 /Fo RaytraceSimpleCHS.cso -Zi -Od -Qembed_debug -Fd RaytraceSimpleCHS.pdb RaytraceSimpleCHS.hlsl
+dxc /T lib_6_6 /Fo RayGen_Simple.cso -Zi -Od -Qembed_debug -Fd RayGen_Simple.pdb RayGen_Simple.hlsl
+dxc /T lib_6_6 /Fo RayGen_Bad.cso -Zi -Od -Qembed_debug -Fd RayGen_Bad.pdb RayGen_Bad.hlsl
+dxc /T lib_6_6 /Fo RayGen_invert.cso -Zi -Od -Qembed_debug -Fd RayGen_invert.pdb RayGen_invert.hlsl
 
 dxc /T ms_6_6 -E MSMain -Fo HelloMesh_MS.cso -Zi -Od -Qembed_debug -Fd HelloMesh_MS.pdb HelloMesh.hlsl
 dxc /T ps_6_6 -E PSMain -Fo HelloMesh_PS.cso -Zi -Od -Qembed_debug -Fd HelloMesh_PS.pdb HelloMesh.hlsl

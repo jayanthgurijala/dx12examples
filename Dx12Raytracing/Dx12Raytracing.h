@@ -30,7 +30,7 @@ protected:
 	virtual inline UINT NumDSVsNeededForApp()         override { return 0; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }
 	virtual inline UINT NumRootSrvDescriptorsForApp() override { return 1; }
-	virtual inline const std::vector<std::string> GltfFileName() override { return { "fox\\gltf\\fox.gltf" }; }
+	virtual inline const std::vector<std::string> GltfFileName() override { return { "Models\\deer.gltf" }; }
 
 private:
 
