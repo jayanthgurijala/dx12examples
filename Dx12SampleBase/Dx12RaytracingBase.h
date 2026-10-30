@@ -20,11 +20,11 @@ protected:
 	virtual inline UINT MaxRecursionDepth() { return 2; }
 	virtual inline std::string SerializedFilePrefix() { return "common"; }
 
-	virtual inline BOOL SerializeBlas() { return FALSE; }
-	virtual inline BOOL SerializeTlas() { return FALSE; }
+	inline BOOL SerializeBlas() { return GetBoolCmdLineOption(OP_BOOL_SERIALIZEBLAS); }
+	inline BOOL SerializeTlas() { return GetBoolCmdLineOption(OP_BOOL_SERIALIZETLAS); }
 
-	virtual inline BOOL DeSerializeBlas() { return FALSE; }
-	virtual inline BOOL DeSerializeTlas() { return FALSE; }
+	inline BOOL DeSerializeBlas() { return GetBoolCmdLineOption(OP_BOOL_DESERIALIZEBLAS); }
+	inline BOOL DeSerializeTlas() { return GetBoolCmdLineOption(OP_BOOL_DESERIALIZETLAS); }
 
 	VOID CreateGlobalRootSignature();
 	VOID CreateLocalRootSignature();
