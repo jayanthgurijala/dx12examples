@@ -164,6 +164,8 @@ VOID Dx12SampleBase::ParseCommandLineArguments(LPCWSTR cmdLineOptions)
 		return;
 	}
 
+	std::string curOption;
+
 	for (int argIdx = 1; argIdx < numArgs; argIdx++)
 	{
 		const int numBytes = WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, nullptr, 0, nullptr, nullptr);
@@ -173,7 +175,17 @@ VOID Dx12SampleBase::ParseCommandLineArguments(LPCWSTR cmdLineOptions)
 			///@note numBytes includes the null terminator
 			std::string argument(numBytes - 1, '\0');
 			WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, &argument[0], numBytes - 1, nullptr, nullptr);
-			m_cmdLineArguments.push_back(std::move(argument));
+
+			if ((argument.size() > 1) && (argument[0] == '-'))
+			{
+				curOption = argument.substr(1);
+				m_cmdLineArguments[curOption] = "";
+			}
+			else if (curOption.empty() == false)
+			{
+				m_cmdLineArguments[curOption] = argument;
+				curOption.clear();
+			}
 		}
 	}
 

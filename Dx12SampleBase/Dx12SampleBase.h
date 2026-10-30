@@ -8,6 +8,7 @@
 #include "stdafx.h"
 #include <vector>
 #include <array>
+#include <unordered_map>
 #include "FileReader.h"
 #include <DirectXMath.h>
 #include <d3dx12.h>
@@ -56,9 +57,9 @@ public:
 
     int RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions);
 
-    ///@note Tokens are stored in command line order e.g. "-model a.gltf -wireframe" gives {"-model", "a.gltf", "-wireframe"}
+    ///@note Maps option name to its argument e.g. "-model a.gltf -wireframe" gives {"model": "a.gltf", "wireframe": ""}
     VOID ParseCommandLineArguments(LPCWSTR cmdLineOptions);
-    inline const std::vector<std::string>& GetCommandLineArguments() const { return m_cmdLineArguments; }
+    inline const std::unordered_map<std::string, std::string>& GetCommandLineArguments() const { return m_cmdLineArguments; }
 
     VOID RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx);
 
@@ -598,7 +599,7 @@ private:
 
     DxSceneInfo m_sceneInfo;
 
-    std::vector<std::string> m_cmdLineArguments;
+    std::unordered_map<std::string, std::string> m_cmdLineArguments;
 
 };
 
