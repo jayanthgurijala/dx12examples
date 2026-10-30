@@ -16,6 +16,7 @@
 #include "CameraLightsMaterialsBuffer.h"
 #include "DxDescriptorHeapManager.h"
 #include "dxhelper.h"
+#include "DxCmdLineOptions.h"
 
 
 using namespace DirectX;
@@ -44,22 +45,22 @@ struct OptionBoolDefinition
 
 static const OptionStringDefinition s_strOptions[] =
 {
-    { "-modelFilePath", "models\\deer.gltf" },
-    { "-ioFilePath", ""}
+    { OP_STRING_MODELFILEPATH, "models\\deer.gltf" },
+    { OP_STRING_IOFILEPATH, ""}
 };
 
 static const OptionBoolDefinition s_boolOptions[] =
 {
-    { "-serializeBlas", FALSE },
-    { "-serializeTlas", FALSE},
-    { "-deserializeBlas", FALSE},
-    { "-deserializeTlas", FALSE}
+    { OP_BOOL_SERIALIZEBLAS, FALSE },
+    { OP_BOOL_SERIALIZETLAS, FALSE},
+    { OP_BOOL_DESERIALIZEBLAS, FALSE},
+    { OP_BOOL_DESERIALIZETLAS, FALSE}
 };
 
 static const OptionUintDefinition s_uintOptions[] =
 {
-    {"-width", 1920},
-    {"-height", 1080}
+    { OP_UINT_WIDTH, 1920},
+    { OP_UINT_HEIGHT, 1080}
 };
 
 

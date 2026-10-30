@@ -164,6 +164,7 @@
     <ClInclude Include="Dx12RaytracingBase.h" />
     <ClInclude Include="Dx12SampleBase.h" />
     <ClInclude Include="DxCamera.h" />
+    <ClInclude Include="DxCmdLineOptions.h" />
     <ClInclude Include="DxGfxDrawRenderObject.h" />
     <ClInclude Include="DxGltfLoader.h" />
     <ClInclude Include="dxhelper.h" />
