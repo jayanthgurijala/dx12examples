@@ -4,13 +4,14 @@
 */
 #pragma once
 
-#define OP_STRING_MODELFILEPATH  "-modelFilePath"
-#define OP_STRING_IOFILEPATH     "-ioFilePath"
+#define OP_STRING_MODELFILEPATH         "-modelFilePath"
+#define OP_STRING_IOFILEPATH            "-ioFilePath"
+#define OP_STRING_SERIALIZEDFILEPREFIX  "-serializedFilePrefix"
 
-#define OP_BOOL_SERIALIZEBLAS    "-serializeBlas"
-#define OP_BOOL_SERIALIZETLAS    "-serializeTlas"
-#define OP_BOOL_DESERIALIZEBLAS  "-deserializeBlas"
-#define OP_BOOL_DESERIALIZETLAS  "-deserializeTlas"
+#define OP_BOOL_SERIALIZEBLAS           "-serializeBlas"
+#define OP_BOOL_SERIALIZETLAS           "-serializeTlas"
+#define OP_BOOL_DESERIALIZEBLAS         "-deserializeBlas"
+#define OP_BOOL_DESERIALIZETLAS         "-deserializeTlas"
 
-#define OP_UINT_WIDTH            "-width"
-#define OP_UINT_HEIGHT           "-height"
+#define OP_UINT_WIDTH                   "-width"
+#define OP_UINT_HEIGHT                  "-height"

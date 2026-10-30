@@ -69,14 +69,21 @@ protected:
 	DxSceneBlasDesc m_sceneBlas;
 	DxSceneTlasDesc m_sceneTlas;
 private:
+	///@note The command line option takes priority over the prefix set by the sample
+	inline std::string GetSerializedFilePrefix()
+	{
+		const std::string& cmdLinePrefix = GetStringCmdLineOption(OP_STRING_SERIALIZEDFILEPREFIX);
+		return (cmdLinePrefix.empty() == false) ? cmdLinePrefix : SerializedFilePrefix();
+	}
+
 	inline std::string GetBlasSerializedFileName(UINT index)
 	{
-		return SerializedFilePrefix() + "_blas_" + std::to_string(index) + ".bin";
+		return GetSerializedFilePrefix() + "_blas_" + std::to_string(index) + ".bin";
 	}
 
 	inline std::string GetTlasSerializedFileName(UINT index)
 	{
-		return SerializedFilePrefix() + "_tlas_" + std::to_string(index) + ".bin";
+		return GetSerializedFilePrefix() + "_tlas_" + std::to_string(index) + ".bin";
 	}
 
 	inline CD3DX12_SHADER_BYTECODE GetShaderByteCodeFromBlob(ComPtr<ID3DBlob>& shaderBlob)
