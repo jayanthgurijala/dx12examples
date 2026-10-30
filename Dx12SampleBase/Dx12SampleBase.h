@@ -23,6 +23,46 @@ using namespace Microsoft::WRL;
 
 class DxGltfLoader;
 
+
+struct OptionStringDefinition
+{
+    const char* name;
+    std::string defaultValue;
+};
+
+struct OptionUintDefinition
+{
+    const char* name;
+    UINT defaultValue;
+};
+
+struct OptionBoolDefinition
+{
+    const char* name;
+    BOOL defaultValue;
+};
+
+static const OptionStringDefinition s_strOptions[] =
+{
+    { "-modelFilePath", "models\\deer.gltf" },
+    { "-ioFilePath", ""}
+};
+
+static const OptionBoolDefinition s_boolOptions[] =
+{
+    { "-serializeBlas", FALSE },
+    { "-serializeTlas", FALSE},
+    { "-deserializeBlas", FALSE},
+    { "-deserializeTlas", FALSE}
+};
+
+static const OptionUintDefinition s_uintOptions[] =
+{
+    {"-width", 1920},
+    {"-height", 1080}
+};
+
+
 class Dx12SampleBase
 {
 public:
@@ -57,9 +97,12 @@ public:
 
     int RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions);
 
-    ///@note Maps option name to its argument e.g. "-model a.gltf -wireframe" gives {"model": "a.gltf", "wireframe": ""}
+    ///@note Fills the option maps with the defaults from s_strOptions, s_uintOptions and s_boolOptions,
+    ///      then overrides them with user provided values. Option names include the leading '-'
     VOID ParseCommandLineArguments(LPCWSTR cmdLineOptions);
-    inline const std::unordered_map<std::string, std::string>& GetCommandLineArguments() const { return m_cmdLineArguments; }
+    inline const std::string& GetStringCmdLineOption(const std::string& name) const { return m_stringCmdLineOptions.at(name); }
+    inline UINT GetUintCmdLineOption(const std::string& name) const { return m_uintCmdLineOptions.at(name); }
+    inline BOOL GetBoolCmdLineOption(const std::string& name) const { return m_boolCmdLineOptions.at(name); }
 
     VOID RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx);
 
@@ -599,7 +642,9 @@ private:
 
     DxSceneInfo m_sceneInfo;
 
-    std::unordered_map<std::string, std::string> m_cmdLineArguments;
+    std::unordered_map<std::string, std::string> m_stringCmdLineOptions;
+    std::unordered_map<std::string, UINT> m_uintCmdLineOptions;
+    std::unordered_map<std::string, BOOL> m_boolCmdLineOptions;
 
 };
 

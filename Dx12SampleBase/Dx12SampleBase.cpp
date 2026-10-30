@@ -8,6 +8,8 @@
 #include "DxPrintUtils.h"
 #include <memory>
 #include <chrono>
+#include <cerrno>
+#include <cstdlib>
 #include "WICImageLoader.h"
 #include "gltfutils.h"
 #include "dxhelper.h"
@@ -149,7 +151,20 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 
 VOID Dx12SampleBase::ParseCommandLineArguments(LPCWSTR cmdLineOptions)
 {
-	m_cmdLineArguments.clear();
+	for (const auto& option : s_strOptions)
+	{
+		m_stringCmdLineOptions[option.name] = option.defaultValue;
+	}
+
+	for (const auto& option : s_uintOptions)
+	{
+		m_uintCmdLineOptions[option.name] = option.defaultValue;
+	}
+
+	for (const auto& option : s_boolOptions)
+	{
+		m_boolCmdLineOptions[option.name] = option.defaultValue;
+	}
 
 	///@note CommandLineToArgvW expects the program name as the first token and returns the
 	///      exe path for an empty string, so a placeholder is prepended and skipped below
@@ -164,32 +179,55 @@ VOID Dx12SampleBase::ParseCommandLineArguments(LPCWSTR cmdLineOptions)
 		return;
 	}
 
-	std::string curOption;
+	std::vector<std::string> tokens;
 
 	for (int argIdx = 1; argIdx < numArgs; argIdx++)
 	{
-		const int numBytes = WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, nullptr, 0, nullptr, nullptr);
+		const int numWideChars = static_cast<int>(wcslen(args[argIdx]));
+		const int numBytes = WideCharToMultiByte(CP_UTF8, 0, args[argIdx], numWideChars, nullptr, 0, nullptr, nullptr);
+
+		std::string token(numBytes, '\0');
 
 		if (numBytes > 0)
 		{
-			///@note numBytes includes the null terminator
-			std::string argument(numBytes - 1, '\0');
-			WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, &argument[0], numBytes - 1, nullptr, nullptr);
-
-			if ((argument.size() > 1) && (argument[0] == '-'))
-			{
-				curOption = argument.substr(1);
-				m_cmdLineArguments[curOption] = "";
-			}
-			else if (curOption.empty() == false)
-			{
-				m_cmdLineArguments[curOption] = argument;
-				curOption.clear();
-			}
+			WideCharToMultiByte(CP_UTF8, 0, args[argIdx], numWideChars, &token[0], numBytes, nullptr, nullptr);
 		}
+
+		tokens.push_back(std::move(token));
 	}
 
 	LocalFree(args);
+
+	for (size_t tokenIdx = 0; tokenIdx < tokens.size(); tokenIdx++)
+	{
+		const std::string& option = tokens[tokenIdx];
+		const BOOL hasNextToken = ((tokenIdx + 1) < tokens.size()) ? TRUE : FALSE;
+
+		if (m_boolCmdLineOptions.count(option) > 0)
+		{
+			///@note bool options take no argument, being present enables them
+			m_boolCmdLineOptions[option] = TRUE;
+		}
+		else if ((m_stringCmdLineOptions.count(option) > 0) && (hasNextToken == TRUE))
+		{
+			m_stringCmdLineOptions[option] = tokens[++tokenIdx];
+		}
+		else if ((m_uintCmdLineOptions.count(option) > 0) && (hasNextToken == TRUE))
+		{
+			const std::string& argument = tokens[tokenIdx + 1];
+			char* parseEnd = nullptr;
+
+			errno = 0;
+			const unsigned long value = strtoul(argument.c_str(), &parseEnd, 10);
+
+			///@note an invalid argument keeps the default value and is not consumed
+			if ((argument[0] >= '0') && (argument[0] <= '9') && (*parseEnd == '\0') && (errno != ERANGE))
+			{
+				m_uintCmdLineOptions[option] = static_cast<UINT>(value);
+				tokenIdx++;
+			}
+		}
+	}
 }
 
 int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions)
