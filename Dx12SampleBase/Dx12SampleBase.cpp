@@ -147,9 +147,43 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
+VOID Dx12SampleBase::ParseCommandLineArguments(LPCWSTR cmdLineOptions)
+{
+	m_cmdLineArguments.clear();
+
+	///@note CommandLineToArgvW expects the program name as the first token and returns the
+	///      exe path for an empty string, so a placeholder is prepended and skipped below
+	std::wstring cmdLine = L"app ";
+	cmdLine += (cmdLineOptions != nullptr) ? cmdLineOptions : L"";
+
+	int numArgs = 0;
+	LPWSTR* args = CommandLineToArgvW(cmdLine.c_str(), &numArgs);
+
+	if (args == nullptr)
+	{
+		return;
+	}
+
+	for (int argIdx = 1; argIdx < numArgs; argIdx++)
+	{
+		const int numBytes = WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, nullptr, 0, nullptr, nullptr);
+
+		if (numBytes > 0)
+		{
+			///@note numBytes includes the null terminator
+			std::string argument(numBytes - 1, '\0');
+			WideCharToMultiByte(CP_UTF8, 0, args[argIdx], -1, &argument[0], numBytes - 1, nullptr, nullptr);
+			m_cmdLineArguments.push_back(std::move(argument));
+		}
+	}
+
+	LocalFree(args);
+}
+
 int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions)
 {
-	
+	ParseCommandLineArguments(cmdLineOptions);
+
 	SetupWindow(hInstance, nCmdShow);
 	Initialize();
 	OnInit();
@@ -185,8 +219,6 @@ int Dx12SampleBase::RenderLoop()
 		NextFrame(duration.count());
 		previousTime = currentTime;
 	}
-
-	PostRun();
 
 	// Return this part of the WM_QUIT message to Windows.
 	return static_cast<char>(msg.wParam);

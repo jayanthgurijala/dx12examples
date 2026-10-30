@@ -56,6 +56,10 @@ public:
 
     int RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions);
 
+    ///@note Tokens are stored in command line order e.g. "-model a.gltf -wireframe" gives {"-model", "a.gltf", "-wireframe"}
+    VOID ParseCommandLineArguments(LPCWSTR cmdLineOptions);
+    inline const std::vector<std::string>& GetCommandLineArguments() const { return m_cmdLineArguments; }
+
     VOID RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx);
 
 
@@ -593,6 +597,8 @@ private:
     std::vector<DxSceneElementInstance> m_sceneDescription;
 
     DxSceneInfo m_sceneInfo;
+
+    std::vector<std::string> m_cmdLineArguments;
 
 };
 
