@@ -147,8 +147,9 @@ LRESULT CALLBACK Dx12SampleBase::WindowProc(HWND hWnd, UINT message, WPARAM wPar
 	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow)
+int Dx12SampleBase::RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions)
 {
+	
 	SetupWindow(hInstance, nCmdShow);
 	Initialize();
 	OnInit();

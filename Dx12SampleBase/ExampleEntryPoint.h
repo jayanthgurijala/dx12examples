@@ -16,7 +16,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,                        \
 _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF); \
                                                                         \
     AppClass* pSample = new AppClass(1280, 720);                        \
-    int retval = pSample->RunApp(hInstance, nCmdShow);                  \
+    int retval = pSample->RunApp(hInstance, nCmdShow, lpCmdLine);       \
     delete pSample;                                                     \
     return retval;                                                      \
 }

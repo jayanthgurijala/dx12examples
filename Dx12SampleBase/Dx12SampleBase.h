@@ -54,7 +54,7 @@ public:
     VOID SetupWindow(HINSTANCE hInstance, int nCmdShow);
     int RenderLoop();
 
-    int RunApp(HINSTANCE hInstance, int nCmdShow);
+    int RunApp(HINSTANCE hInstance, int nCmdShow, LPWSTR cmdLineOptions);
 
     VOID RenderModel(ID3D12GraphicsCommandList* pCmdList, UINT assetIdx, UINT primIdx);
 
