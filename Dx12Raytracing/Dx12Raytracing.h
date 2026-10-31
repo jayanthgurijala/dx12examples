@@ -24,8 +24,6 @@ protected:
 	{
         return NumSrvsForRaytracing(); //uv buffer srv and index buffer srv
 	} 
-
-	virtual inline std::string SerializedFilePrefix() override { return "raytracing"; }
 	
 	virtual inline UINT NumDSVsNeededForApp()         override { return 0; }
 	virtual inline UINT NumUAVsNeededForApp()         override { return 1; }

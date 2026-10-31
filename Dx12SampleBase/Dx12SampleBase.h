@@ -47,7 +47,7 @@ static const OptionStringDefinition s_strOptions[] =
 {
     { OP_STRING_MODELFILEPATH, "models\\deer.gltf" },
     { OP_STRING_IOFILEPATH, ""},
-    { OP_STRING_SERIALIZEDFILEPREFIX, ""}
+    { OP_STRING_SERIALIZEDFILEPREFIX, "raytracing"}
 };
 
 static const OptionBoolDefinition s_boolOptions[] =

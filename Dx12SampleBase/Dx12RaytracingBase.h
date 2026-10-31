@@ -18,7 +18,6 @@ public:
 protected:
 
 	virtual inline UINT MaxRecursionDepth() { return 2; }
-	virtual inline std::string SerializedFilePrefix() { return "common"; }
 
 	inline BOOL SerializeBlas() { return GetBoolCmdLineOption(OP_BOOL_SERIALIZEBLAS); }
 	inline BOOL SerializeTlas() { return GetBoolCmdLineOption(OP_BOOL_SERIALIZETLAS); }
@@ -73,7 +72,7 @@ private:
 	inline std::string GetSerializedFilePrefix()
 	{
 		const std::string& cmdLinePrefix = GetStringCmdLineOption(OP_STRING_SERIALIZEDFILEPREFIX);
-		return (cmdLinePrefix.empty() == false) ? cmdLinePrefix : SerializedFilePrefix();
+		return cmdLinePrefix;
 	}
 
 	inline std::string GetBlasSerializedFileName(UINT index)
